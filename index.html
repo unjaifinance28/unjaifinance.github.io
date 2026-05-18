@@ -640,15 +640,25 @@ function doStatusSearch() {
     return;
   }
   document.getElementById('statusResult').innerHTML = matches.map(l => {
-    const st = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
-    return `<div style="background:white;border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:8px;text-align:left;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong style="color:#1b5e20;">${l.id}</strong>
-        <span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.75rem;font-weight:700;">${st.label}</span>
+    const st                 = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
+    const totalInterest      = Math.max(0, (l.totalDue || 0) - (l.amount || 0));
+    const remainingInterest  = Math.max(0, totalInterest - (l.interestPaid || 0));
+    const remainingPrincipal = l.remainingPrincipal ?? l.amount;
+    const totalRemaining     = remainingPrincipal + remainingInterest;
+    return `<div style="background:white;border:1.5px solid #e0e0e0;border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;">
+      <div style="margin-bottom:8px;">
+        <div style="font-weight:800;color:#1b5e20;font-size:.9rem;">${l.id}</div>
+        <div style="font-size:.75rem;color:#9e9e9e;margin-top:1px;">${l.name} · ${l.productName}</div>
       </div>
-      <div style="font-size:.83rem;color:#616161;">
-        <div>${l.name} · ${l.productName}</div>
-        <div>ກູ້: ${formatMoney(l.amount)} | ຕ້ອງຊຳລະ: ${formatMoney(l.totalDue)}</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:.83rem;align-items:center;">
+        <span style="color:#616161;">ເງິນຕົ້ນ</span>
+        <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(remainingPrincipal)}</span>
+        <span style="color:#616161;">ດອກເບ້ຍ</span>
+        <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(remainingInterest)}</span>
+        <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ລວມທັງໝົດ</span>
+        <span style="font-weight:900;color:#1b5e20;border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${formatMoney(totalRemaining)}</span>
+        <span style="color:#616161;">ສະຖານະ</span>
+        <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
       </div>
     </div>`;
   }).join('');

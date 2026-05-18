@@ -19,6 +19,8 @@ const mapLoan = r => ({
   occupation: r.occupation, income: r.income, address: r.address, note: r.note || '',
   amount: r.amount, duration: r.duration, totalDue: r.total_due,
   status: r.status, paidAmount: r.paid_amount || 0, createdAt: r.created_at,
+  remainingPrincipal: r.remaining_principal ?? null,
+  interestPaid: r.interest_paid || 0,
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
@@ -36,20 +38,39 @@ const mapDebtPayment = r => ({
   id: r.id, debtId: r.debt_id, amount: r.amount, method: r.method,
   date: r.date, note: r.note || '', createdAt: r.created_at,
 });
+const mapTopup = r => ({
+  id: r.id, loanId: r.loan_id, amount: r.amount, note: r.note || '', date: r.date,
+});
 
 // ===== DATA STORE =====
+// Supabase SQL migration — add payment-tracking columns to loans table:
+// alter table loans add column if not exists remaining_principal numeric default null;
+// alter table loans add column if not exists interest_paid numeric default 0;
+
+// Supabase SQL — run once to create the topups table:
+// create table topups (
+//   id text primary key,
+//   loan_id text,
+//   amount numeric,
+//   note text,
+//   date timestamptz default now()
+// );
+// alter table topups enable row level security;
+// create policy "allow all" on topups for all using (true) with check (true);
+
 const DB = {
-  products: [], loans: [], payments: [], expenses: [], debts: [], debtPayments: [],
+  products: [], loans: [], payments: [], expenses: [], debts: [], debtPayments: [], topups: [],
 
   async loadAll() {
     console.log('[DB] loadAll: fetching from Supabase...');
-    const [p, l, pay, exp, dbt, dpay] = await Promise.all([
+    const [p, l, pay, exp, dbt, dpay, top] = await Promise.all([
       sb.from('products').select('*'),
       sb.from('loans').select('*'),
       sb.from('payments').select('*'),
       sb.from('expenses').select('*'),
       sb.from('debts').select('*'),
       sb.from('debt_payments').select('*'),
+      sb.from('topups').select('*'),
     ]);
     const errors = [
       p.error   && `products: ${p.error.message}`,
@@ -58,6 +79,7 @@ const DB = {
       exp.error && `expenses: ${exp.error.message}`,
       dbt.error && `debts: ${dbt.error.message}`,
       dpay.error && `debt_payments: ${dpay.error.message}`,
+      top.error && `topups: ${top.error.message}`,
     ].filter(Boolean);
     if (errors.length) {
       console.error('[DB] loadAll errors:', errors);
@@ -69,6 +91,7 @@ const DB = {
     this.expenses     = (exp.data || []).map(mapExpense);
     this.debts        = (dbt.data || []).map(mapDebt);
     this.debtPayments = (dpay.data || []).map(mapDebtPayment);
+    this.topups       = (top.data || []).map(mapTopup);
     console.log(`[DB] loadAll: ${this.products.length} products, ${this.loans.length} loans, ${this.payments.length} payments`);
   },
 
@@ -118,7 +141,9 @@ const DB = {
       occupation: data.occupation, income: data.income,
       address: data.address, note: data.note || '',
       amount: data.amount, duration: data.duration, total_due: data.totalDue,
-      status: 'pending', paid_amount: 0, created_at: new Date().toISOString(),
+      status: 'pending', paid_amount: 0,
+      remaining_principal: data.amount, interest_paid: 0,
+      created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     const loan = mapLoan(r);
@@ -135,30 +160,79 @@ const DB = {
 
   async deleteLoan(id) {
     await sb.from('payments').delete().eq('loan_id', id);
+    await sb.from('topups').delete().eq('loan_id', id);
     const { error } = await sb.from('loans').delete().eq('id', id);
     if (error) throw error;
     this.loans    = this.loans.filter(l => l.id !== id);
     this.payments = this.payments.filter(p => p.loanId !== id);
+    this.topups   = this.topups.filter(t => t.loanId !== id);
   },
 
   getLoanPayments(loanId) {
     return this.payments.filter(p => p.loanId === loanId);
   },
 
+  getLoanTopups(loanId) {
+    return this.topups.filter(t => t.loanId === loanId);
+  },
+
+  async addTopup(loanId, amount, note) {
+    const loan = this.loans.find(l => l.id === loanId);
+    if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    const product = this.products.find(p => p.id === loan.productId);
+    if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
+    const id = 'TOP' + Date.now();
+    const { data: r, error } = await sb.from('topups').insert({
+      id, loan_id: loanId, amount, note: note || '', date: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    const newAmount             = loan.amount + amount;
+    const newTotalDue           = calcLoanTotal(product, newAmount, loan.duration);
+    const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
+    const { error: upErr } = await sb.from('loans').update({
+      amount: newAmount, total_due: newTotalDue,
+      remaining_principal: newRemainingPrincipal,
+    }).eq('id', loanId);
+    if (upErr) throw upErr;
+    this.topups.push(mapTopup(r));
+    loan.amount             = newAmount;
+    loan.totalDue           = newTotalDue;
+    loan.remainingPrincipal = newRemainingPrincipal;
+  },
+
   async addPayment(loanId, amount, method, note) {
-    const ref = 'PAY' + Date.now().toString().slice(-8);
+    const ref  = 'PAY' + Date.now().toString().slice(-8);
     const loan = this.loans.find(l => l.id === loanId);
     const newPaid = (loan ? loan.paidAmount : 0) + amount;
+
+    // Interest is collected first, then principal
+    const totalInterest        = Math.max(0, (loan ? loan.totalDue - loan.amount : 0));
+    const alreadyPaidInterest  = loan ? (loan.interestPaid || 0) : 0;
+    const interestRemaining    = Math.max(0, totalInterest - alreadyPaidInterest);
+    const interestThisPayment  = Math.min(amount, interestRemaining);
+    const principalThisPayment = Math.max(0, amount - interestThisPayment);
+    const newInterestPaid      = alreadyPaidInterest + interestThisPayment;
+    const currentPrincipal     = loan ? (loan.remainingPrincipal ?? loan.amount) : 0;
+    const newRemainingPrincipal = Math.max(0, currentPrincipal - principalThisPayment);
+
     const { data: r, error } = await sb.from('payments').insert({
       id: ref, loan_id: loanId, amount, method, note: note || '',
       date: new Date().toISOString(), ref,
     }).select().single();
     if (error) throw error;
-    const { error: upErr } = await sb.from('loans').update({ paid_amount: newPaid }).eq('id', loanId);
+    const { error: upErr } = await sb.from('loans').update({
+      paid_amount: newPaid,
+      interest_paid: newInterestPaid,
+      remaining_principal: newRemainingPrincipal,
+    }).eq('id', loanId);
     if (upErr) throw upErr;
     const payment = mapPayment(r);
     this.payments.push(payment);
-    if (loan) loan.paidAmount = newPaid;
+    if (loan) {
+      loan.paidAmount         = newPaid;
+      loan.interestPaid       = newInterestPaid;
+      loan.remainingPrincipal = newRemainingPrincipal;
+    }
     return payment;
   },
 

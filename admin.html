@@ -508,6 +508,7 @@
     </div>
     <div id="md-hist" style="margin-top:12px;"></div>
     <div id="md-pay-form"></div>
+    <div id="md-topup-form"></div>
     <div class="ma" id="md-acts"></div>
     <button class="btn btn-outline btn-full" style="margin-top:10px;" onclick="closeLoanModal()">ປິດ</button>
   </div>
@@ -799,14 +800,15 @@ function renderLoans() {
   const tbody = document.getElementById('loanTableBody');
   if (!loans.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="9">ບໍ່ພົບ</td></tr>'; return; }
   tbody.innerHTML = loans.map(l => {
-    const pct      = l.totalDue>0 ? Math.min(100,Math.round((l.paidAmount/l.totalDue)*100)) : 0;
-    const rem      = Math.max(0, l.totalDue - l.paidAmount);
-    const due      = calcDueDate(l);
-    const overdue  = isLoanOverdue(l);
+    const pct        = l.totalDue>0 ? Math.min(100,Math.round((l.paidAmount/l.totalDue)*100)) : 0;
+    const rem        = Math.max(0, l.totalDue - l.paidAmount);
+    const due        = calcDueDate(l);
+    const overdue    = isLoanOverdue(l);
+    const topupCount = DB.getLoanTopups(l.id).length;
     const dueTxt   = due ? `<div style="font-size:.75rem;${overdue?'color:#c62828;font-weight:700;':'color:#9e9e9e;'}">${overdue?'⚠️ ':''}${due.toLocaleDateString('lo-LA',{year:'numeric',month:'short',day:'numeric'})}</div>` : '<div style="font-size:.75rem;color:#bdbdbd;">-</div>';
     const rowStyle = overdue ? 'background:#fff8e1;' : '';
     return `<tr onclick="openLoanModal('${l.id}')" style="${rowStyle}">
-      <td><strong style="color:#1b5e20;font-size:.8rem;">${l.id}</strong>${overdue?'<div style="font-size:.65rem;color:#c62828;">ເກີນກຳໜົດ</div>':''}</td>
+      <td><strong style="color:#1b5e20;font-size:.8rem;">${l.id}</strong>${overdue?'<div style="font-size:.65rem;color:#c62828;">ເກີນກຳໜົດ</div>':''}${topupCount?`<div style="font-size:.65rem;color:#1565c0;">💰 +${topupCount} ຄັ້ງ</div>`:''}</td>
       <td>${l.name}<div style="font-size:.7rem;color:#9e9e9e;">${l.phone}</div></td>
       <td style="font-size:.78rem;">${l.productName}</td>
       <td>${formatMoney(l.amount)}</td>
@@ -891,6 +893,7 @@ function openLoanModal(id, focus) {
     {l:'ວັນສ້າງ',v:formatDate(loan.createdAt)},{l:'ວັນຄົບກຳໜົດ',v:dueTxt},
     {l:'ກູ້',v:formatMoney(loan.amount)},{l:'ຍອດລວມ',v:formatMoney(total)},
     {l:'ຊຳລະ',v:formatMoney(paid)},{l:'ຄ້າງ',v:formatMoney(rem)},
+    {l:'ຕົ້ນທຶນຄ້າງ',v:formatMoney(loan.remainingPrincipal ?? loan.amount)},{l:'ດອກທີ່ໄດ້ຮັບ',v:formatMoney(loan.interestPaid||0)},
     {l:'ທີ່ຢູ່',v:loan.address||'-',full:true},
     {l:'ໝາຍເຫດ',v:loan.note||'-',full:true},
   ].map(r=>`<div class="dr${r.full?' full':''}"><div class="dl">${r.l}</div><div class="dv">${r.v}</div></div>`).join('');
@@ -948,6 +951,38 @@ function openLoanModal(id, focus) {
     }
   } else pf.innerHTML = '';
 
+  // Top-up section for active loans
+  const tf = document.getElementById('md-topup-form');
+  if (loan.status === 'active') {
+    const topups = DB.getLoanTopups(id);
+    let thtml = '';
+    if (topups.length) {
+      thtml += `<div style="margin-top:12px;">
+        <div style="font-size:.78rem;font-weight:700;color:#1565c0;margin-bottom:6px;">💰 ປະຫວັດຢືມເພີ່ມ (${topups.length})</div>
+        <div class="history-list">${[...topups].reverse().map(t=>`
+          <div class="hist-item">
+            <div><div style="font-weight:600;">${formatDate(t.date)}</div>
+            <div class="hi-ref">${t.id}${t.note?' · '+t.note:''}</div></div>
+            <div class="hi-amt" style="color:#1565c0;">+${formatMoney(t.amount)}</div>
+          </div>`).join('')}</div>
+      </div>`;
+    }
+    if (focus === 'topup') {
+      thtml += `<div class="pay-form" style="margin-top:12px;border-color:#bbdefb;">
+        <h4 style="color:#1565c0;">💰 ຢືມເພີ່ມ</h4>
+        <input type="number" id="topup-amt" placeholder="ຈຳນວນຢືມເພີ່ມ (ກີບ)" min="0"
+          style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;margin-bottom:8px;box-sizing:border-box;" />
+        <input type="text" id="topup-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)"
+          style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:8px;box-sizing:border-box;" />
+        <button class="btn btn-full" style="padding:9px;background:#1565c0;color:white;border:none;" onclick="doTopup()">✅ ຢືນຢັນຢືມເພີ່ມ</button>
+      </div>`;
+    }
+    tf.innerHTML = thtml;
+    if (focus === 'topup') {
+      setTimeout(()=>document.getElementById('topup-amt')?.focus(), 300);
+    }
+  } else tf.innerHTML = '';
+
   // Action buttons
   const acts = document.getElementById('md-acts');
   acts.innerHTML = '';
@@ -957,6 +992,7 @@ function openLoanModal(id, focus) {
   }
   if (loan.status === 'active') {
     acts.innerHTML += `<button class="btn btn-primary" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
+    acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:none;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
     const product = DB.products.find(p => p.id === loan.productId);
     if (overdue && rem > 0 && product?.compound) {
       acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:none;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
@@ -986,6 +1022,21 @@ function doPayment() {
       updateAlertsBadge();
       renderRequests();
       if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
+}
+
+function doTopup() {
+  const amt  = parseFloat(document.getElementById('topup-amt').value);
+  const note = document.getElementById('topup-note').value.trim();
+  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+  (async () => {
+    try {
+      await DB.addTopup(currentLoanId, amt, note);
+      showToast('ຢືມເພີ່ມສຳເລັດ ✅');
+      openLoanModal(currentLoanId, 'topup');
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      updateAlertsBadge();
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   })();
 }
