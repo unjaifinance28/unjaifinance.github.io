@@ -339,6 +339,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 <script>
 let selectedProduct = null;
@@ -550,36 +551,47 @@ function validate() {
 }
 
 // ====== SUBMIT ======
-document.getElementById('applyForm').addEventListener('submit', e => {
+document.getElementById('applyForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!validate()) return;
-  const amt = parseFloat(document.getElementById('f-amount').value);
-  const customDays = selectedProduct.interestType === 'daily'
-    ? parseInt(document.getElementById('f-days').value) : undefined;
-  const dur   = customDays || selectedProduct.duration;
-  const total = calcLoanTotal(selectedProduct, amt, customDays);
-  const docTypeRadio = document.querySelector('input[name="docType"]:checked');
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = '⏳ ກຳລັງສົ່ງ...';
+  try {
+    const amt = parseFloat(document.getElementById('f-amount').value);
+    const customDays = selectedProduct.interestType === 'daily'
+      ? parseInt(document.getElementById('f-days').value) : undefined;
+    const dur   = customDays || selectedProduct.duration;
+    const total = calcLoanTotal(selectedProduct, amt, customDays);
+    const docTypeRadio = document.querySelector('input[name="docType"]:checked');
 
-  const loan = DB.addLoan({
-    productId:   selectedProduct.id,
-    productName: selectedProduct.name,
-    name:     document.getElementById('f-name').value.trim(),
-    phone:    document.getElementById('f-phone').value.trim(),
-    idCard:   document.getElementById('f-idcard').value.trim(),
-    docType:  docTypeRadio ? docTypeRadio.value : 'id',
-    docImage: docImageData || null,
-    occupation: document.getElementById('f-occ').value,
-    income:   parseFloat(document.getElementById('f-income').value),
-    address:  document.getElementById('f-address').value.trim(),
-    note:     document.getElementById('f-note').value.trim(),
-    amount:   amt,
-    duration: dur,
-    totalDue: total,
-  });
+    const loan = await DB.addLoan({
+      productId:   selectedProduct.id,
+      productName: selectedProduct.name,
+      name:     document.getElementById('f-name').value.trim(),
+      phone:    document.getElementById('f-phone').value.trim(),
+      idCard:   document.getElementById('f-idcard').value.trim(),
+      docType:  docTypeRadio ? docTypeRadio.value : 'id',
+      docImage: docImageData || null,
+      occupation: document.getElementById('f-occ').value,
+      income:   parseFloat(document.getElementById('f-income').value),
+      address:  document.getElementById('f-address').value.trim(),
+      note:     document.getElementById('f-note').value.trim(),
+      amount:   amt,
+      duration: dur,
+      totalDue: total,
+    });
 
-  document.getElementById('modal-lid').textContent = loan.id;
-  document.getElementById('successModal').classList.add('open');
-  resetAll();
+    document.getElementById('modal-lid').textContent = loan.id;
+    document.getElementById('successModal').classList.add('open');
+    resetAll();
+  } catch(err) {
+    showToast('ສົ່ງຄຳຂໍລົ້ມເຫລວ: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 });
 
 function resetAll() {
@@ -650,7 +662,17 @@ function doStatusSearch() {
   });
 });
 
-renderProducts();
+(async () => {
+  const grid = document.getElementById('prodGrid');
+  grid.innerHTML = '<p style="text-align:center;color:var(--gray-text);padding:30px;grid-column:1/-1;">ກຳລັງໂຫລດ...</p>';
+  try {
+    await DB.loadAll();
+    renderProducts();
+  } catch(err) {
+    console.error(err);
+    grid.innerHTML = '<p style="text-align:center;color:#c62828;padding:30px;grid-column:1/-1;">ໂຫລດຂໍ້ມູນລົ້ມເຫລວ</p>';
+  }
+})();
 </script>
 </body>
 </html>

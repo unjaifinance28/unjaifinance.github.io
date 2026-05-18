@@ -557,6 +557,14 @@
 
 <div id="toast" class="toast"></div>
 
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(27,94,32,0.88);z-index:9000;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:white;">
+  <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:ld-spin 1s linear infinite;"></div>
+  <div style="font-size:1rem;font-weight:600;">ກຳລັງໂຫລດ...</div>
+</div>
+<style>@keyframes ld-spin{to{transform:rotate(360deg);}}</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 <script>
 // ====== LOGO ======
@@ -681,10 +689,20 @@ function showTab(name, btn) {
 }
 
 // ====== INIT ======
-function initAdmin() {
-  updatePendingBadge();
-  updateAlertsBadge();
-  renderRequests();
+async function initAdmin() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.style.display = 'flex';
+  try {
+    await DB.loadAll();
+    updatePendingBadge();
+    updateAlertsBadge();
+    renderRequests();
+  } catch(err) {
+    showToast('ໂຫລດຂໍ້ມູນລົ້ມເຫລວ', 'error');
+    console.error(err);
+  } finally {
+    if (overlay) overlay.style.display = 'none';
+  }
 }
 function updatePendingBadge() {
   const n = DB.loans.filter(l=>l.status==='pending').length;
@@ -807,27 +825,29 @@ function renderLoans() {
 function doStatus(id, newStatus) {
   const labels = { active:'ອະນຸມັດ & ໂອນເງິນ', completed:'ປິດສຳເລັດ', rejected:'ປະຕິເສດ' };
   const icons  = { active:'✅', completed:'🎉', rejected:'❌' };
-  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', `ຢືນຢັນ: ${labels[newStatus]}`, () => {
-    const loan = DB.loans.find(l=>l.id===id);
-    if (loan) { loan.status = newStatus; DB.save(); }
-    closeConfirm();
-    updatePendingBadge();
-    updateAlertsBadge();
-    renderRequests();
-    if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
-    if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
-    if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
-    showToast('ປ່ຽນສະຖານະ ✅');
+  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', `ຢືນຢັນ: ${labels[newStatus]}`, async () => {
+    try {
+      await DB.updateLoanStatus(id, newStatus);
+      closeConfirm();
+      updatePendingBadge();
+      updateAlertsBadge();
+      renderRequests();
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
+      showToast('ປ່ຽນສະຖານະ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
 
 function deleteLoan(id) {
-  openConfirm('🗑️','ລຶບ?','ຂໍ້ມູນຈະຖືກລຶບຖາວອນ', () => {
-    DB.loans = DB.loans.filter(l=>l.id!==id);
-    DB.payments = DB.payments.filter(p=>p.loanId!==id);
-    DB.save(); closeConfirm(); closeLoanModal();
-    updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
-    showToast('ລຶບສຳເລັດ');
+  openConfirm('🗑️','ລຶບ?','ຂໍ້ມູນຈະຖືກລຶບຖາວອນ', async () => {
+    try {
+      await DB.deleteLoan(id);
+      closeConfirm(); closeLoanModal();
+      updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
+      showToast('ລຶບສຳເລັດ');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
 
@@ -943,14 +963,18 @@ function doPayment() {
   const method = document.getElementById('pay-method').value;
   const note   = document.getElementById('pay-note').value.trim();
   if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
-  DB.addPayment(currentLoanId, amt, method, note);
-  showToast('ບັນທຶກຊຳລະ ✅');
-  openLoanModal(currentLoanId); // re-render
-  if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
-  if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
-  updateAlertsBadge();
-  renderRequests();
-  if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
+  (async () => {
+    try {
+      await DB.addPayment(currentLoanId, amt, method, note);
+      showToast('ບັນທຶກຊຳລະ ✅');
+      openLoanModal(currentLoanId);
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      updateAlertsBadge();
+      renderRequests();
+      if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 
 // ====== TAB: PRODUCTS ======
@@ -983,7 +1007,7 @@ function updateProdPreview() {
   box.textContent = '📊 ' + ex;
 }
 
-function saveProd(e) {
+async function saveProd(e) {
   e.preventDefault();
   const id   = document.getElementById('pf-id').value;
   const name = document.getElementById('pf-name').value.trim();
@@ -998,15 +1022,17 @@ function saveProd(e) {
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
   const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc };
-  if (id) {
-    DB.updateProduct(id, data);
-    showToast('ແກ້ໄຂສຳເລັດ ✅');
-  } else {
-    DB.addProduct(data);
-    showToast('ເພີ່ມຜະລິດຕະພັນ ✅');
-  }
-  cancelProdEdit();
-  renderProducts();
+  try {
+    if (id) {
+      await DB.updateProduct(id, data);
+      showToast('ແກ້ໄຂສຳເລັດ ✅');
+    } else {
+      await DB.addProduct(data);
+      showToast('ເພີ່ມຜະລິດຕະພັນ ✅');
+    }
+    cancelProdEdit();
+    renderProducts();
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
 }
 
 function cancelProdEdit() {
@@ -1041,16 +1067,23 @@ function editProd(id) {
 function toggleProd(id) {
   const p = DB.products.find(x=>x.id===id);
   if (!p) return;
-  DB.updateProduct(id, { status: p.status==='active' ? 'inactive' : 'active' });
-  renderProducts();
-  showToast(p.status==='active' ? 'ປິດຜະລິດຕະພັນ' : 'ເປີດຜະລິດຕະພັນ');
+  const newStatus = p.status==='active' ? 'inactive' : 'active';
+  (async () => {
+    try {
+      await DB.updateProduct(id, { status: newStatus });
+      renderProducts();
+      showToast(p.status==='active' ? 'ປິດຜະລິດຕະພັນ' : 'ເປີດຜະລິດຕະພັນ');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 
 function deleteProd(id) {
   const inUse = DB.loans.some(l=>l.productId===id && ['pending','active'].includes(l.status));
   if (inUse) { showToast('ໃຊ້ຢູ່ – ລຶບບໍ່ໄດ້','error'); return; }
-  openConfirm('🗑️','ລຶບຜະລິດຕະພັນ?','ຢືນຢັນລຶບ', () => {
-    DB.deleteProduct(id); closeConfirm(); renderProducts(); showToast('ລຶບສຳເລັດ');
+  openConfirm('🗑️','ລຶບຜະລິດຕະພັນ?','ຢືນຢັນລຶບ', async () => {
+    try {
+      await DB.deleteProduct(id); closeConfirm(); renderProducts(); showToast('ລຶບສຳເລັດ');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
 
@@ -1084,26 +1117,6 @@ function renderProducts() {
 }
 
 // ====== TAB: PERFORMANCE ======
-function addExpense() {
-  const cat  = document.getElementById('expCat').value;
-  const amt  = parseFloat(document.getElementById('expAmt').value);
-  const note = document.getElementById('expNote').value.trim();
-  if (!cat) { showToast('ເລືອກໝວດ','error'); return; }
-  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
-  DB.addExpense({ category:cat, amount:amt, note });
-  document.getElementById('expCat').value = '';
-  document.getElementById('expAmt').value = '';
-  document.getElementById('expNote').value = '';
-  renderPerf();
-  showToast('ບັນທຶກລາຍຈ່າຍ ✅');
-}
-
-function deleteExpense(id) {
-  DB.expenses = DB.expenses.filter(e=>e.id!==id);
-  DB.save();
-  renderPerf();
-}
-
 // ====== DEBT HELPERS ======
 function debtRemaining(d) {
   const repaid = DB.debtPayments.filter(p => p.debtId === d.id).reduce((s, p) => s + p.amount, 0);
@@ -1132,25 +1145,33 @@ function addDebt() {
   if (!amount || amount<=0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
   if (!rate   || rate<0)    { showToast('ໃສ່ອັດຕາດອກ','error'); return; }
   if (!borrowDate)       { showToast('ເລືອກວັນທີກູ້','error'); return; }
-  DB.addDebt({ creditor, amount, rate, borrowDate, dueDate, note });
-  document.getElementById('dbt-creditor').value = '';
-  document.getElementById('dbt-amount').value   = '';
-  document.getElementById('dbt-rate').value     = '';
-  document.getElementById('dbt-borrow').value   = '';
-  document.getElementById('dbt-due').value      = '';
-  document.getElementById('dbt-note').value     = '';
-  renderPerf();
-  showToast('ບັນທຶກໜີ້ ✅');
+  (async () => {
+    try {
+      await DB.addDebt({ creditor, amount, rate, borrowDate, dueDate, note });
+      document.getElementById('dbt-creditor').value = '';
+      document.getElementById('dbt-amount').value   = '';
+      document.getElementById('dbt-rate').value     = '';
+      document.getElementById('dbt-borrow').value   = '';
+      document.getElementById('dbt-due').value      = '';
+      document.getElementById('dbt-note').value     = '';
+      renderPerf();
+      showToast('ບັນທຶກໜີ້ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 function settleDebt(id) {
-  openConfirm('✅','ຢືນຢັນຊຳລະໜີ້ຄົບ?','ໜີ້ນີ້ຈະຖືກໝາຍວ່າ settled', () => {
-    DB.updateDebt(id, { status:'settled', settledDate: new Date().toISOString() });
-    closeConfirm(); renderPerf(); showToast('ຊຳລະໜີ້ຄົບ ✅');
+  openConfirm('✅','ຢືນຢັນຊຳລະໜີ້ຄົບ?','ໜີ້ນີ້ຈະຖືກໝາຍວ່າ settled', async () => {
+    try {
+      await DB.updateDebt(id, { status:'settled', settledDate: new Date().toISOString() });
+      closeConfirm(); renderPerf(); showToast('ຊຳລະໜີ້ຄົບ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
 function deleteDebt(id) {
-  openConfirm('🗑️','ລຶບ?','ຂໍ້ມູນໜີ້ຈະຖືກລຶບຖາວອນ', () => {
-    DB.deleteDebt(id); closeConfirm(); renderPerf(); showToast('ລຶບສຳເລັດ');
+  openConfirm('🗑️','ລຶບ?','ຂໍ້ມູນໜີ້ຈະຖືກລຶບຖາວອນ', async () => {
+    try {
+      await DB.deleteDebt(id); closeConfirm(); renderPerf(); showToast('ລຶບສຳເລັດ');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
 
@@ -1161,17 +1182,24 @@ function addExpense() {
   const note = document.getElementById('expNote').value.trim();
   if (!cat) { showToast('ເລືອກໝວດ','error'); return; }
   if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
-  DB.addExpense({ category:cat, amount:amt, note });
-  document.getElementById('expCat').value  = '';
-  document.getElementById('expAmt').value  = '';
-  document.getElementById('expNote').value = '';
-  renderPerf();
-  showToast('ບັນທຶກລາຍຈ່າຍ ✅');
+  (async () => {
+    try {
+      await DB.addExpense({ category:cat, amount:amt, note });
+      document.getElementById('expCat').value  = '';
+      document.getElementById('expAmt').value  = '';
+      document.getElementById('expNote').value = '';
+      renderPerf();
+      showToast('ບັນທຶກລາຍຈ່າຍ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 function deleteExpense(id) {
-  DB.expenses = DB.expenses.filter(e=>e.id!==id);
-  DB.save();
-  renderPerf();
+  (async () => {
+    try {
+      await DB.deleteExpense(id);
+      renderPerf();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 
 function renderPerf() {
@@ -1621,17 +1649,21 @@ function doDebtPayment() {
   const date   = document.getElementById('dpm-date').value;
   const note   = document.getElementById('dpm-note').value.trim();
   if (!amount || amount <= 0) { showToast('ໃສ່ຈຳນວນເງິນ', 'error'); return; }
-  DB.addDebtPayment(currentDebtId, amount, method, date, note);
-  const debt = DB.debts.find(d => d.id === currentDebtId);
-  const rem  = debtRemaining(debt);
-  if (rem <= 0) {
-    showToast('ຊຳລະໜີ້ຄົບແລ້ວ ✅');
-    closeDebtPayModal();
-  } else {
-    showToast('ບັນທຶກການຊຳລະໜີ້ ✅');
-    openDebtPayModal(currentDebtId);
-  }
-  renderPerf();
+  (async () => {
+    try {
+      await DB.addDebtPayment(currentDebtId, amount, method, date, note);
+      const debt = DB.debts.find(d => d.id === currentDebtId);
+      const rem  = debtRemaining(debt);
+      if (rem <= 0) {
+        showToast('ຊຳລະໜີ້ຄົບແລ້ວ ✅');
+        closeDebtPayModal();
+      } else {
+        showToast('ບັນທຶກການຊຳລະໜີ້ ✅');
+        openDebtPayModal(currentDebtId);
+      }
+      renderPerf();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  })();
 }
 function renderDebtPayHistory(debtId) {
   const hist = [...DB.debtPayments].filter(p => p.debtId === debtId).sort((a, b) => new Date(b.date) - new Date(a.date));
