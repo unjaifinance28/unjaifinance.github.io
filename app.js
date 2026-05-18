@@ -1,6 +1,6 @@
 // ===== SUPABASE CLIENT =====
 if (!window.supabase) throw new Error('Supabase CDN failed to load. Check the <script> tag order.');
-const supabase = window.supabase.createClient(
+const sb = window.supabase.createClient(
   'https://cucptovzyvrxvhpgppom.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Y3B0b3Z6eXZyeHZocGdwcG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTQxMDcsImV4cCI6MjA5NDY3MDEwN30.IG-Ly_Bv3pmYW5N2jscAQ_MDxXSY-SMX5lOs07aam5Q'
 )
@@ -43,12 +43,12 @@ const DB = {
   async loadAll() {
     console.log('[DB] loadAll: fetching from Supabase...');
     const [p, l, pay, exp, dbt, dpay] = await Promise.all([
-      supabase.from('products').select('*'),
-      supabase.from('loans').select('*'),
-      supabase.from('payments').select('*'),
-      supabase.from('expenses').select('*'),
-      supabase.from('debts').select('*'),
-      supabase.from('debt_payments').select('*'),
+      sb.from('products').select('*'),
+      sb.from('loans').select('*'),
+      sb.from('payments').select('*'),
+      sb.from('expenses').select('*'),
+      sb.from('debts').select('*'),
+      sb.from('debt_payments').select('*'),
     ]);
     const errors = [
       p.error   && `products: ${p.error.message}`,
@@ -73,7 +73,7 @@ const DB = {
 
   async addProduct(data) {
     const id = 'PRD' + Date.now().toString().slice(-6);
-    const { data: r, error } = await supabase.from('products').insert({
+    const { data: r, error } = await sb.from('products').insert({
       id, name: data.name, interest_rate: data.interestRate, interest_type: data.interestType,
       duration: data.duration, min_amount: data.minAmount, max_amount: data.maxAmount,
       description: data.description || '', status: 'active', created_at: new Date().toISOString(),
@@ -94,21 +94,21 @@ const DB = {
     if (data.maxAmount    !== undefined) row.max_amount    = data.maxAmount;
     if (data.description  !== undefined) row.description   = data.description;
     if (data.status       !== undefined) row.status        = data.status;
-    const { error } = await supabase.from('products').update(row).eq('id', id);
+    const { error } = await sb.from('products').update(row).eq('id', id);
     if (error) throw error;
     const i = this.products.findIndex(p => p.id === id);
     if (i >= 0) this.products[i] = { ...this.products[i], ...data };
   },
 
   async deleteProduct(id) {
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { error } = await sb.from('products').delete().eq('id', id);
     if (error) throw error;
     this.products = this.products.filter(p => p.id !== id);
   },
 
   async addLoan(data) {
     const id = 'LAO' + Date.now().toString().slice(-6);
-    const { data: r, error } = await supabase.from('loans').insert({
+    const { data: r, error } = await sb.from('loans').insert({
       id, product_id: data.productId, product_name: data.productName,
       name: data.name, phone: data.phone, id_card: data.idCard,
       doc_type: data.docType, doc_image: data.docImage,
@@ -124,15 +124,15 @@ const DB = {
   },
 
   async updateLoanStatus(id, newStatus) {
-    const { error } = await supabase.from('loans').update({ status: newStatus }).eq('id', id);
+    const { error } = await sb.from('loans').update({ status: newStatus }).eq('id', id);
     if (error) throw error;
     const loan = this.loans.find(l => l.id === id);
     if (loan) loan.status = newStatus;
   },
 
   async deleteLoan(id) {
-    await supabase.from('payments').delete().eq('loan_id', id);
-    const { error } = await supabase.from('loans').delete().eq('id', id);
+    await sb.from('payments').delete().eq('loan_id', id);
+    const { error } = await sb.from('loans').delete().eq('id', id);
     if (error) throw error;
     this.loans    = this.loans.filter(l => l.id !== id);
     this.payments = this.payments.filter(p => p.loanId !== id);
@@ -146,12 +146,12 @@ const DB = {
     const ref = 'PAY' + Date.now().toString().slice(-8);
     const loan = this.loans.find(l => l.id === loanId);
     const newPaid = (loan ? loan.paidAmount : 0) + amount;
-    const { data: r, error } = await supabase.from('payments').insert({
+    const { data: r, error } = await sb.from('payments').insert({
       id: ref, loan_id: loanId, amount, method, note: note || '',
       date: new Date().toISOString(), ref,
     }).select().single();
     if (error) throw error;
-    const { error: upErr } = await supabase.from('loans').update({ paid_amount: newPaid }).eq('id', loanId);
+    const { error: upErr } = await sb.from('loans').update({ paid_amount: newPaid }).eq('id', loanId);
     if (upErr) throw upErr;
     const payment = mapPayment(r);
     this.payments.push(payment);
@@ -161,7 +161,7 @@ const DB = {
 
   async addExpense(data) {
     const id = 'EXP' + Date.now();
-    const { data: r, error } = await supabase.from('expenses').insert({
+    const { data: r, error } = await sb.from('expenses').insert({
       id, category: data.category, amount: data.amount,
       note: data.note || '', date: new Date().toISOString(),
     }).select().single();
@@ -172,14 +172,14 @@ const DB = {
   },
 
   async deleteExpense(id) {
-    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    const { error } = await sb.from('expenses').delete().eq('id', id);
     if (error) throw error;
     this.expenses = this.expenses.filter(e => e.id !== id);
   },
 
   async addDebt(data) {
     const id = 'DBT' + Date.now();
-    const { data: r, error } = await supabase.from('debts').insert({
+    const { data: r, error } = await sb.from('debts').insert({
       id, creditor: data.creditor, amount: data.amount, rate: data.rate,
       borrow_date: data.borrowDate || null, due_date: data.dueDate || null,
       note: data.note || '', status: 'active',
@@ -195,15 +195,15 @@ const DB = {
     const row = {};
     if (data.status      !== undefined) row.status       = data.status;
     if (data.settledDate !== undefined) row.settled_date = data.settledDate;
-    const { error } = await supabase.from('debts').update(row).eq('id', id);
+    const { error } = await sb.from('debts').update(row).eq('id', id);
     if (error) throw error;
     const i = this.debts.findIndex(d => d.id === id);
     if (i >= 0) this.debts[i] = { ...this.debts[i], ...data };
   },
 
   async deleteDebt(id) {
-    await supabase.from('debt_payments').delete().eq('debt_id', id);
-    const { error } = await supabase.from('debts').delete().eq('id', id);
+    await sb.from('debt_payments').delete().eq('debt_id', id);
+    const { error } = await sb.from('debts').delete().eq('id', id);
     if (error) throw error;
     this.debts        = this.debts.filter(d => d.id !== id);
     this.debtPayments = this.debtPayments.filter(p => p.debtId !== id);
@@ -213,7 +213,7 @@ const DB = {
     const debt = this.debts.find(d => d.id === debtId);
     if (!debt) return null;
     const id = 'DPAY' + Date.now();
-    const { data: r, error } = await supabase.from('debt_payments').insert({
+    const { data: r, error } = await sb.from('debt_payments').insert({
       id, debt_id: debtId, amount, method: method || 'cash',
       date: payDate ? new Date(payDate).toISOString() : new Date().toISOString(),
       note: note || '', created_at: new Date().toISOString(),
