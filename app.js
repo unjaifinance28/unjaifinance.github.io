@@ -1,4 +1,5 @@
 // ===== SUPABASE CLIENT =====
+if (!window.supabase) throw new Error('Supabase CDN failed to load. Check the <script> tag order.');
 const supabase = window.supabase.createClient(
   'https://cucptovzyvrxvhpgppom.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Y3B0b3Z6eXZyeHZocGdwcG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTQxMDcsImV4cCI6MjA5NDY3MDEwN30.IG-Ly_Bv3pmYW5N2jscAQ_MDxXSY-SMX5lOs07aam5Q'
@@ -40,6 +41,7 @@ const DB = {
   products: [], loans: [], payments: [], expenses: [], debts: [], debtPayments: [],
 
   async loadAll() {
+    console.log('[DB] loadAll: fetching from Supabase...');
     const [p, l, pay, exp, dbt, dpay] = await Promise.all([
       supabase.from('products').select('*'),
       supabase.from('loans').select('*'),
@@ -48,18 +50,25 @@ const DB = {
       supabase.from('debts').select('*'),
       supabase.from('debt_payments').select('*'),
     ]);
-    if (p.error)    console.error('products:', p.error);
-    if (l.error)    console.error('loans:', l.error);
-    if (pay.error)  console.error('payments:', pay.error);
-    if (exp.error)  console.error('expenses:', exp.error);
-    if (dbt.error)  console.error('debts:', dbt.error);
-    if (dpay.error) console.error('debt_payments:', dpay.error);
+    const errors = [
+      p.error   && `products: ${p.error.message}`,
+      l.error   && `loans: ${l.error.message}`,
+      pay.error && `payments: ${pay.error.message}`,
+      exp.error && `expenses: ${exp.error.message}`,
+      dbt.error && `debts: ${dbt.error.message}`,
+      dpay.error && `debt_payments: ${dpay.error.message}`,
+    ].filter(Boolean);
+    if (errors.length) {
+      console.error('[DB] loadAll errors:', errors);
+      throw new Error(errors.join(' | '));
+    }
     this.products     = (p.data   || []).map(mapProduct);
     this.loans        = (l.data   || []).map(mapLoan);
     this.payments     = (pay.data || []).map(mapPayment);
     this.expenses     = (exp.data || []).map(mapExpense);
     this.debts        = (dbt.data || []).map(mapDebt);
     this.debtPayments = (dpay.data || []).map(mapDebtPayment);
+    console.log(`[DB] loadAll: ${this.products.length} products, ${this.loans.length} loans, ${this.payments.length} payments`);
   },
 
   async addProduct(data) {
