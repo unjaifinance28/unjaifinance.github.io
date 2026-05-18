@@ -620,11 +620,12 @@ function openStatusCheck() {
   document.getElementById('statusModal').classList.add('open');
 }
 const STATUS_LABELS = {
-  pending:   { label:'ລໍຖ້າ',   color:'#e65100', bg:'#fff3e0' },
-  approved:  { label:'ອະນຸມັດ', color:'#1b5e20', bg:'#e8f5e9' },
-  active:    { label:'ດຳເນີນ',  color:'#1565c0', bg:'#e3f2fd' },
-  completed: { label:'ສຳເລັດ',  color:'#6a1b9a', bg:'#f3e5f5' },
-  rejected:  { label:'ປະຕິເສດ', color:'#c62828', bg:'#ffebee' },
+  pending:      { label:'ລໍຖ້າ',    color:'#e65100', bg:'#fff3e0' },
+  approved:     { label:'ອະນຸມັດ',  color:'#1b5e20', bg:'#e8f5e9' },
+  active:       { label:'ດຳເນີນ',   color:'#1565c0', bg:'#e3f2fd' },
+  completed:    { label:'ສຳເລັດ',   color:'#6a1b9a', bg:'#f3e5f5' },
+  rejected:     { label:'ປະຕິເສດ',  color:'#c62828', bg:'#ffebee' },
+  restructured: { label:'ທົບຕົ້ນ',  color:'#3949ab', bg:'#e8eaf6' },
 };
 function doStatusSearch() {
   const q = document.getElementById('statusQuery').value.trim().toLowerCase();
@@ -639,8 +640,7 @@ function doStatusSearch() {
     return;
   }
   document.getElementById('statusResult').innerHTML = matches.map(l => {
-    const st  = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
-    const pct = l.totalDue > 0 ? Math.min(100, Math.round((l.paidAmount/l.totalDue)*100)) : 0;
+    const st = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
     return `<div style="background:white;border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:8px;text-align:left;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <strong style="color:#1b5e20;">${l.id}</strong>
@@ -649,7 +649,6 @@ function doStatusSearch() {
       <div style="font-size:.83rem;color:#616161;">
         <div>${l.name} · ${l.productName}</div>
         <div>ກູ້: ${formatMoney(l.amount)} | ຕ້ອງຊຳລະ: ${formatMoney(l.totalDue)}</div>
-        <div>ຊຳລະ: ${formatMoney(l.paidAmount)} (${pct}%)</div>
       </div>
     </div>`;
   }).join('');

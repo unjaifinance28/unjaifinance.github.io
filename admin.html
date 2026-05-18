@@ -71,7 +71,8 @@
   .sb-approved  { background:#e8f5e9; color:#1b5e20; }
   .sb-active    { background:#e3f2fd; color:#1565c0; }
   .sb-completed { background:#f3e5f5; color:#6a1b9a; }
-  .sb-rejected  { background:#ffebee; color:#c62828; }
+  .sb-rejected      { background:#ffebee; color:#c62828; }
+  .sb-restructured  { background:#e8eaf6; color:#3949ab; }
 
   /* Section title */
   .sec-title { font-size:.9rem; font-weight:800; color:#1b5e20; margin:18px 0 10px; display:flex; align-items:center; gap:6px; }
@@ -325,6 +326,13 @@
             <div class="fi full">
               <label>ຄຳອະທິບາຍ</label>
               <textarea id="pf-desc" placeholder="ເງື່ອນໄຂ ຫຼື ໝາຍເຫດ"></textarea>
+            </div>
+            <div class="fi full" style="padding:8px 0;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-compound" style="width:17px;height:17px;accent-color:#2e7d32;flex-shrink:0;" />
+                <span style="font-weight:700;color:#1b5e20;">ດອກທົບຕົ້ນ (Compound)</span>
+              </label>
+              <small style="color:#9e9e9e;font-size:.75rem;margin-top:4px;display:block;padding-left:27px;">ຖ້າລູກຄ້າບໍ່ຊຳລະທັນກຳໜົດ ຍອດຄ້າງຈະກາຍເປັນສັນຍາກູ້ໃໝ່ອັດຕາດຽວກັນ</small>
             </div>
           </div>
           <!-- Mini preview -->
@@ -669,8 +677,9 @@ const ST = {
   pending:   { label:'ລໍຖ້າ',    cls:'sb-pending' },
   approved:  { label:'ອະນຸມັດ',  cls:'sb-approved' },
   active:    { label:'ດຳເນີນ',   cls:'sb-active' },
-  completed: { label:'ສຳເລັດ',   cls:'sb-completed' },
-  rejected:  { label:'ປະຕິເສດ',  cls:'sb-rejected' },
+  completed:    { label:'ສຳເລັດ',   cls:'sb-completed' },
+  rejected:     { label:'ປະຕິເສດ',  cls:'sb-rejected' },
+  restructured: { label:'ທົບຕົ້ນ',  cls:'sb-restructured' },
 };
 const stBadge = s => { const t=ST[s]||ST.pending; return `<span class="sbadge ${t.cls}">${t.label}</span>`; };
 
@@ -948,6 +957,10 @@ function openLoanModal(id, focus) {
   }
   if (loan.status === 'active') {
     acts.innerHTML += `<button class="btn btn-primary" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
+    const product = DB.products.find(p => p.id === loan.productId);
+    if (overdue && rem > 0 && product?.compound) {
+      acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:none;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
+    }
   }
 
   document.getElementById('loanModal').classList.add('open');
@@ -975,6 +988,36 @@ function doPayment() {
       if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   })();
+}
+
+function doCompound(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const rem = Math.max(0, loan.totalDue - (loan.paidAmount || 0));
+  if (rem <= 0) { showToast('ບໍ່ມີຍອດຄ້າງ', 'error'); return; }
+  const product = DB.products.find(p => p.id === loan.productId);
+  if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
+  openConfirm('🔄', `ທົບຕົ້ນ — ຍອດຄ້າງ ${formatMoney(rem)} ຈະກາຍເປັນສັນຍາກູ້ໃໝ່`, 'ຢືນຢັນທົບຕົ້ນ', async () => {
+    try {
+      const newTotal = calcLoanTotal(product, rem, product.duration);
+      await DB.addLoan({
+        productId: loan.productId, productName: loan.productName,
+        name: loan.name, phone: loan.phone, idCard: loan.idCard,
+        docType: loan.docType, docImage: loan.docImage,
+        occupation: loan.occupation, income: loan.income,
+        address: loan.address, note: loan.note,
+        amount: rem, duration: product.duration, totalDue: newTotal,
+      });
+      await DB.updateLoanStatus(loanId, 'restructured');
+      closeConfirm();
+      closeLoanModal();
+      renderLoans();
+      renderRequests();
+      updatePendingBadge();
+      updateAlertsBadge();
+      showToast('ທົບຕົ້ນສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
 }
 
 // ====== TAB: PRODUCTS ======
@@ -1016,12 +1059,13 @@ async function saveProd(e) {
   const dur  = parseInt(document.getElementById('pf-dur').value) || 0;
   const minA = parseFloat(document.getElementById('pf-min').value);
   const maxA = parseFloat(document.getElementById('pf-max').value);
-  const desc = document.getElementById('pf-desc').value.trim();
+  const desc     = document.getElementById('pf-desc').value.trim();
+  const compound = document.getElementById('pf-compound').checked;
 
   if (!name || !rate || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
-  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc };
+  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound };
   try {
     if (id) {
       await DB.updateProduct(id, data);
@@ -1043,7 +1087,8 @@ function cancelProdEdit() {
   document.getElementById('pf-dur').value  = '';
   document.getElementById('pf-min').value  = '';
   document.getElementById('pf-max').value  = '';
-  document.getElementById('pf-desc').value = '';
+  document.getElementById('pf-desc').value     = '';
+  document.getElementById('pf-compound').checked = false;
   document.getElementById('prodCalcPreview').style.display = 'none';
   document.getElementById('prodFormTitle').textContent = '➕ ສ້າງຜະລິດຕະພັນໃໝ່';
 }
@@ -1058,7 +1103,8 @@ function editProd(id) {
   document.getElementById('pf-dur').value  = p.duration||'';
   document.getElementById('pf-min').value  = p.minAmount;
   document.getElementById('pf-max').value  = p.maxAmount;
-  document.getElementById('pf-desc').value = p.description||'';
+  document.getElementById('pf-desc').value     = p.description||'';
+  document.getElementById('pf-compound').checked = !!p.compound;
   document.getElementById('prodFormTitle').textContent = '✏️ ແກ້ໄຂ: '+p.name;
   updateProdPreview();
   document.getElementById('pf-name').scrollIntoView({behavior:'smooth'});
@@ -1108,6 +1154,7 @@ function renderProducts() {
       </div>
       <div class="pi-actions">
         <span class="sbadge ${active?'sb-active':'sb-rejected'}" style="font-size:.7rem;">${active?'ເປີດ':'ປິດ'}</span>
+        ${p.compound?'<span class="sbadge sb-restructured" style="font-size:.7rem;">ທົບຕົ້ນ</span>':''}
         <button class="act-btn ${active?'a-warn':'a-ok'}" onclick="toggleProd('${p.id}')">${active?'ປິດ':'ເປີດ'}</button>
         <button class="act-btn a-view" onclick="editProd('${p.id}')">✏️ ແກ້ໄຂ</button>
         <button class="act-btn a-del"  onclick="deleteProd('${p.id}')">🗑</button>

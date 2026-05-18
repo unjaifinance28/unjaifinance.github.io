@@ -11,6 +11,7 @@ const mapProduct = r => ({
   interestRate: r.interest_rate, interestType: r.interest_type,
   duration: r.duration, minAmount: r.min_amount, maxAmount: r.max_amount,
   description: r.description || '', status: r.status, createdAt: r.created_at,
+  compound: r.compound || false,
 });
 const mapLoan = r => ({
   id: r.id, productId: r.product_id, productName: r.product_name,
@@ -76,7 +77,8 @@ const DB = {
     const { data: r, error } = await sb.from('products').insert({
       id, name: data.name, interest_rate: data.interestRate, interest_type: data.interestType,
       duration: data.duration, min_amount: data.minAmount, max_amount: data.maxAmount,
-      description: data.description || '', status: 'active', created_at: new Date().toISOString(),
+      description: data.description || '', compound: data.compound || false,
+      status: 'active', created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     const p = mapProduct(r);
@@ -93,6 +95,7 @@ const DB = {
     if (data.minAmount    !== undefined) row.min_amount    = data.minAmount;
     if (data.maxAmount    !== undefined) row.max_amount    = data.maxAmount;
     if (data.description  !== undefined) row.description   = data.description;
+    if (data.compound     !== undefined) row.compound      = data.compound;
     if (data.status       !== undefined) row.status        = data.status;
     const { error } = await sb.from('products').update(row).eq('id', id);
     if (error) throw error;
