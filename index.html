@@ -112,6 +112,9 @@
   .lid-box p { font-size:.8rem; color:var(--gray-text); margin-top:4px; }
 
   @media(max-width:560px){ .form-grid{grid-template-columns:1fr;} .prod-grid{grid-template-columns:1fr;} .doc-type-row{flex-direction:column;} }
+
+  /* ====== MONEY INPUT ====== */
+  .money-input { text-align:right; letter-spacing:.5px; }
   </style>
 </head>
 <body>
@@ -175,6 +178,10 @@
       </div>
 
       <div class="prod-info-bar" id="prodInfoBar"></div>
+      <div id="discount-banner" style="display:none;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #4caf50;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+        <div style="font-weight:800;color:#1b5e20;font-size:.9rem;">🎉 ສ່ວນຫຼຸດ Credit Score ສຳລັບທ່ານ!</div>
+        <div id="discount-detail" style="font-size:.84rem;color:#2e7d32;margin-top:3px;"></div>
+      </div>
 
       <form id="applyForm" novalidate>
         <div class="form-grid">
@@ -187,7 +194,7 @@
           </div>
           <div class="form-group">
             <label>ເບີໂທລະສັບ *</label>
-            <input type="tel" id="f-phone" placeholder="020 XXXX XXXX" />
+            <input type="tel" id="f-phone" placeholder="020 XXXX XXXX" oninput="checkPhoneDiscount()" />
             <span class="error-msg" id="e-phone"></span>
           </div>
 
@@ -232,7 +239,7 @@
 
           <div class="form-group">
             <label>ຈຳນວນກູ້ (ກີບ) *</label>
-            <input type="number" id="f-amount" placeholder="ຈຳນວນ" min="0" step="50000" oninput="updatePreview()" />
+            <input type="text" inputmode="numeric" id="f-amount" placeholder="ຈຳນວນ" class="money-input" oninput="formatMoneyInput(this);updatePreview()" />
             <span class="error-msg" id="e-amount"></span>
           </div>
           <div class="form-group" id="daysGroup">
@@ -243,7 +250,7 @@
 
           <div class="form-group">
             <label>ລາຍໄດ້/ເດືອນ (ກີບ) *</label>
-            <input type="number" id="f-income" placeholder="ລາຍໄດ້ຕໍ່ເດືອນ" min="0" />
+            <input type="text" inputmode="numeric" id="f-income" placeholder="ລາຍໄດ້ຕໍ່ເດືອນ" class="money-input" oninput="formatMoneyInput(this)" />
             <span class="error-msg" id="e-income"></span>
           </div>
           <div class="form-group full">
@@ -342,8 +349,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 <script>
-let selectedProduct = null;
-let docImageData    = null; // compressed base64
+let selectedProduct  = null;
+let docImageData     = null; // compressed base64
+let _activeDiscount  = null; // { cs, loan } if customer has approved discount
 
 // ====== LOGO: load company logo if saved ======
 (function() {
@@ -359,19 +367,33 @@ let docImageData    = null; // compressed base64
 
 // ====== RENDER PRODUCTS ======
 function renderProducts() {
-  const active = DB.products.filter(p => p.status === 'active');
+  const phoneRaw = (document.getElementById('f-phone')?.value || '').trim().replace(/\D/g,'');
+  const visible = DB.products.filter(p => {
+    if (p.status !== 'active') return false;
+    if (!p.isVip) return true;
+    if (!phoneRaw) return false;
+    return (p.vipCustomers || []).some(v => v.replace(/\D/g,'') === phoneRaw);
+  });
+  if (selectedProduct && !visible.find(p => p.id === selectedProduct.id)) {
+    selectedProduct = null;
+    document.getElementById('formSection').style.display = 'none';
+  }
   const grid = document.getElementById('prodGrid');
-  if (!active.length) {
+  if (!visible.length) {
     grid.innerHTML = '<p style="text-align:center;color:var(--gray-text);padding:30px;grid-column:1/-1;">ຕິດຕໍ່ທີ່ທີ່ງານເພື່ອຮູ້ຂໍ້ມູນຜະລິດຕະພັນ</p>';
     return;
   }
   const icons = { flat:'⚡', daily:'📅' };
-  grid.innerHTML = active.map(p => {
+  grid.innerHTML = visible.map(p => {
     const rateLabel = p.interestType === 'daily' ? p.interestRate + '%/ວັນ' : p.interestRate + '%';
     const unitLabel = p.interestType === 'daily' ? 'ຕໍ່ວັນ' : (p.duration ? p.duration + ' ວັນ' : 'ດອກລວມ');
-    return `<div class="prod-card" id="pc-${p.id}" onclick="selectProduct('${p.id}')">
+    const vipStyle  = p.isVip ? 'border-color:#fdd835;box-shadow:0 0 0 2px rgba(253,216,53,.25);' : '';
+    const vipBadge  = p.isVip ? '<div class="pc-badge" style="background:linear-gradient(90deg,#f9a825,#ff8f00);">👑 VIP Exclusive</div>' : '';
+    const vipIcon   = p.isVip ? '👑' : (icons[p.interestType] || '💰');
+    return `<div class="prod-card" id="pc-${p.id}" onclick="selectProduct('${p.id}')" style="${vipStyle}">
+      ${vipBadge}
       <div class="pc-sel-check">✓</div>
-      <div class="pc-icon">${icons[p.interestType] || '💰'}</div>
+      <div class="pc-icon">${vipIcon}</div>
       <div class="pc-name">${p.name}</div>
       <div class="pc-rate">${rateLabel}</div>
       <div class="pc-unit">${unitLabel}</div>
@@ -397,6 +419,31 @@ function selectProduct(id) {
   document.getElementById('formSection').style.display = 'block';
   document.getElementById('formSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
   updatePreview();
+}
+
+// ====== DISCOUNT CHECK ======
+function checkPhoneDiscount() {
+  const phone  = document.getElementById('f-phone').value.trim();
+  const banner = document.getElementById('discount-banner');
+  const detail = document.getElementById('discount-detail');
+  if (phone.length < 8) {
+    _activeDiscount = null;
+    banner.style.display = 'none';
+    updatePreview();
+    renderProducts();
+    return;
+  }
+  const found = DB.getCustomerDiscount(phone);
+  if (found) {
+    _activeDiscount = found;
+    banner.style.display = 'block';
+    detail.textContent = `ສ່ວນຫຼຸດ ${found.cs.discountPercent}% ກ່ຽວຂ້ອງກັບ ${found.loan.id} ຈາກ Credit Score ປີ ${found.cs.year}${found.cs.note ? ' · ' + found.cs.note : ''}`;
+  } else {
+    _activeDiscount = null;
+    banner.style.display = 'none';
+  }
+  updatePreview();
+  renderProducts();
 }
 
 // ====== DOCUMENT TYPE ======
@@ -467,18 +514,31 @@ function compressImage(dataUrl, maxW, quality, cb) {
 // ====== PREVIEW ======
 function updatePreview() {
   if (!selectedProduct) return;
-  const amt  = parseFloat(document.getElementById('f-amount').value);
+  const amt  = getMoneyValue(document.getElementById('f-amount'));
   const days = parseInt(document.getElementById('f-days').value);
   const box  = document.getElementById('previewBox');
   const needDays = selectedProduct.interestType === 'daily';
   if (!amt || amt <= 0 || (needDays && (!days || days < 1))) { box.style.display = 'none'; return; }
   const customDays = needDays ? days : undefined;
-  const total      = calcLoanTotal(selectedProduct, amt, customDays);
-  const interest   = total - amt;
-  const dur        = needDays ? days + ' ວັນ' : (selectedProduct.duration + ' ວັນ');
-  let payNote = selectedProduct.duration >= 60 && selectedProduct.interestType === 'flat'
+
+  // Apply discount if available
+  let effectiveProduct = selectedProduct;
+  if (_activeDiscount) {
+    const discPct      = _activeDiscount.cs.discountPercent;
+    const discountedRate = Math.max(0, selectedProduct.interestRate * (1 - discPct / 100));
+    effectiveProduct = { ...selectedProduct, interestRate: discountedRate };
+  }
+
+  const total    = calcLoanTotal(effectiveProduct, amt, customDays);
+  const origTotal = calcLoanTotal(selectedProduct, amt, customDays);
+  const interest = total - amt;
+  const dur      = needDays ? days + ' ວັນ' : (selectedProduct.duration + ' ວັນ');
+  let payNote    = selectedProduct.duration >= 60 && selectedProduct.interestType === 'flat'
     ? `ຊຳລະ/ວັນ: ${formatMoney(Math.round(total / selectedProduct.duration))}`
     : `ຊຳລະຄືນ 1 ຄັ້ງ: ${formatMoney(total)}`;
+  if (_activeDiscount && total < origTotal) {
+    payNote += ` · 🎉 ປະຢັດ ${formatMoney(origTotal - total)}`;
+  }
   document.getElementById('pv-prod').textContent  = selectedProduct.name;
   document.getElementById('pv-amt').textContent   = formatMoney(amt);
   document.getElementById('pv-int').textContent   = formatMoney(interest);
@@ -520,7 +580,7 @@ function validate() {
     ok = false;
   }
 
-  const amt = parseFloat(document.getElementById('f-amount').value);
+  const amt = getMoneyValue(document.getElementById('f-amount'));
   if (!amt || amt <= 0) {
     document.getElementById('e-amount').textContent = 'ກະລຸນາໃສ່ຈຳນວນ';
     document.getElementById('f-amount').classList.add('error');
@@ -559,11 +619,23 @@ document.getElementById('applyForm').addEventListener('submit', async e => {
   const origText = btn.textContent;
   btn.textContent = '⏳ ກຳລັງສົ່ງ...';
   try {
-    const amt = parseFloat(document.getElementById('f-amount').value);
+    const amt = getMoneyValue(document.getElementById('f-amount'));
     const customDays = selectedProduct.interestType === 'daily'
       ? parseInt(document.getElementById('f-days').value) : undefined;
-    const dur   = customDays || selectedProduct.duration;
-    const total = calcLoanTotal(selectedProduct, amt, customDays);
+    const dur  = customDays || selectedProduct.duration;
+
+    // Apply discount if available
+    let effectiveProduct = selectedProduct;
+    let discountApplied = 0, originalRate = null, discountedRate = null;
+    if (_activeDiscount) {
+      const discPct    = _activeDiscount.cs.discountPercent;
+      discountedRate   = Math.max(0, selectedProduct.interestRate * (1 - discPct / 100));
+      originalRate     = selectedProduct.interestRate;
+      discountApplied  = discPct;
+      effectiveProduct = { ...selectedProduct, interestRate: discountedRate };
+    }
+
+    const total = calcLoanTotal(effectiveProduct, amt, customDays);
     const docTypeRadio = document.querySelector('input[name="docType"]:checked');
 
     const loan = await DB.addLoan({
@@ -575,13 +647,19 @@ document.getElementById('applyForm').addEventListener('submit', async e => {
       docType:  docTypeRadio ? docTypeRadio.value : 'id',
       docImage: docImageData || null,
       occupation: document.getElementById('f-occ').value,
-      income:   parseFloat(document.getElementById('f-income').value),
+      income:   getMoneyValue(document.getElementById('f-income')),
       address:  document.getElementById('f-address').value.trim(),
       note:     document.getElementById('f-note').value.trim(),
       amount:   amt,
       duration: dur,
       totalDue: total,
+      originalRate, discountedRate, discountApplied,
     });
+
+    if (_activeDiscount) {
+      await DB.markDiscountUsed(_activeDiscount.cs.id).catch(() => {});
+      _activeDiscount = null;
+    }
 
     document.getElementById('modal-lid').textContent = loan.id;
     document.getElementById('successModal').classList.add('open');
@@ -608,8 +686,10 @@ function resetAll() {
   document.getElementById('docUploadArea').classList.remove('has-file');
   document.getElementById('idCardLabel').textContent    = 'ເລກເອກະສານ *';
   document.getElementById('f-idcard').placeholder       = 'ໃສ່ເລກຕາມເອກະສານ';
-  selectedProduct = null;
-  docImageData    = null;
+  selectedProduct  = null;
+  docImageData     = null;
+  _activeDiscount  = null;
+  document.getElementById('discount-banner').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -640,26 +720,132 @@ function doStatusSearch() {
     return;
   }
   document.getElementById('statusResult').innerHTML = matches.map(l => {
-    const st                 = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
-    const totalInterest      = Math.max(0, (l.totalDue || 0) - (l.amount || 0));
-    const remainingInterest  = Math.max(0, totalInterest - (l.interestPaid || 0));
-    const remainingPrincipal = l.remainingPrincipal ?? l.amount;
-    const totalRemaining     = remainingPrincipal + remainingInterest;
-    return `<div style="background:white;border:1.5px solid #e0e0e0;border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;">
+    const st          = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
+    const isVipLoan   = DB.products.find(p => p.id === l.productId)?.isVip || false;
+    const principal      = l.remainingPrincipal ?? l.amount ?? 0;
+    const interestDue    = Math.max(0, (l.totalDue || 0) - principal);
+    const totalRemaining = l.totalDue || 0;
+
+    let compoundWarning = '';
+    if (l.status === 'active' && l.duration > 0) {
+      if (interestDue > 0) {
+        const product = DB.products.find(p => p.id === l.productId);
+        const cDays = product ? (product.compoundDays || 0) : 0;
+        const dueDate = new Date(new Date(l.createdAt).getTime() + l.duration * 86400000);
+        const compoundDate = new Date(dueDate.getTime() + cDays * 86400000);
+        const todayMs = new Date().setHours(0, 0, 0, 0);
+        const daysUntil = Math.ceil((compoundDate.getTime() - todayMs) / 86400000);
+        if (daysUntil > 0) {
+          compoundWarning = `<div style="color:#c62828;font-weight:700;font-size:.81rem;margin-top:8px;padding:6px 10px;background:#ffebee;border-radius:8px;">⚠️ ດອກຈະຖືກທົບຕົ້ນໃນອີກ ${daysUntil} ວັນ</div>`;
+        } else {
+          compoundWarning = `<div style="color:#c62828;font-weight:700;font-size:.81rem;margin-top:8px;padding:6px 10px;background:#ffebee;border-radius:8px;">🔴 ດອກຖືກທົບຕົ້ນແລ້ວ — ກະລຸນາຕິດຕໍ່</div>`;
+        }
+      }
+    }
+
+    const cardBorder = isVipLoan ? '1.5px solid #fdd835' : '1.5px solid #e0e0e0';
+    const cardBg     = isVipLoan ? 'linear-gradient(135deg,#fffde7,white)' : 'white';
+
+    const paymentCard = (() => {
+      if (l.status !== 'active') return '';
+      const fmtDMY = iso => {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      };
+      const loanPayments = DB.getLoanPayments(l.id).sort((a,b) => new Date(a.date) - new Date(b.date));
+      const lastPay = loanPayments.length ? loanPayments[loanPayments.length - 1] : null;
+
+      const lastPayHtml = lastPay
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;">
+             <span style="color:#616161;">ຊຳລະລ່າສຸດ</span>
+             <span style="font-weight:700;">${fmtDMY(lastPay.date)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຈຳນວນ</span>
+             <span style="font-weight:700;color:#2e7d32;">${formatMoney(lastPay.amount)}</span>
+           </div>`
+        : `<div style="font-size:.82rem;color:#9e9e9e;font-style:italic;">ຍັງບໍ່ທັນຊຳລະ</div>`;
+
+      const baseDate    = lastPay ? new Date(lastPay.date) : new Date(l.createdAt);
+      const nextDueObj  = new Date(baseDate.getTime() + (l.duration || 30) * 86400000);
+      const nextDueStr  = fmtDMY(nextDueObj);
+      const todayStart  = new Date(); todayStart.setHours(0,0,0,0);
+      const nextStart   = new Date(nextDueObj); nextStart.setHours(0,0,0,0);
+      const daysLeft    = Math.ceil((nextStart - todayStart) / 86400000);
+
+      let countdownBg, countdownColor, countdownIcon, countdownText;
+      if (daysLeft > 7) {
+        countdownBg = '#e8f5e9'; countdownColor = '#2e7d32'; countdownIcon = '🟢';
+        countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+      } else if (daysLeft >= 1) {
+        countdownBg = '#fff3e0'; countdownColor = '#e65100'; countdownIcon = '🟡';
+        countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+      } else {
+        countdownBg = '#ffebee'; countdownColor = '#c62828'; countdownIcon = '🔴';
+        countdownText = `ເກີນກຳນົດ ${Math.abs(daysLeft)} ວັນແລ້ວ`;
+      }
+
+      const interestHtml = interestDue > 0
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ດອກທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:#e65100;">${formatMoney(interestDue)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຕ່ຳສຸດທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:#c62828;">${formatMoney(interestDue)}</span>
+           </div>`
+        : `<div style="font-size:.81rem;color:#2e7d32;margin-top:3px;">✅ ດອກໄດ້ຊຳລະຄົບແລ້ວ</div>`;
+
+      return `<div style="margin-top:10px;background:linear-gradient(135deg,#f1f8e9,#e8f5e9);border:1px solid #c8e6c9;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:.72rem;font-weight:800;color:#1b5e20;margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase;">💳 ຂໍ້ມູນການຊຳລະ</div>
+        <div style="padding-bottom:9px;border-bottom:1px dashed #c8e6c9;">
+          ${lastPayHtml}
+        </div>
+        <div style="padding-top:8px;padding-bottom:6px;border-bottom:1px dashed #c8e6c9;">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;">
+            <span style="color:#616161;">ກຳນົດຊຳລະຄັ້ງຕໍ່ໄປ</span>
+            <span style="font-weight:700;">${nextDueStr}</span>
+          </div>
+          ${interestHtml}
+        </div>
+        <div style="margin-top:9px;padding:7px 10px;background:${countdownBg};border-radius:8px;font-size:.83rem;font-weight:700;color:${countdownColor};text-align:center;">
+          ${countdownIcon} ${countdownText}
+        </div>
+      </div>`;
+    })();
+
+    return `<div style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;">
       <div style="margin-bottom:8px;">
-        <div style="font-weight:800;color:#1b5e20;font-size:.9rem;">${l.id}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:800;color:#1b5e20;font-size:.9rem;">${l.id}</span>
+          ${isVipLoan ? '<span style="background:linear-gradient(90deg,#f9a825,#ff8f00);color:white;padding:1px 8px;border-radius:50px;font-size:.7rem;font-weight:700;">👑 VIP</span>' : ''}
+        </div>
         <div style="font-size:.75rem;color:#9e9e9e;margin-top:1px;">${l.name} · ${l.productName}</div>
       </div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:.83rem;align-items:center;">
         <span style="color:#616161;">ເງິນຕົ້ນ</span>
-        <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(remainingPrincipal)}</span>
+        <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
         <span style="color:#616161;">ດອກເບ້ຍ</span>
-        <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(remainingInterest)}</span>
+        <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(interestDue)}</span>
         <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ລວມທັງໝົດ</span>
         <span style="font-weight:900;color:#1b5e20;border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${formatMoney(totalRemaining)}</span>
         <span style="color:#616161;">ສະຖານະ</span>
         <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
       </div>
+      ${paymentCard}
+      ${compoundWarning}
+      ${(() => {
+        const hist = DB.getCompoundHistory(l.id);
+        if (!hist.length) return '';
+        return `<div style="margin-top:10px;border-top:1px solid #f0f0f0;padding-top:8px;">
+          <div style="font-size:.74rem;font-weight:700;color:#3949ab;margin-bottom:6px;">📋 ປະຫວັດທົບຕົ້ນ (${hist.length} ຄັ້ງ)</div>
+          ${[...hist].reverse().map(h=>`<div style="font-size:.76rem;color:#616161;padding:3px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;gap:8px;">
+            <span style="color:#3949ab;font-weight:600;flex-shrink:0;">${formatDate(h.date)}</span>
+            <span>ດອກຄ້າງ <strong style="color:#c62828;">${formatMoney(h.unpaidInterest)}</strong> → ຕົ້ນໃໝ່ <strong>${formatMoney(h.newPrincipal)}</strong></span>
+          </div>`).join('')}
+        </div>`;
+      })()}
     </div>`;
   }).join('');
 }

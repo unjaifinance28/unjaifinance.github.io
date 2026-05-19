@@ -144,6 +144,26 @@
   .mini-prog { height:5px; background:#e0e0e0; border-radius:3px; overflow:hidden; margin-top:3px; }
   .mini-prog-fill { height:100%; background:#2e7d32; border-radius:3px; }
 
+  /* ====== VIP ====== */
+  .vip-badge { background:linear-gradient(135deg,#fff8e1,#fff3cd); color:#f9a825; border:1px solid #fdd835; padding:2px 9px; border-radius:50px; font-size:.72rem; font-weight:800; }
+  .btn-vip   { background:linear-gradient(135deg,#fff8e1,#ffe082); color:#f57f17; border:1px solid #fdd835; font-weight:700; }
+  .btn-vip:hover { opacity:.85; }
+
+  /* ====== CREDIT SCORE ====== */
+  .cs-card { background:white; border-radius:13px; padding:18px; box-shadow:0 1px 6px rgba(0,0,0,.09); }
+  .month-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:4px; margin-bottom:6px; }
+  .m-cell { text-align:center; cursor:pointer; border-radius:6px; padding:5px 2px; border:1.5px solid #e0e0e0; font-size:.6rem; transition:.15s; user-select:none; }
+  .m-cell .mi { font-size:.9rem; display:block; }
+  .m-cell.normal   { background:#e8f5e9; border-color:#2e7d32; color:#1b5e20; }
+  .m-cell.late     { background:#fff3e0; border-color:#e65100; color:#e65100; }
+  .m-cell.compound { background:#ffebee; border-color:#c62828; color:#c62828; }
+  .m-cell:hover    { opacity:.8; transform:scale(1.06); }
+  .score-badge { display:inline-block; padding:3px 12px; border-radius:50px; font-weight:800; font-size:.8rem; }
+  .score-hi  { background:#e8f5e9; color:#1b5e20; }
+  .score-mid { background:#fff3e0; color:#e65100; }
+  .score-lo  { background:#ffebee; color:#c62828; }
+  .eligible-badge { display:inline-block; background:#e3f2fd; color:#1565c0; padding:2px 10px; border-radius:50px; font-size:.73rem; font-weight:700; margin-top:4px; }
+
   /* ====== MOBILE ≤480px ====== */
   @media(max-width:480px) {
     /* Login */
@@ -189,6 +209,9 @@
     /* Debt form date row */
     #dbt-dates-row { grid-template-columns:1fr !important; }
   }
+  /* ====== MONEY INPUT ====== */
+  .money-input { text-align:right; letter-spacing:.5px; }
+
   @media(max-width:480px){
     .admin-nav .logo { font-size:.75rem; }
     .admin-nav a { display:none; }
@@ -243,6 +266,7 @@
       <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
       <button class="atab" onclick="showTab('alerts',this)">🔔 ແຈ້ງເຕືອນ <span id="badge-alerts" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
+      <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
     </div>
 
     <!-- ====== TAB: REQUESTS ====== -->
@@ -317,11 +341,11 @@
             </div>
             <div class="fi">
               <label>ຈຳນວນຕ່ຳສຸດ (ກີບ) *</label>
-              <input type="number" id="pf-min" placeholder="500000" min="0" step="100000" />
+              <input type="text" inputmode="numeric" id="pf-min" placeholder="500,000" class="money-input" oninput="formatMoneyInput(this)" />
             </div>
             <div class="fi">
               <label>ຈຳນວນສູງສຸດ (ກີບ) *</label>
-              <input type="number" id="pf-max" placeholder="50000000" min="0" step="500000" />
+              <input type="text" inputmode="numeric" id="pf-max" placeholder="50,000,000" class="money-input" oninput="formatMoneyInput(this)" />
             </div>
             <div class="fi full">
               <label>ຄຳອະທິບາຍ</label>
@@ -333,6 +357,23 @@
                 <span style="font-weight:700;color:#1b5e20;">ດອກທົບຕົ້ນ (Compound)</span>
               </label>
               <small style="color:#9e9e9e;font-size:.75rem;margin-top:4px;display:block;padding-left:27px;">ຖ້າລູກຄ້າບໍ່ຊຳລະທັນກຳໜົດ ຍອດຄ້າງຈະກາຍເປັນສັນຍາກູ້ໃໝ່ອັດຕາດຽວກັນ</small>
+            </div>
+            <div class="fi">
+              <label>ທົບຕົ້ນຫຼັງຈາກ (ວັນ)</label>
+              <input type="number" id="pf-cdays" placeholder="0" min="0" value="0" />
+              <small style="color:#9e9e9e;font-size:.75rem;">0 = ທົບຕົ້ນທັນທີເມື່ອຄົບກຳໜົດ</small>
+            </div>
+            <div class="fi full" style="padding:8px 0;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-vip" style="width:17px;height:17px;accent-color:#f9a825;flex-shrink:0;" onchange="onVipChange()" />
+                <span style="font-weight:700;color:#f57f17;">👑 ຜະລິດຕະພັນ VIP (ເຊີນເທົ່ານັ້ນ)</span>
+              </label>
+              <small style="color:#9e9e9e;font-size:.75rem;margin-top:4px;display:block;padding-left:27px;">ບໍ່ສະແດງໃນໜ້າລູກຄ້າ — ເຫັນສະເພາະລູກຄ້າ VIP ທີ່ອະນຸຍາດ</small>
+            </div>
+            <div class="fi full" id="pf-vip-phones-group" style="display:none;">
+              <label>ເບີໂທລູກຄ້າ VIP <small style="font-weight:400;color:#9e9e9e;">(ຄັ່ນດ້ວຍ ,)</small></label>
+              <input type="text" id="pf-vip-phones" placeholder="020xxxxxxxx, 030xxxxxxxx" />
+              <small style="color:#9e9e9e;font-size:.75rem;">ລູກຄ້າທີ່ໃສ່ເບີຕາມນີ້ຈະເຫັນ VIP product ໃນໜ້າສະໝັກ</small>
             </div>
           </div>
           <!-- Mini preview -->
@@ -375,7 +416,7 @@
               <option>ຄ່າຂົນສົ່ງ</option>
               <option>ອື່ນໆ</option>
             </select>
-            <input type="number" id="expAmt"  placeholder="ຈຳນວນ (ກີບ)" min="0" />
+            <input type="text" inputmode="numeric" id="expAmt" placeholder="ຈຳນວນ (ກີບ)" class="money-input" oninput="formatMoneyInput(this)" />
             <input type="text"   id="expNote" placeholder="ໝາຍເຫດ" />
             <button class="btn btn-primary" style="padding:8px;" onclick="addExpense()">+ ບັນທຶກ</button>
           </div>
@@ -391,7 +432,7 @@
           <h3>➕ ບັນທຶກໜີ້ໃໝ່</h3>
           <div class="exp-form" style="gap:7px;">
             <input type="text"   id="dbt-creditor"   placeholder="ຊື່ເຈົ້າໜີ້ *" />
-            <input type="number" id="dbt-amount"      placeholder="ຈຳນວນກູ້ (ກີບ) *" min="0" step="100000" />
+            <input type="text" inputmode="numeric" id="dbt-amount" placeholder="ຈຳນວນກູ້ (ກີບ) *" class="money-input" oninput="formatMoneyInput(this)" />
             <input type="number" id="dbt-rate"        placeholder="ອັດຕາດອກ (%/ເດືອນ) *" min="0" step="0.1" />
             <div id="dbt-dates-row" style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
               <div><label style="font-size:.75rem;color:#616161;">ວັນທີກູ້</label>
@@ -482,6 +523,23 @@
       <style>@media(max-width:600px){.chart-grid{grid-template-columns:1fr!important;}}</style>
     </div>
 
+    <!-- ====== TAB: CREDIT SCORE ====== -->
+    <div id="tab-credits" class="tab-pane">
+      <div style="background:#e8f5e9;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:.82rem;color:#1b5e20;">
+        ✅ ປົກກະຕິ <strong>(−0)</strong> &nbsp;·&nbsp; ⚠️ ຊ້າ <strong>(−5)</strong> &nbsp;·&nbsp; 🔴 ທົບຕົ້ນ <strong>(−15)</strong>
+        &nbsp;|&nbsp; <strong>ຄຸນສົມບັດ:</strong> ກູ້ກ່ອນ 1 ມ.ກ. ປີນີ້ · ≥10 ເດືອນປົກກະຕິ · 0 ທົບຕົ້ນ
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <label style="font-size:.82rem;font-weight:600;color:#1b5e20;">ສະແດງປີ:</label>
+        <select id="cs-year" style="padding:6px 12px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;" onchange="renderCreditScore()"></select>
+      </div>
+      <div id="cs-list"></div>
+      <div id="cs-dec-panel" style="display:none;background:white;border-radius:13px;padding:18px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-top:14px;">
+        <div class="sec-title">🎁 ລູກຄ້າທີ່ມີສິດຮັບສ່ວນຫຼຸດ</div>
+        <div id="cs-eligible-list"></div>
+      </div>
+    </div>
+
   </div><!-- /admin-wrap -->
 </div><!-- /admin-body -->
 
@@ -507,6 +565,7 @@
       </div>
     </div>
     <div id="md-hist" style="margin-top:12px;"></div>
+    <div id="md-compound-hist"></div>
     <div id="md-pay-form"></div>
     <div id="md-topup-form"></div>
     <div class="ma" id="md-acts"></div>
@@ -519,7 +578,7 @@
   <div class="modal" style="max-width:400px;">
     <div class="modal-icon" id="cm-icon">❓</div>
     <h3 id="cm-title"></h3>
-    <p id="cm-msg" style="font-size:.88rem;color:#616161;line-height:1.6;"></p>
+    <div id="cm-msg" style="font-size:.88rem;color:#616161;line-height:1.6;"></div>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:18px;">
       <button class="btn btn-primary" id="cm-ok">ຢືນຢັນ</button>
       <button class="btn btn-outline" onclick="closeConfirm()">ຍົກເລີກ</button>
@@ -537,7 +596,7 @@
     <div id="dpm-info" style="background:#f1f8e9;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.84rem;"></div>
     <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:12px;">
       <div class="fi"><label>ຈຳນວນຊຳລະ (ກີບ) *</label>
-        <input type="number" id="dpm-amount" placeholder="ຈຳນວນ" min="0" step="10000" /></div>
+        <input type="text" inputmode="numeric" id="dpm-amount" placeholder="ຈຳນວນ" class="money-input" oninput="formatMoneyInput(this)" /></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="dpm-row2">
         <div class="fi"><label>ວິທີຊຳລະ</label>
           <select id="dpm-method">
@@ -696,6 +755,7 @@ function showTab(name, btn) {
   if (name==='perf')     renderPerf();
   if (name==='alerts')   renderAlerts();
   if (name==='charts')   renderCharts();
+  if (name==='credits')  renderCreditScore();
 }
 
 // ====== INIT ======
@@ -800,8 +860,9 @@ function renderLoans() {
   const tbody = document.getElementById('loanTableBody');
   if (!loans.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="9">ບໍ່ພົບ</td></tr>'; return; }
   tbody.innerHTML = loans.map(l => {
-    const pct        = l.totalDue>0 ? Math.min(100,Math.round((l.paidAmount/l.totalDue)*100)) : 0;
-    const rem        = Math.max(0, l.totalDue - l.paidAmount);
+    const origTotal  = (l.paidAmount || 0) + (l.totalDue || 0);
+    const pct        = origTotal > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / origTotal) * 100)) : 0;
+    const rem        = l.totalDue || 0;
     const due        = calcDueDate(l);
     const overdue    = isLoanOverdue(l);
     const topupCount = DB.getLoanTopups(l.id).length;
@@ -869,10 +930,10 @@ function openLoanModal(id, focus) {
   const loan = DB.loans.find(l=>l.id===id);
   if (!loan) return;
   const payments = DB.getLoanPayments(id);
-  const paid = loan.paidAmount || 0;
-  const total = loan.totalDue || 0;
-  const rem   = Math.max(0, total - paid);
-  const pct   = total > 0 ? Math.min(100,Math.round((paid/total)*100)) : 0;
+  const paid  = loan.paidAmount || 0;
+  const rem   = loan.totalDue || 0;
+  const total = paid + rem;
+  const pct   = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const MTD   = {bcel:'BCEL',ldb:'LDB',cash:'ເງິນສົດ',transfer:'ໂອນ'};
 
   document.getElementById('md-id').textContent = loan.id;
@@ -929,13 +990,25 @@ function openLoanModal(id, focus) {
            <div class="hi-amt">+${formatMoney(p.amount)}</div>
          </div>`).join('')}</div>` : '';
 
+  const cphList = DB.getCompoundHistory(id);
+  document.getElementById('md-compound-hist').innerHTML = cphList.length
+    ? `<div style="font-size:.78rem;font-weight:700;color:#3949ab;margin:10px 0 6px;">🔄 ປະຫວັດທົບຕົ້ນດອກ (${cphList.length})</div>
+       <div class="history-list">${[...cphList].reverse().map(h=>`
+         <div class="hist-item">
+           <div>
+             <div style="font-weight:600;">${formatDate(h.date)}</div>
+             <div class="hi-ref">ດອກຄ້າງ ${formatMoney(h.unpaidInterest)} → ຕົ້ນໃໝ່ ${formatMoney(h.newPrincipal)}${h.note?' · '+h.note:''}</div>
+           </div>
+           <div class="hi-amt" style="color:#3949ab;">ລວມ ${formatMoney(h.newTotalDue)}</div>
+         </div>`).join('')}</div>` : '';
+
   // Payment form for active loans
   const pf = document.getElementById('md-pay-form');
   if (loan.status === 'active') {
     pf.innerHTML = `<div class="pay-form">
       <h4>💳 ບັນທຶກການຊຳລະ</h4>
       <div class="pay-row">
-        <input type="number" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" min="0" />
+        <input type="text" inputmode="numeric" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" class="money-input" oninput="formatMoneyInput(this)" />
         <select id="pay-method">
           <option value="bcel">BCEL</option>
           <option value="ldb">LDB</option>
@@ -970,8 +1043,8 @@ function openLoanModal(id, focus) {
     if (focus === 'topup') {
       thtml += `<div class="pay-form" style="margin-top:12px;border-color:#bbdefb;">
         <h4 style="color:#1565c0;">💰 ຢືມເພີ່ມ</h4>
-        <input type="number" id="topup-amt" placeholder="ຈຳນວນຢືມເພີ່ມ (ກີບ)" min="0"
-          style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;margin-bottom:8px;box-sizing:border-box;" />
+        <input type="text" inputmode="numeric" id="topup-amt" placeholder="ຈຳນວນຢືມເພີ່ມ (ກີບ)" class="money-input"
+          style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;margin-bottom:8px;box-sizing:border-box;" oninput="formatMoneyInput(this)" />
         <input type="text" id="topup-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)"
           style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:8px;box-sizing:border-box;" />
         <button class="btn btn-full" style="padding:9px;background:#1565c0;color:white;border:none;" onclick="doTopup()">✅ ຢືນຢັນຢືມເພີ່ມ</button>
@@ -993,9 +1066,17 @@ function openLoanModal(id, focus) {
   if (loan.status === 'active') {
     acts.innerHTML += `<button class="btn btn-primary" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
     acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:none;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
+    if (DB.products.some(p => p.isVip && p.status === 'active')) {
+      acts.innerHTML += `<button class="btn btn-vip" onclick="doInviteVip('${id}')">👑 ເຊີນ VIP</button>`;
+    }
     const product = DB.products.find(p => p.id === loan.productId);
     if (overdue && rem > 0 && product?.compound) {
       acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:none;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
+    }
+    const _curP = loan.remainingPrincipal ?? loan.amount;
+    const _iDue = Math.max(0, loan.totalDue - _curP);
+    if (_iDue > 0) {
+      acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:none;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
     }
   }
 
@@ -1008,7 +1089,7 @@ function closeLoanModal() {
 }
 
 function doPayment() {
-  const amt = parseFloat(document.getElementById('pay-amt').value);
+  const amt = getMoneyValue(document.getElementById('pay-amt'));
   const method = document.getElementById('pay-method').value;
   const note   = document.getElementById('pay-note').value.trim();
   if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
@@ -1027,7 +1108,7 @@ function doPayment() {
 }
 
 function doTopup() {
-  const amt  = parseFloat(document.getElementById('topup-amt').value);
+  const amt  = getMoneyValue(document.getElementById('topup-amt'));
   const note = document.getElementById('topup-note').value.trim();
   if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
   (async () => {
@@ -1044,7 +1125,7 @@ function doTopup() {
 function doCompound(loanId) {
   const loan = DB.loans.find(l => l.id === loanId);
   if (!loan) return;
-  const rem = Math.max(0, loan.totalDue - (loan.paidAmount || 0));
+  const rem = loan.totalDue || 0;
   if (rem <= 0) { showToast('ບໍ່ມີຍອດຄ້າງ', 'error'); return; }
   const product = DB.products.find(p => p.id === loan.productId);
   if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
@@ -1067,6 +1148,36 @@ function doCompound(loanId) {
       updatePendingBadge();
       updateAlertsBadge();
       showToast('ທົບຕົ້ນສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+function doCompoundInterest(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const product = DB.products.find(p => p.id === loan.productId);
+  if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
+
+  const curPrincipal = loan.remainingPrincipal ?? loan.amount;
+  const interestDue  = Math.max(0, loan.totalDue - curPrincipal);
+  if (interestDue <= 0) { showToast('ດອກຊຳລະຄົບແລ້ວ', 'error'); return; }
+
+  const newPrincipal = curPrincipal + interestDue;
+  const newTotalDue  = calcLoanTotal(product, newPrincipal, loan.duration);
+  const newInterest  = newTotalDue - newPrincipal;
+
+  const msg = `ດອກຄ້າງ: <strong style="color:#c62828;">${formatMoney(interestDue)}</strong> ຈະຖືກທົບເຂົ້າຕົ້ນ<br>
+    <span style="font-size:.82rem;color:#616161;">ຕົ້ນໃໝ່: <strong>${formatMoney(newPrincipal)}</strong> &nbsp;|&nbsp; ດອກໃໝ່: <strong>${formatMoney(newInterest)}</strong> &nbsp;|&nbsp; ລວມ: <strong>${formatMoney(newTotalDue)}</strong></span>`;
+
+  openConfirm('🔄', 'ທົບຕົ້ນດອກ', msg, async () => {
+    try {
+      await DB.addCompoundInterest(loanId, '');
+      closeConfirm();
+      openLoanModal(loanId);
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      updateAlertsBadge();
+      showToast('ທົບຕົ້ນດອກສຳເລັດ ✅');
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
@@ -1108,15 +1219,20 @@ async function saveProd(e) {
   const rate = parseFloat(document.getElementById('pf-rate').value);
   const type = document.getElementById('pf-type').value;
   const dur  = parseInt(document.getElementById('pf-dur').value) || 0;
-  const minA = parseFloat(document.getElementById('pf-min').value);
-  const maxA = parseFloat(document.getElementById('pf-max').value);
-  const desc     = document.getElementById('pf-desc').value.trim();
-  const compound = document.getElementById('pf-compound').checked;
+  const minA = getMoneyValue(document.getElementById('pf-min'));
+  const maxA = getMoneyValue(document.getElementById('pf-max'));
+  const desc         = document.getElementById('pf-desc').value.trim();
+  const compound     = document.getElementById('pf-compound').checked;
+  const compoundDays = parseInt(document.getElementById('pf-cdays').value) || 0;
+  const isVip        = document.getElementById('pf-vip').checked;
+  const vipCustomers = isVip
+    ? document.getElementById('pf-vip-phones').value.split(',').map(s=>s.trim()).filter(Boolean)
+    : [];
 
   if (!name || !rate || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
-  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound };
+  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers };
   try {
     if (id) {
       await DB.updateProduct(id, data);
@@ -1140,6 +1256,10 @@ function cancelProdEdit() {
   document.getElementById('pf-max').value  = '';
   document.getElementById('pf-desc').value     = '';
   document.getElementById('pf-compound').checked = false;
+  document.getElementById('pf-cdays').value = '0';
+  document.getElementById('pf-vip').checked = false;
+  document.getElementById('pf-vip-phones').value = '';
+  document.getElementById('pf-vip-phones-group').style.display = 'none';
   document.getElementById('prodCalcPreview').style.display = 'none';
   document.getElementById('prodFormTitle').textContent = '➕ ສ້າງຜະລິດຕະພັນໃໝ່';
 }
@@ -1152,10 +1272,14 @@ function editProd(id) {
   document.getElementById('pf-rate').value = p.interestRate;
   document.getElementById('pf-type').value = p.interestType;
   document.getElementById('pf-dur').value  = p.duration||'';
-  document.getElementById('pf-min').value  = p.minAmount;
-  document.getElementById('pf-max').value  = p.maxAmount;
+  document.getElementById('pf-min').value  = p.minAmount ? p.minAmount.toLocaleString('en-US') : '';
+  document.getElementById('pf-max').value  = p.maxAmount ? p.maxAmount.toLocaleString('en-US') : '';
   document.getElementById('pf-desc').value     = p.description||'';
   document.getElementById('pf-compound').checked = !!p.compound;
+  document.getElementById('pf-cdays').value = p.compoundDays || 0;
+  document.getElementById('pf-vip').checked = !!p.isVip;
+  document.getElementById('pf-vip-phones').value = (p.vipCustomers || []).join(', ');
+  document.getElementById('pf-vip-phones-group').style.display = p.isVip ? 'flex' : 'none';
   document.getElementById('prodFormTitle').textContent = '✏️ ແກ້ໄຂ: '+p.name;
   updateProdPreview();
   document.getElementById('pf-name').scrollIntoView({behavior:'smooth'});
@@ -1206,6 +1330,7 @@ function renderProducts() {
       <div class="pi-actions">
         <span class="sbadge ${active?'sb-active':'sb-rejected'}" style="font-size:.7rem;">${active?'ເປີດ':'ປິດ'}</span>
         ${p.compound?'<span class="sbadge sb-restructured" style="font-size:.7rem;">ທົບຕົ້ນ</span>':''}
+        ${p.isVip?`<span class="vip-badge">👑 VIP · ${(p.vipCustomers||[]).length} ເບີ</span>`  :''}
         <button class="act-btn ${active?'a-warn':'a-ok'}" onclick="toggleProd('${p.id}')">${active?'ປິດ':'ເປີດ'}</button>
         <button class="act-btn a-view" onclick="editProd('${p.id}')">✏️ ແກ້ໄຂ</button>
         <button class="act-btn a-del"  onclick="deleteProd('${p.id}')">🗑</button>
@@ -1234,7 +1359,7 @@ function debtDaysUntilDue(d) {
 // ====== DEBT CRUD ======
 function addDebt() {
   const creditor   = document.getElementById('dbt-creditor').value.trim();
-  const amount     = parseFloat(document.getElementById('dbt-amount').value);
+  const amount     = getMoneyValue(document.getElementById('dbt-amount'));
   const rate       = parseFloat(document.getElementById('dbt-rate').value);
   const borrowDate = document.getElementById('dbt-borrow').value;
   const dueDate    = document.getElementById('dbt-due').value;
@@ -1276,7 +1401,7 @@ function deleteDebt(id) {
 // ====== TAB: PERFORMANCE ======
 function addExpense() {
   const cat  = document.getElementById('expCat').value;
-  const amt  = parseFloat(document.getElementById('expAmt').value);
+  const amt  = getMoneyValue(document.getElementById('expAmt'));
   const note = document.getElementById('expNote').value.trim();
   if (!cat) { showToast('ເລືອກໝວດ','error'); return; }
   if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
@@ -1311,12 +1436,12 @@ function renderPerf() {
   const totalDisbursed   = DB.loans.filter(l=>!['pending','rejected'].includes(l.status))
                                     .reduce((s,l)=>s+l.amount,0);
   const totalCollected   = DB.payments.reduce((s,p)=>s+p.amount,0);
-  const totalOutstanding = activeLns.reduce((s,l)=>s+Math.max(0,l.totalDue-(l.paidAmount||0)),0);
+  const totalOutstanding = activeLns.reduce((s,l)=>s+(l.totalDue||0),0);
 
-  // ── Fixed interest formula: earned = paidAmount - principal lent ──
+  // ── Interest earned = sum of interest_paid across all non-pending/rejected loans ──
   const interestEarned = DB.loans
     .filter(l=>!['pending','rejected'].includes(l.status))
-    .reduce((s,l)=>s + Math.max(0,(l.paidAmount||0) - l.amount), 0);
+    .reduce((s,l)=>s + (l.interestPaid || 0), 0);
 
   // ── Expenses ──────────────────────────────────────────────────────
   const totalExpenses = DB.expenses.reduce((s,e)=>s+e.amount,0);
@@ -1368,7 +1493,7 @@ function renderPerf() {
   // ── Revenue detail card ───────────────────────────────────────────
   const intExpected = DB.loans
     .filter(l=>!['pending','rejected'].includes(l.status))
-    .reduce((s,l)=>s+(l.totalDue-l.amount),0);
+    .reduce((s,l)=>s+Math.max(0,(l.paidAmount||0)+(l.totalDue||0)-l.amount),0);
   document.getElementById('perfRevDetail').innerHTML =
     plRow('ດອກທີ່ຄາດໄວ້ (ທັງໝົດ)',  formatMoney(intExpected),  false,'#6a1b9a') +
     plRow('ດອກຮັບແລ້ວຕົວຈິງ',       formatMoney(interestEarned),false,'#2e7d32') +
@@ -1461,7 +1586,7 @@ function renderPerf() {
     const pDone   = pLoans.filter(l=>l.status==='completed').length;
     const pDis    = pLoans.filter(l=>!['pending','rejected'].includes(l.status)).reduce((s,l)=>s+l.amount,0);
     const pInt    = pLoans.filter(l=>!['pending','rejected'].includes(l.status))
-                          .reduce((s,l)=>s+Math.max(0,(l.paidAmount||0)-l.amount),0);
+                          .reduce((s,l)=>s+(l.interestPaid||0),0);
     return `<tr>
       <td style="font-weight:700;">${p.name}</td>
       <td style="text-align:center;">${pLoans.length}</td>
@@ -1500,7 +1625,7 @@ function updateAlertsBadge() {
   const in7 = new Date(now.getTime() + 7 * 86400000);
   const cnt = DB.loans.filter(l => {
     if (l.status !== 'active') return false;
-    if ((l.paidAmount||0) >= l.totalDue) return false;
+    if ((l.totalDue||0) <= 0) return false;
     const due = calcDueDate(l);
     return due && due <= in7;
   }).length;
@@ -1519,7 +1644,8 @@ function alertCard(l, dueDate, days, remaining, type) {
     ? `${icon} <strong>ເກີນກຳໜົດ ${days} ວັນ</strong>`
     : `${icon} <strong>ຄ້ຽວຄົບໃນ ${days} ວັນ</strong>`;
   const dueFmt = dueDate.toLocaleDateString('lo-LA', {year:'numeric',month:'short',day:'numeric'});
-  const pct    = l.totalDue > 0 ? Math.min(100,Math.round(((l.paidAmount||0)/l.totalDue)*100)) : 0;
+  const _origTotal = (l.paidAmount||0) + (l.totalDue||0);
+  const pct        = _origTotal > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / _origTotal) * 100)) : 0;
   return `
   <div style="background:${bg};border:1.5px solid ${border};border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;"
        onclick="openLoanModal('${l.id}')">
@@ -1561,14 +1687,14 @@ function renderAlerts() {
 
   const overdue = DB.loans.filter(l => {
     if (l.status !== 'active') return false;
-    if ((l.paidAmount||0) >= l.totalDue) return false;
+    if ((l.totalDue||0) <= 0) return false;
     const due = calcDueDate(l);
     return due && due < now;
   }).sort((a,b) => calcDueDate(a) - calcDueDate(b));
 
   const dueSoon = DB.loans.filter(l => {
     if (l.status !== 'active') return false;
-    if ((l.paidAmount||0) >= l.totalDue) return false;
+    if ((l.totalDue||0) <= 0) return false;
     const due = calcDueDate(l);
     return due && due >= now && due <= in7;
   }).sort((a,b) => calcDueDate(a) - calcDueDate(b));
@@ -1578,7 +1704,7 @@ function renderAlerts() {
     {icon:'🔴', label:'ເກີນກຳໜົດ',          val:overdue.length,  color:'#c62828'},
     {icon:'🟠', label:'ໃກ້ຄົບ (7 ວັນ)',      val:dueSoon.length,  color:'#e65100'},
     {icon:'⚠️', label:'ທັງໝົດຕ້ອງເອົາໃຈໃສ່', val:overdue.length+dueSoon.length, color:'#6a1b9a'},
-    {icon:'💰', label:'ຍອດຄ້າງ overdue',     val:formatMoney(overdue.reduce((s,l)=>s+Math.max(0,l.totalDue-(l.paidAmount||0)),0)), color:'#c62828'},
+    {icon:'💰', label:'ຍອດຄ້າງ overdue',     val:formatMoney(overdue.reduce((s,l)=>s+(l.totalDue||0),0)), color:'#c62828'},
   ].map(k=>`<div class="kcard" style="border-left-color:${k.color};">
     <div class="ki">${k.icon}</div>
     <div class="kv" style="color:${k.color};font-size:1rem;">${k.val}</div>
@@ -1591,7 +1717,7 @@ function renderAlerts() {
     ? overdue.map(l => {
         const due  = calcDueDate(l);
         const days = Math.floor((now - due) / 86400000);
-        return alertCard(l, due, days, Math.max(0, l.totalDue-(l.paidAmount||0)), 'overdue');
+        return alertCard(l, due, days, l.totalDue||0, 'overdue');
       }).join('')
     : '<div style="text-align:center;padding:24px;color:#9e9e9e;background:white;border-radius:12px;">✅ ບໍ່ມີລາຍການເກີນກຳໜົດ</div>';
 
@@ -1601,7 +1727,7 @@ function renderAlerts() {
     ? dueSoon.map(l => {
         const due  = calcDueDate(l);
         const days = Math.ceil((due - now) / 86400000);
-        return alertCard(l, due, days, Math.max(0, l.totalDue-(l.paidAmount||0)), 'soon');
+        return alertCard(l, due, days, l.totalDue||0, 'soon');
       }).join('')
     : '<div style="text-align:center;padding:24px;color:#9e9e9e;background:white;border-radius:12px;">✅ ບໍ່ມີລາຍການໃກ້ຄົບ</div>';
 
@@ -1618,8 +1744,8 @@ function exportLoansCSV() {
     const due = calcDueDate(l);
     return [
       l.id, l.name, l.phone, l.productName,
-      l.amount, l.totalDue, l.paidAmount||0,
-      Math.max(0, l.totalDue-(l.paidAmount||0)),
+      l.amount, (l.paidAmount||0) + (l.totalDue||0), l.paidAmount||0,
+      l.totalDue||0,
       l.duration||'',
       new Date(l.createdAt).toLocaleDateString('lo-LA'),
       due ? due.toLocaleDateString('lo-LA') : '',
@@ -1731,7 +1857,7 @@ function openDebtPayModal(debtId) {
        <div><div style="font-size:.68rem;color:#9e9e9e;">ຊຳລະແລ້ວ</div><div style="font-weight:700;color:#2e7d32;">${formatMoney(totalRepaid)}</div></div>
        <div><div style="font-size:.68rem;color:#9e9e9e;">ຍັງຄ້າງ</div><div style="font-weight:900;color:#c62828;">${formatMoney(remaining)}</div></div>
      </div>`;
-  document.getElementById('dpm-amount').value = remaining > 0 ? remaining : '';
+  document.getElementById('dpm-amount').value = remaining > 0 ? remaining.toLocaleString('en-US') : '';
   document.getElementById('dpm-date').value   = new Date().toISOString().slice(0, 10);
   document.getElementById('dpm-note').value   = '';
   renderDebtPayHistory(debtId);
@@ -1742,7 +1868,7 @@ function closeDebtPayModal() {
   currentDebtId = null;
 }
 function doDebtPayment() {
-  const amount = parseFloat(document.getElementById('dpm-amount').value);
+  const amount = getMoneyValue(document.getElementById('dpm-amount'));
   const method = document.getElementById('dpm-method').value;
   const date   = document.getElementById('dpm-date').value;
   const note   = document.getElementById('dpm-note').value.trim();
@@ -1782,11 +1908,177 @@ function renderDebtPayHistory(debtId) {
 function openConfirm(icon, title, msg, cb) {
   document.getElementById('cm-icon').textContent  = icon;
   document.getElementById('cm-title').textContent = title;
-  document.getElementById('cm-msg').textContent   = msg;
+  document.getElementById('cm-msg').innerHTML     = msg;
   document.getElementById('cm-ok').onclick = cb;
   document.getElementById('confirmModal').classList.add('open');
 }
 function closeConfirm() { document.getElementById('confirmModal').classList.remove('open'); }
+
+// ====== VIP ======
+function onVipChange() {
+  const checked = document.getElementById('pf-vip').checked;
+  document.getElementById('pf-vip-phones-group').style.display = checked ? 'flex' : 'none';
+}
+
+function doInviteVip(loanId) {
+  const loan     = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const vipProds = DB.products.filter(p => p.isVip && p.status === 'active');
+  if (!vipProds.length) { showToast('ຍັງບໍ່ມີຜະລິດຕະພັນ VIP', 'error'); return; }
+  const opts = vipProds.map(p =>
+    `<option value="${p.id}">${p.name} (${p.interestRate}%${p.isVip?' · '+((p.vipCustomers||[]).length)+' ເບີ':''})</option>`
+  ).join('');
+  const already = vipProds.filter(p =>
+    (p.vipCustomers||[]).some(v => v.replace(/\D/g,'') === loan.phone.replace(/\D/g,''))
+  ).map(p => p.name);
+  const alreadyMsg = already.length
+    ? `<div style="color:#2e7d32;font-size:.78rem;margin-top:6px;">✅ ເປັນ VIP ຢູ່ແລ້ວ: ${already.join(', ')}</div>`
+    : '';
+  const msg = `ລູກຄ້າ: <strong>${loan.name}</strong> (${loan.phone})${alreadyMsg}
+    <div style="margin-top:10px;">
+      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ຜະລິດຕະພັນ VIP:</label>
+      <select id="vip-prod-sel" style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;">${opts}</select>
+    </div>
+    <div style="margin-top:8px;">
+      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ໝາຍເຫດ (ທາງເລືອກ):</label>
+      <input type="text" id="vip-note-inp" placeholder="ໝາຍເຫດ"
+        style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;" />
+    </div>`;
+  openConfirm('👑', 'ເຊີນລູກຄ້າ VIP', msg, async () => {
+    const productId = document.getElementById('vip-prod-sel')?.value;
+    const note      = document.getElementById('vip-note-inp')?.value.trim() || '';
+    if (!productId) return;
+    try {
+      await DB.addVipInvitation(loanId, productId, loan.phone, note);
+      closeConfirm();
+      renderProducts();
+      showToast('ເຊີນລູກຄ້າເຂົ້າ VIP ສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+// ====== TAB: CREDIT SCORE ======
+const MONTH_NAMES_LO = ['ມ.ກ','ກ.ພ','ມ.ນ','ມ.ສ','ພ.ພ','ມ.ຖ','ກ.ລ','ສ.ຫ','ກ.ຍ','ຕ.ລ','ພ.ຈ','ທ.ວ'];
+
+function initCsYearSelect() {
+  const sel = document.getElementById('cs-year');
+  if (!sel || sel.options.length) return;
+  const now = new Date().getFullYear();
+  sel.innerHTML = [now, now-1, now-2].map(y =>
+    `<option value="${y}" ${y===now?'selected':''}>${y}</option>`).join('');
+}
+
+function renderCreditScore() {
+  initCsYearSelect();
+  const year = parseInt(document.getElementById('cs-year')?.value) || new Date().getFullYear();
+  const activeLoans = DB.loans.filter(l => ['active','completed'].includes(l.status))
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const list = document.getElementById('cs-list');
+
+  if (!activeLoans.length) {
+    list.innerHTML = '<div style="text-align:center;padding:32px;color:#9e9e9e;background:white;border-radius:13px;">ຍັງບໍ່ມີສັນຍາກູ້</div>';
+    document.getElementById('cs-dec-panel').style.display = 'none';
+    return;
+  }
+
+  list.innerHTML = activeLoans.map(loan => {
+    const cs    = DB.creditScores.find(s => s.loanId === loan.id && s.year === year);
+    const marks = cs ? cs.monthMarks : {};
+    const score = cs ? cs.score : 100;
+    const eligible = cs ? cs.eligible : false;
+    const scoreCls = score >= 80 ? 'score-hi' : score >= 50 ? 'score-mid' : 'score-lo';
+
+    const cells = MONTH_NAMES_LO.map((m, i) => {
+      const mo   = String(i + 1).padStart(2, '0');
+      const st   = marks[mo] || '';
+      const icons  = { normal:'✅', late:'⚠️', compound:'🔴' };
+      const clsMap = { normal:'normal', late:'late', compound:'compound' };
+      return `<div class="m-cell ${clsMap[st]||''}" onclick="cycleMonthMark('${loan.id}',${year},'${mo}')" title="${m}">
+        <span class="mi">${icons[st]||'·'}</span>${m}</div>`;
+    }).join('');
+
+    const normalC   = Object.values(marks).filter(v=>v==='normal').length;
+    const lateC     = Object.values(marks).filter(v=>v==='late').length;
+    const compoundC = Object.values(marks).filter(v=>v==='compound').length;
+
+    return `<div class="cs-card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:.7rem;color:#9e9e9e;">${loan.id} · ${stBadge(loan.status)}</div>
+          <div style="font-weight:800;color:#1b5e20;margin-top:2px;">${loan.name}</div>
+          <div style="font-size:.75rem;color:#9e9e9e;">📞 ${loan.phone} · ${loan.productName}</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="score-badge ${scoreCls}">⭐ ${score} pts</span>
+          ${eligible ? '<div class="eligible-badge">🎁 ມີສິດຮັບສ່ວນຫຼຸດ</div>' : ''}
+        </div>
+      </div>
+      <div class="month-grid">${cells}</div>
+      <div style="font-size:.72rem;color:#9e9e9e;margin-top:2px;">
+        ✅ ${normalC} ປົກກະຕິ &nbsp;·&nbsp; ⚠️ ${lateC} ຊ້າ &nbsp;·&nbsp; 🔴 ${compoundC} ທົບຕົ້ນ
+      </div>
+    </div>`;
+  }).join('');
+
+  // Eligible panel
+  const eligibleScores = DB.creditScores.filter(s => s.year === year && s.eligible && !s.discountUsed);
+  const decPanel = document.getElementById('cs-dec-panel');
+  const eligibleList = document.getElementById('cs-eligible-list');
+  decPanel.style.display = eligibleScores.length ? 'block' : 'none';
+
+  if (eligibleScores.length) {
+    eligibleList.innerHTML = eligibleScores.map(cs => {
+      const loan = DB.loans.find(l => l.id === cs.loanId);
+      if (!loan) return '';
+      return `<div style="background:#f9fbe7;border-radius:10px;padding:14px 16px;margin-bottom:10px;border:1px solid #c8e6c9;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-weight:800;">${loan.name}</div>
+            <div style="font-size:.75rem;color:#9e9e9e;">${loan.id} · 📞 ${loan.phone}</div>
+            <div style="font-size:.78rem;color:#1b5e20;margin-top:2px;">⭐ ${cs.score} pts · ປີ ${year}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+            ${cs.discountApproved
+              ? `<span style="background:#e8f5e9;color:#1b5e20;padding:3px 12px;border-radius:50px;font-size:.8rem;font-weight:700;">✅ ອະນຸມັດ ${cs.discountPercent}%${cs.note?' · '+cs.note:''}</span>`
+              : `<input type="number" id="disc-${cs.id}" value="5" min="0.5" max="50" step="0.5"
+                   style="width:65px;padding:6px 8px;border:2px solid #e0e0e0;border-radius:8px;font-size:.83rem;outline:none;font-family:inherit;" />
+                 <span style="font-size:.8rem;color:#616161;">%</span>
+                 <input type="text" id="disc-note-${cs.id}" placeholder="ໝາຍເຫດ"
+                   style="width:110px;padding:6px 8px;border:2px solid #e0e0e0;border-radius:8px;font-size:.8rem;outline:none;font-family:inherit;" />
+                 <button class="act-btn a-ok" onclick="approveDiscount('${cs.id}','${loan.id}',${year})">✅ ອະນຸມັດສ່ວນຫຼຸດ</button>`
+            }
+            ${DB.products.some(p=>p.isVip&&p.status==='active')
+              ? `<button class="act-btn btn-vip" style="padding:4px 10px;" onclick="doInviteVip('${loan.id}')">👑 ເຊີນ VIP</button>`
+              : ''
+            }
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function cycleMonthMark(loanId, year, month) {
+  const cs      = DB.creditScores.find(s => s.loanId === loanId && s.year === year);
+  const current = cs?.monthMarks?.[month] || '';
+  const cycle   = { '': 'normal', normal: 'late', late: 'compound', compound: '' };
+  const next    = cycle[current];
+  try {
+    await DB.updateMonthMark(loanId, year, month, next);
+    renderCreditScore();
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+async function approveDiscount(scoreId, loanId, year) {
+  const pct  = parseFloat(document.getElementById('disc-' + scoreId)?.value) || 0;
+  const note = (document.getElementById('disc-note-' + scoreId)?.value || '').trim();
+  if (pct <= 0) { showToast('ໃສ່ເປີເຊັນສ່ວນຫຼຸດ', 'error'); return; }
+  try {
+    await DB.saveDiscount(loanId, year, pct, note);
+    showToast('ອະນຸມັດສ່ວນຫຼຸດ ' + pct + '% ✅');
+    renderCreditScore();
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
 
 // Backdrop close
 ['loanModal','confirmModal','debtPayModal'].forEach(id => {
