@@ -18,7 +18,8 @@ create table if not exists agents (
   username        text not null unique,
   password        text not null,
   phone           text,
-  commission_rate numeric(15,2) not null default 0,  -- fixed kip amount per remittance period
+  commission_rate      numeric(15,2) not null default 0,  -- fixed kip amount per remittance period
+  commission_paid_month text,                             -- "2026-05" format, set by admin on confirm
   status          text not null default 'active' check (status in ('active','inactive')),
   created_at      timestamptz not null default now()
 );

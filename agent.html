@@ -844,6 +844,13 @@ async function loadCollections() {
       .eq('status', 'pending');
     pendingRemit = remits?.[0] || null;
 
+    // Re-fetch agent row so commission_paid_month is always up-to-date
+    const { data: freshAgent } = await sb.from('agents').select('*').eq('id', agentSession.id).single();
+    if (freshAgent) {
+      agentSession = { ...agentSession, ...freshAgent };
+      sessionStorage.setItem('agent_session', JSON.stringify(agentSession));
+    }
+
     updateCollBadge();
     renderCollections();
     renderProfile();
@@ -860,9 +867,11 @@ function updateCollBadge() {
 }
 
 function renderCollections() {
-  const total   = myCollections.reduce((s, c) => s + c.amount, 0);
-  const commAmt = agentSession.commission_rate || 0;
-  const netAmt  = total - commAmt;
+  const total           = myCollections.reduce((s, c) => s + c.amount, 0);
+  const currentMonth    = new Date().toISOString().slice(0, 7);
+  const commAlreadyPaid = agentSession.commission_paid_month === currentMonth;
+  const commAmt         = commAlreadyPaid ? 0 : (agentSession.commission_rate || 0);
+  const netAmt          = total - commAmt;
 
   // Table
   const tblEl = document.getElementById('collTable');
@@ -906,14 +915,20 @@ function renderCollections() {
         <span class="sr-v">${fmt(total)}</span>
       </div>
       <div class="sum-row">
-        <span class="sr-l">ຄ່າຈ້າງຄົງທີ່</span>
-        <span class="sr-v" style="color:#1565c0;">${fmt(commAmt)}</span>
+        <span class="sr-l">ຄ່າຈ້າງ</span>
+        <span class="sr-v" style="color:${commAlreadyPaid ? '#9e9e9e' : '#1565c0'};">
+          ${commAlreadyPaid
+            ? 'ຖືກຫັກແລ້ວ (0 ກີບ ຮອບນີ້)'
+            : fmt(agentSession.commission_rate || 0) + ' (ຫັກຄັ້ງດຽວເດືອນນີ້)'}
+        </span>
       </div>
       <div class="sum-total">
         <div class="st-l">ຕ້ອງສົ່ງຄືນ Admin</div>
         <div class="st-v">${fmt(Math.max(0, netAmt))}</div>
       </div>
-      ${total < commAmt ? `<div style="margin-top:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;padding:10px 12px;font-size:.82rem;color:#e65100;font-weight:700;text-align:center;">⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ</div>` : ''}
+      ${!commAlreadyPaid && total < (agentSession.commission_rate || 0)
+        ? `<div style="margin-top:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;padding:10px 12px;font-size:.82rem;color:#e65100;font-weight:700;text-align:center;">⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ</div>`
+        : ''}
     </div>` : '';
 
   // Remit section
@@ -969,11 +984,13 @@ function onSlipUpload(input) {
 }
 
 async function submitRemittance() {
-  const total   = myCollections.reduce((s, c) => s + c.amount, 0);
-  const commAmt = agentSession.commission_rate || 0;
-  const netAmt  = total - commAmt;
+  const total           = myCollections.reduce((s, c) => s + c.amount, 0);
+  const currentMonth    = new Date().toISOString().slice(0, 7);
+  const commAlreadyPaid = agentSession.commission_paid_month === currentMonth;
+  const commAmt         = commAlreadyPaid ? 0 : (agentSession.commission_rate || 0);
+  const netAmt          = total - commAmt;
   if (!slipImageData) { showToast('ກະລຸນາອັບໂຫລດ slip ກ່ອນ', 'error'); return; }
-  if (total < commAmt) { showToast('⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ', 'error'); return; }
+  if (!commAlreadyPaid && total < commAmt) { showToast('⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ', 'error'); return; }
 
   const btn = document.querySelector('#remitSection .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ ກຳລັງສົ່ງ...'; }
@@ -1012,7 +1029,8 @@ async function renderProfile() {
   document.getElementById('profInfo').innerHTML = `
     <div class="info-row"><span class="ir-l">📱 ເບີໂທ</span><span class="ir-v">${agentSession.phone||'-'}</span></div>
     <div class="info-row"><span class="ir-l">💼 ຊື່ຜູ້ໃຊ້</span><span class="ir-v">${agentSession.username}</span></div>
-    <div class="info-row"><span class="ir-l">💰 ຄ່າຈ້າງຄົງທີ່</span><span class="ir-v green">${fmt(agentSession.commission_rate||0)}</span></div>`;
+    <div class="info-row"><span class="ir-l">💰 ຄ່າຈ້າງ</span><span class="ir-v green">${fmt(agentSession.commission_rate||0)}</span></div>
+    <div class="info-row"><span class="ir-l">📅 ຄ່າຈ້າງເດືອນນີ້</span><span class="ir-v" style="color:${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'#2e7d32':'#e65100'};">${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'✅ ຖືກຫັກແລ້ວ':'⏳ ຍັງບໍ່ຖືກຫັກ'}</span></div>`;
 
   // Load history
   const now30 = new Date(Date.now() - 30*86400000).toISOString();
