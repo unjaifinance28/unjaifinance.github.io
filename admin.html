@@ -2231,6 +2231,9 @@ async function renderAgents() {
   }
 }
 
+// ====== REMITTANCE CARD CACHE (for print) ======
+const _remitCache = {};
+
 // ====== REMITTANCES TAB ======
 async function renderRemittances() {
   // Load agents (needed for performance table)
@@ -2244,31 +2247,24 @@ async function renderRemittances() {
     .order('created_at', { ascending: false });
   const pendingRemits = remits || [];
 
+  // Batch-fetch all collections for pending remittances in one query
+  let collByRemit = {};
+  if (pendingRemits.length) {
+    const remitIds = pendingRemits.map(r => r.id);
+    const { data: allCols } = await sb.from('agent_collections')
+      .select('*').in('remittance_id', remitIds).order('created_at', { ascending: true });
+    (allCols || []).forEach(c => {
+      if (!collByRemit[c.remittance_id]) collByRemit[c.remittance_id] = [];
+      collByRemit[c.remittance_id].push(c);
+    });
+  }
+
+  // Cache for print function
+  pendingRemits.forEach(r => { _remitCache[r.id] = { remit: r, cols: collByRemit[r.id] || [] }; });
+
   const remitEl = document.getElementById('remitList');
   const pendingHtml = pendingRemits.length
-    ? pendingRemits.map(r => `
-      <div style="background:white;border-radius:13px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
-          <div>
-            <div style="font-weight:800;font-size:.95rem;">👤 ${r.agent_name||'Agent'}</div>
-            <div style="font-size:.75rem;color:#9e9e9e;">${new Date(r.created_at).toLocaleDateString('lo-LA',{year:'numeric',month:'short',day:'numeric'})}</div>
-            <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;">
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ຮັບທັງໝົດ</div><div style="font-weight:700;">${formatMoney(r.total_amount)}</div></div>
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ຄ່າຈ້າງ</div><div style="font-weight:700;color:#1565c0;">${formatMoney(r.commission)}</div></div>
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ສົ່ງ</div><div style="font-weight:900;color:#1b5e20;font-size:.95rem;">${formatMoney(r.net_amount)}</div></div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-direction:column;align-items:flex-end;">
-            ${r.slip_image
-              ? `<img src="${r.slip_image}" style="max-width:200px;border-radius:8px;border:1px solid #e0e0e0;cursor:zoom-in;display:block;margin-bottom:4px;" onclick="viewSlip(this.src)" />`
-              : '<div style="font-size:.78rem;color:#9e9e9e;margin-bottom:4px;">ບໍ່ມີຮູບສະລິບ</div>'
-            }
-            <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem;" onclick="confirmRemittance('${r.id}')">
-              ✅ ຢືນຢັນໄດ້ຮັບເງິນ
-            </button>
-          </div>
-        </div>
-      </div>`).join('')
+    ? pendingRemits.map(r => buildRemittanceCard(r, collByRemit[r.id] || [])).join('')
     : '<div style="background:white;border-radius:12px;padding:20px;text-align:center;color:#9e9e9e;">✅ ບໍ່ມີ remittance ລໍຖ້າ</div>';
 
   // Recently confirmed remittances (last 30 days)
@@ -2347,6 +2343,186 @@ async function updateRemitBadge(count) {
   if (!b) return;
   b.textContent = count;
   b.style.display = count > 0 ? 'inline' : 'none';
+}
+
+function buildRemittanceCard(r, cols) {
+  const fmtD = iso => new Date(iso).toLocaleDateString('lo-LA', { year:'numeric', month:'short', day:'numeric' });
+  const mIcon = m => m==='cash'?'💵 ສົດ':m==='bcel'?'🏦 BCEL':'💳 '+m;
+
+  const tableRows = cols.map((c, i) => `
+    <tr style="border-bottom:1px solid #f5f5f5;">
+      <td style="padding:7px 8px;color:#9e9e9e;">${i+1}</td>
+      <td style="padding:7px 8px;white-space:nowrap;font-size:.75rem;">${fmtD(c.created_at)}</td>
+      <td style="padding:7px 8px;font-weight:600;">${c.loan_name||'-'}</td>
+      <td style="padding:7px 8px;font-size:.72rem;color:#1b5e20;">${c.loan_id}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;">${formatMoney(c.amount)}</td>
+      <td style="padding:7px 8px;font-size:.75rem;">${mIcon(c.method)}</td>
+    </tr>`).join('');
+
+  const totalRow = `
+    <tr style="background:#e8f5e9;font-weight:800;border-top:2px solid #c8e6c9;">
+      <td colspan="4" style="padding:8px 8px;text-align:right;color:#1b5e20;">ລວມທັງໝົດ</td>
+      <td style="padding:8px 8px;text-align:right;color:#1b5e20;font-size:.95rem;">${formatMoney(r.total_amount)}</td>
+      <td></td>
+    </tr>`;
+
+  return `
+    <div style="background:white;border-radius:13px;box-shadow:0 2px 10px rgba(0,0,0,.1);margin-bottom:18px;overflow:hidden;border:1.5px solid #ffe082;">
+      <!-- Card header -->
+      <div style="background:#fff8e1;border-bottom:1.5px solid #ffe082;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-weight:800;font-size:1rem;">👤 ${r.agent_name||'Agent'}</div>
+          <div style="font-size:.75rem;color:#9e9e9e;">ສ່ົງ: ${fmtD(r.created_at)}</div>
+        </div>
+        <span style="background:#e65100;color:white;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;">⏳ ລໍຖ້າຢືນຢັນ</span>
+      </div>
+
+      <div style="padding:16px 18px;">
+        <!-- Collection breakdown table -->
+        <div style="font-size:.8rem;font-weight:800;color:#1b5e20;margin-bottom:8px;">📋 ລາຍລະອຽດການຮັບ (${cols.length} ລາຍການ)</div>
+        <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0;">
+          <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+            <thead>
+              <tr style="background:#f5f5f5;">
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">#</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;white-space:nowrap;">ວັນທີ</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ຊື່ລູກຄ້າ</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ລະຫັດ</th>
+                <th style="padding:8px 8px;text-align:right;font-weight:700;color:#616161;white-space:nowrap;">ຮັບ (ກີບ)</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ວິທີ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows || '<tr><td colspan="6" style="text-align:center;padding:14px;color:#9e9e9e;">ບໍ່ພົບລາຍການ</td></tr>'}
+              ${totalRow}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary -->
+        <div style="margin-top:12px;background:#fafafa;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px;">
+            <span style="color:#616161;">├─ ລວມຮັບທັງໝົດ</span>
+            <span style="font-weight:700;">${formatMoney(r.total_amount)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:8px;">
+            <span style="color:#616161;">├─ ຄ່າຈ້າງ Agent (ຄົງທີ)</span>
+            <span style="font-weight:700;color:#c62828;">-${formatMoney(r.commission||0)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;border-top:1.5px solid #1b5e20;padding-top:8px;">
+            <span style="font-weight:800;color:#1b5e20;">└─ ສຸດທິຕ້ອງໂອນ</span>
+            <span style="font-weight:900;color:#1b5e20;font-size:1.05rem;">${formatMoney(r.net_amount)}</span>
+          </div>
+        </div>
+
+        <!-- Slip image -->
+        <div style="margin-top:12px;">
+          ${r.slip_image
+            ? `<img src="${r.slip_image}" style="max-width:100%;border-radius:10px;border:1px solid #e0e0e0;cursor:zoom-in;display:block;" onclick="viewSlip(this.src)" />`
+            : '<div style="background:#fff3e0;border:1.5px dashed #ffb74d;border-radius:10px;padding:14px;text-align:center;color:#e65100;font-size:.85rem;font-weight:700;">⚠️ ບໍ່ມີຮູບສະລິບ</div>'
+          }
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+          <button class="btn" style="padding:9px 16px;font-size:.83rem;background:#f5f5f5;color:#424242;border:1px solid #e0e0e0;" onclick="printRemittance('${r.id}')">
+            🖨️ ພິມ / PDF
+          </button>
+          <button class="btn btn-primary" style="padding:9px 16px;font-size:.83rem;flex:1;min-width:160px;" onclick="confirmRemittance('${r.id}')">
+            ✅ ຢືນຢັນໄດ້ຮັບເງິນ
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function printRemittance(remitId) {
+  const cached = _remitCache[remitId];
+  if (!cached) { showToast('ກະລຸນາໂຫລດໜ້ານີ້ໃໝ່', 'error'); return; }
+  const { remit: r, cols } = cached;
+
+  const fmtD  = iso => new Date(iso).toLocaleDateString('lo-LA', { year:'numeric', month:'short', day:'numeric' });
+  const fmtM  = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0)) + ' ກີບ';
+  const mName = m => m==='cash'?'ສົດ':m==='bcel'?'BCEL':m;
+  const printDate = new Date().toLocaleDateString('lo-LA', { year:'numeric', month:'long', day:'numeric' });
+
+  const tableRows = cols.map((c, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${fmtD(c.created_at)}</td>
+      <td>${c.loan_name||'-'}</td>
+      <td style="font-size:.8em;color:#1b5e20;">${c.loan_id}</td>
+      <td style="text-align:right;font-weight:700;">${fmtM(c.amount)}</td>
+      <td>${mName(c.method)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="lo"><head>
+    <meta charset="UTF-8"/>
+    <title>Remittance — ${r.agent_name}</title>
+    <style>
+      body { font-family:'Phetsarath OT','Noto Sans Lao',sans-serif; margin:28px 32px; color:#212121; font-size:14px; }
+      .hdr { text-align:center; border-bottom:3px solid #1b5e20; padding-bottom:14px; margin-bottom:20px; }
+      .hdr .logo { font-size:2.4rem; }
+      .hdr h1 { color:#1b5e20; margin:4px 0 0; font-size:1.5rem; }
+      .hdr h2 { margin:4px 0 0; font-size:1rem; color:#424242; font-weight:600; }
+      .meta { display:flex; gap:28px; flex-wrap:wrap; margin-bottom:18px; font-size:.88rem; }
+      .meta span { color:#616161; }
+      .meta strong { color:#212121; }
+      table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:.85rem; }
+      thead th { background:#1b5e20; color:white; padding:9px 10px; text-align:left; white-space:nowrap; }
+      tbody td { padding:8px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+      .total-row td { background:#e8f5e9; font-weight:800; border-top:2px solid #c8e6c9; border-bottom:none; }
+      .summary { background:#f9f9f9; border:1px solid #ddd; border-radius:8px; padding:14px 18px; margin-bottom:24px; }
+      .s-row { display:flex; justify-content:space-between; margin-bottom:7px; font-size:.9rem; }
+      .s-total { display:flex; justify-content:space-between; border-top:2px solid #1b5e20; padding-top:9px; font-weight:900; font-size:1.05rem; color:#1b5e20; }
+      .slip-img { max-width:280px; border:1px solid #ddd; border-radius:6px; margin-bottom:24px; }
+      .sig { display:flex; gap:80px; margin-top:56px; }
+      .sig-box { flex:1; text-align:center; }
+      .sig-line { border-top:1px solid #424242; margin:56px 0 8px; }
+      .sig-label { font-size:.85rem; color:#424242; }
+      @media print { @page { margin:18mm; } }
+    </style>
+  </head><body>
+    <div class="hdr">
+      <div class="logo">🏦</div>
+      <h1>Unjai Finance</h1>
+      <h2>ລາຍງານການສົ່ງເງິນ</h2>
+    </div>
+    <div class="meta">
+      <span>Agent: <strong>${r.agent_name||'-'}</strong></span>
+      <span>ວັນທີສົ່ງ: <strong>${fmtD(r.created_at)}</strong></span>
+      <span>ວັນທີພິມ: <strong>${printDate}</strong></span>
+      <span>ລະຫັດ: <strong>${r.id}</strong></span>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th><th>ວັນທີ</th><th>ຊື່ລູກຄ້າ</th><th>ລະຫັດ</th><th>ຮັບ (ກີບ)</th><th>ວິທີ</th>
+      </tr></thead>
+      <tbody>
+        ${tableRows || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#9e9e9e;">ບໍ່ພົບລາຍການ</td></tr>'}
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right;padding:9px 10px;">ລວມທັງໝົດ</td>
+          <td style="padding:9px 10px;">${fmtM(r.total_amount)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="summary">
+      <div class="s-row"><span>ລວມຮັບທັງໝົດ</span><span>${fmtM(r.total_amount)}</span></div>
+      <div class="s-row"><span>ຄ່າຈ້າງ Agent (ຄົງທີ)</span><span style="color:#c62828;">-${fmtM(r.commission||0)}</span></div>
+      <div class="s-total"><span>ສຸດທິຕ້ອງໂອນ</span><span>${fmtM(r.net_amount)}</span></div>
+    </div>
+    ${r.slip_image ? `<div><div style="font-weight:700;margin-bottom:8px;">ຮູບ Slip ໂອນເງິນ:</div><img src="${r.slip_image}" class="slip-img"/></div>` : ''}
+    <div class="sig">
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ລາຍເຊັນ Admin</div></div>
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ລາຍເຊັນ Agent (${r.agent_name||''})</div></div>
+    </div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 async function saveAgent(e) {
