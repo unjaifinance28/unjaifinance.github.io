@@ -786,12 +786,18 @@ async function confirmPayment() {
 
     // 3. Save to agent_collections
     const colId = 'COL' + Date.now();
-    await sb.from('agent_collections').insert({
-      id: colId, agent_id: agentSession.id,
-      loan_id: loan.id, loan_name: loan.name, loan_ref: ref,
-      amount: amt, method, remitted: false,
+    console.log('[agent] saving collection — agent_id:', agentSession.id, '| loan_id:', loan.id, '| amount:', amt);
+    const { error: colErr } = await sb.from('agent_collections').insert({
+      id: colId,
+      agent_id:  agentSession.id,
+      loan_id:   loan.id,
+      loan_name: loan.name,
+      amount:    amt,
+      method,
+      remitted:  false,
       created_at: new Date().toISOString(),
     });
+    if (colErr) console.error('[agent] agent_collections insert FAILED:', colErr.message, colErr);
 
     // Show receipt
     document.getElementById('loanResult').innerHTML = `
@@ -822,11 +828,14 @@ async function confirmPayment() {
 // ===== LOAD COLLECTIONS =====
 async function loadCollections() {
   try {
-    const { data: cols } = await sb.from('agent_collections')
+    console.log('[agent] loadCollections — agent_id:', agentSession.id);
+    const { data: cols, error: colsErr } = await sb.from('agent_collections')
       .select('*')
       .eq('agent_id', agentSession.id)
       .eq('remitted', false)
       .order('created_at', { ascending: false });
+    if (colsErr) console.error('[agent] agent_collections query FAILED:', colsErr.message, colsErr);
+    console.log('[agent] unremitted collections found:', cols?.length ?? 0, cols);
     myCollections = cols || [];
 
     const { data: remits } = await sb.from('agent_remittances')

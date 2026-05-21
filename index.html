@@ -735,10 +735,9 @@ function doStatusSearch() {
       ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
       : Math.round(principal * (interestRate / 100));
 
-    // How much of this cycle's interest remains in totalDue
-    const interestInDb      = Math.max(0, (l.totalDue || 0) - principal);
-    // How much has been paid toward this cycle = full cycle minus what's still owed
-    const interestPaidCycle = Math.max(0, cycleInterest - interestInDb);
+    // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
+    const interestPaidCycle = l.interestPaid || 0;
+    const interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
 
     // Due date and countdown (always from createdAt + duration, the contract date)
     const dueDate    = new Date(new Date(l.createdAt).getTime() + (l.duration || 30) * 86400000);
@@ -747,17 +746,8 @@ function doStatusSearch() {
     const daysLeft   = Math.ceil((dueStart - todayStart) / 86400000);
     const isOverdue  = daysLeft < 0;
 
-    // If cycle fully paid AND past due → new cycle, full interest resets
-    let cycleInterestDisplay, interestPaidDisplay, interestOwed;
-    if (interestPaidCycle >= cycleInterest && isOverdue) {
-      cycleInterestDisplay = cycleInterest;
-      interestPaidDisplay  = 0;
-      interestOwed         = cycleInterest;
-    } else {
-      cycleInterestDisplay = cycleInterest;
-      interestPaidDisplay  = interestPaidCycle;
-      interestOwed         = Math.max(0, cycleInterest - interestPaidCycle);
-    }
+    const cycleInterestDisplay = cycleInterest;
+    const interestPaidDisplay  = interestPaidCycle;
 
     // ---- Compound warning (uses interestOwed, not old interestDue) ----
     let compoundWarning = '';
