@@ -771,33 +771,59 @@ function removeLogo() {
 }
 
 // ====== AUTH ======
-const DEFAULT_PWD = 'admin1234';
-const getAdminPwd = () => localStorage.getItem('admin_pwd') || DEFAULT_PWD;
+async function getAdminPwd() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','admin_password').single();
+    return data?.value || 'admin1234';
+  } catch { return 'admin1234'; }
+}
+async function saveAdminPwd(newPwd) {
+  await sb.from('app_settings').upsert({ key:'admin_password', value:newPwd, updated_at:new Date().toISOString() });
+}
 
-function doLogin() {
+async function doLogin() {
   const v = document.getElementById('pwdInput').value;
-  if (!v) { document.getElementById('pwdErr').textContent = 'ໃສ່ລະຫັດ'; return; }
-  if (v !== getAdminPwd()) {
-    document.getElementById('pwdErr').textContent = '❌ ລະຫັດຜ່ານຜິດ';
-    document.getElementById('pwdInput').value = '';
-    return;
+  const errEl = document.getElementById('pwdErr');
+  const btn = document.querySelector('#loginScreen .btn-primary');
+  if (!v) { errEl.textContent = 'ໃສ່ລະຫັດ'; return; }
+  errEl.textContent = '';
+  btn.textContent = 'ກຳລັງກວດສອບ...';
+  btn.disabled = true;
+  try {
+    const correctPwd = await getAdminPwd();
+    if (v !== correctPwd) {
+      errEl.textContent = '❌ ລະຫັດຜ່ານຜິດ';
+      document.getElementById('pwdInput').value = '';
+      btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
+      btn.disabled = false;
+      return;
+    }
+    sessionStorage.setItem('admin_auth','1');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminBody').style.display = 'block';
+    initAdmin();
+  } catch(err) {
+    errEl.textContent = '❌ ເກີດຂໍ້ຜິດພາດ ກະລຸນາລອງໃໝ່';
+    btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
+    btn.disabled = false;
   }
-  sessionStorage.setItem('admin_auth','1');
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('adminBody').style.display = 'block';
-  initAdmin();
 }
 function doLogout() { sessionStorage.removeItem('admin_auth'); location.reload(); }
 document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
-function changePwd() {
+async function changePwd() {
   const p1=document.getElementById('np1').value, p2=document.getElementById('np2').value;
   const msg=document.getElementById('pwdMsg');
   if (p1.length < 4) { msg.style.color='#c62828'; msg.textContent='ຢ່າງໜ້ອຍ 4 ຕົວ'; return; }
   if (p1 !== p2) { msg.style.color='#c62828'; msg.textContent='ລະຫັດບໍ່ກົງກັນ'; return; }
-  localStorage.setItem('admin_pwd', p1);
-  msg.style.color='#1b5e20'; msg.textContent='✅ ປ່ຽນສຳເລັດ';
-  document.getElementById('np1').value = document.getElementById('np2').value = '';
-  setTimeout(()=>msg.textContent='', 3000);
+  msg.style.color='#9e9e9e'; msg.textContent='ກຳລັງບັນທຶກ...';
+  try {
+    await saveAdminPwd(p1);
+    msg.style.color='#1b5e20'; msg.textContent='✅ ປ່ຽນສຳເລັດ';
+    document.getElementById('np1').value = document.getElementById('np2').value = '';
+    setTimeout(()=>msg.textContent='', 3000);
+  } catch(err) {
+    msg.style.color='#c62828'; msg.textContent='❌ ບໍ່ສາມາດບັນທຶກໄດ້';
+  }
 }
 if (sessionStorage.getItem('admin_auth')==='1') {
   document.getElementById('loginScreen').style.display='none';
