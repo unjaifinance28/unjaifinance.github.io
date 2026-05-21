@@ -458,8 +458,10 @@
         </div>
         <div class="pc-body">
           <div id="profInfo"></div>
+          <div id="profMonthNav"></div>
           <div class="stat-grid" id="profStats"></div>
-          <div style="font-size:.8rem;font-weight:700;color:var(--green-dark);margin-bottom:8px;">📋 ປະຫວັດ 30 ວັນ</div>
+          <div id="profSummary"></div>
+          <div id="profHistLabel" style="font-size:.8rem;font-weight:700;color:var(--green-dark);margin-bottom:8px;margin-top:14px;"></div>
           <div class="hist-list" id="profHistory"></div>
         </div>
       </div>
@@ -507,10 +509,11 @@ let html5QrCode  = null;
 let scannerActive = false;
 let currentLoan  = null;
 let currentProduct = null;
-let myCollections   = [];
-let myRemittances   = [];
-let pendingRemit    = null;
+let myCollections    = [];
+let myRemittances    = [];
+let pendingRemit     = null;
 let agentRemittances = [];
+let profileMonth     = new Date().toISOString().slice(0, 7);
 
 // ===== UTILS =====
 function fmt(n) {
@@ -1061,54 +1064,145 @@ async function submitRemittance() {
 }
 
 // ===== PROFILE =====
+function profPrevMonth() {
+  const [y, m] = profileMonth.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  profileMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  renderProfile();
+}
+function profNextMonth() {
+  const nowYM = new Date().toISOString().slice(0, 7);
+  if (profileMonth >= nowYM) return;
+  const [y, m] = profileMonth.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  profileMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  renderProfile();
+}
+
 async function renderProfile() {
   document.getElementById('profName').textContent = agentSession.full_name;
+
+  const nowYM      = new Date().toISOString().slice(0, 7);
+  const isThisMonth = profileMonth === nowYM;
+  const commPaidThisMonth = agentSession.commission_paid_month === nowYM;
 
   document.getElementById('profInfo').innerHTML = `
     <div class="info-row"><span class="ir-l">📱 ເບີໂທ</span><span class="ir-v">${agentSession.phone||'-'}</span></div>
     <div class="info-row"><span class="ir-l">💼 ຊື່ຜູ້ໃຊ້</span><span class="ir-v">${agentSession.username}</span></div>
     <div class="info-row"><span class="ir-l">💰 ຄ່າຈ້າງ</span><span class="ir-v green">${fmt(agentSession.commission_rate||0)}</span></div>
-    <div class="info-row"><span class="ir-l">📅 ຄ່າຈ້າງເດືອນນີ້</span><span class="ir-v" style="color:${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'#2e7d32':'#e65100'};">${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'✅ ຖືກຫັກແລ້ວ':'⏳ ຍັງບໍ່ຖືກຫັກ'}</span></div>`;
+    <div class="info-row"><span class="ir-l">📅 ຄ່າຈ້າງເດືອນນີ້</span><span class="ir-v" style="color:${commPaidThisMonth?'#2e7d32':'#e65100'};">${commPaidThisMonth?'✅ ຖືກຫັກແລ້ວ':'⏳ ຍັງບໍ່ຖືກຫັກ'}</span></div>`;
 
-  // Load history
-  const now30 = new Date(Date.now() - 30*86400000).toISOString();
+  // Month navigator
+  const monthLabel = new Date(profileMonth + '-15').toLocaleDateString('lo-LA', { month: 'long', year: 'numeric' });
+  const navBtnStyle = 'border:none;background:transparent;font-size:1.1rem;cursor:pointer;padding:4px 10px;color:#1b5e20;font-weight:900;border-radius:8px;';
+  document.getElementById('profMonthNav').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f1f8e9;border:1.5px solid #c8e6c9;border-radius:12px;padding:10px 14px;margin-bottom:14px;">
+      <button onclick="profPrevMonth()" style="${navBtnStyle}">◀</button>
+      <span style="font-weight:800;color:#1b5e20;font-size:.95rem;">📅 ${monthLabel}</span>
+      <button onclick="profNextMonth()" style="${navBtnStyle}${isThisMonth?';opacity:.3;cursor:not-allowed':''}">▶</button>
+    </div>`;
+
+  // Date range for selected month
+  const [sy, sm] = profileMonth.split('-').map(Number);
+  const monthStart = new Date(sy, sm - 1, 1).toISOString();
+  const monthEnd   = new Date(sy, sm, 1).toISOString();
+
+  // Load collections for selected month
   const { data: hist } = await sb.from('agent_collections')
     .select('*')
     .eq('agent_id', agentSession.id)
-    .gte('created_at', now30)
+    .gte('created_at', monthStart)
+    .lt('created_at', monthEnd)
     .order('created_at', { ascending: false });
-
   const histData = hist || [];
-  const monthTotal = histData.reduce((s, c) => s + c.amount, 0);
-  const commEarned = agentSession.commission_rate || 0;
 
+  // Load remittances for selected month
+  const { data: monthRemits } = await sb.from('agent_remittances')
+    .select('*')
+    .eq('agent_id', agentSession.id)
+    .gte('created_at', monthStart)
+    .lt('created_at', monthEnd)
+    .order('created_at', { ascending: false });
+  const monthRemitList = monthRemits || [];
+  const remitStatusMap = Object.fromEntries(monthRemitList.map(r => [r.id, r.status]));
+
+  // Compute stats
+  const totalAmt   = histData.reduce((s, c) => s + c.amount, 0);
+  const remittedAmt = histData.filter(c => c.remitted).reduce((s, c) => s + c.amount, 0);
+  const pendingAmt  = totalAmt - remittedAmt;
+  const commRate    = agentSession.commission_rate || 0;
+  const commPaidSelectedMonth = agentSession.commission_paid_month === profileMonth;
+  const pendingCount = monthRemitList.filter(r => r.status === 'pending').length;
+
+  // Stats cells
   document.getElementById('profStats').innerHTML = `
-    <div class="stat-cell"><div class="sc-v">${histData.length}</div><div class="sc-l">ລາຍການ (30 ວັນ)</div></div>
-    <div class="stat-cell"><div class="sc-v" style="font-size:.9rem;">${fmt(monthTotal)}</div><div class="sc-l">ຮັບທັງໝົດ</div></div>
-    <div class="stat-cell"><div class="sc-v" style="font-size:.9rem;color:#1565c0;">${fmt(commEarned)}</div><div class="sc-l">ຄ່າຈ້າງ</div></div>
-    <div class="stat-cell"><div class="sc-v">${myCollections.length}</div><div class="sc-l">ຍັງບໍ່ສົ່ງ</div></div>`;
+    <div class="stat-cell"><div class="sc-v">${histData.length}</div><div class="sc-l">ລາຍການ</div></div>
+    <div class="stat-cell"><div class="sc-v" style="font-size:.85rem;">${fmt(totalAmt)}</div><div class="sc-l">ຮັບທັງໝົດ</div></div>
+    <div class="stat-cell"><div class="sc-v" style="font-size:.85rem;color:#1565c0;">${fmt(commRate)}</div><div class="sc-l">ຄ່າຈ້າງ</div></div>
+    <div class="stat-cell"><div class="sc-v" style="color:${pendingCount?'#e65100':'#9e9e9e'};">${pendingCount}</div><div class="sc-l">ລໍຖ້າ Admin</div></div>`;
 
-  const remitStatusMap = Object.fromEntries(agentRemittances.map(r => [r.id, r.status]));
+  // Monthly summary card
+  document.getElementById('profSummary').innerHTML = `
+    <div style="background:white;border:1.5px solid #c8e6c9;border-radius:13px;padding:14px 16px;margin-bottom:4px;">
+      <div style="font-size:.78rem;font-weight:800;color:#1b5e20;margin-bottom:10px;">📊 ສະຫຼຸບເດືອນ ${monthLabel}</div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;">
+          <span style="color:#616161;">ລວມຮັບ</span>
+          <span style="font-weight:700;color:#1b5e20;">${fmt(totalAmt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;">
+          <span style="color:#616161;">ສົ່ງ Admin ແລ້ວ</span>
+          <span style="font-weight:700;color:#1565c0;">${fmt(remittedAmt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;">
+          <span style="color:#616161;">ຄ້າງສົ່ງ</span>
+          <span style="font-weight:700;color:${pendingAmt>0?'#e65100':'#9e9e9e'};">${fmt(pendingAmt)}</span>
+        </div>
+        <div style="border-top:1px dashed #e0e0e0;padding-top:7px;display:flex;justify-content:space-between;font-size:.83rem;">
+          <span style="color:#616161;">ຄ່າຈ້າງ</span>
+          <span style="font-weight:700;color:${commPaidSelectedMonth?'#2e7d32':'#e65100'};">
+            ${fmt(commRate)} · ${commPaidSelectedMonth?'✅ ຖືກຫັກ':'⏳ ຍັງບໍ່ຫັກ'}
+          </span>
+        </div>
+      </div>
+    </div>`;
+
+  // History label
+  document.getElementById('profHistLabel').textContent = `📋 ລາຍການ ${monthLabel}`;
+
+  // Collection table
   document.getElementById('profHistory').innerHTML = histData.length
-    ? histData.map(c => {
-        let badge = '';
-        if (c.remitted && c.remittance_id) {
-          const st = remitStatusMap[c.remittance_id];
-          if (st === 'confirmed') {
-            badge = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.68rem;font-weight:700;background:#e8f5e9;color:#2e7d32;">✅ ສົ່ງສຳເລັດ</span>`;
-          } else {
-            badge = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.68rem;font-weight:700;background:#fff3e0;color:#e65100;">⏳ ລໍຖ້າຢືນຢັນ</span>`;
-          }
-        }
-        return `<div class="hist-item">
-          <div>
-            <div class="hi-name">${c.loan_name||c.loan_id}</div>
-            <div class="hi-sub">${fmtDate(c.created_at)} · ${c.method}${badge}</div>
-          </div>
-          <div class="hi-amt">+${new Intl.NumberFormat('lo-LA').format(c.amount)}</div>
-        </div>`;
-      }).join('')
-    : '<div style="text-align:center;color:#9e9e9e;padding:16px;font-size:.85rem;">ຍັງບໍ່ມີລາຍການ</div>';
+    ? `<table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+        <thead>
+          <tr style="background:#f5f5f5;">
+            <th style="padding:7px 8px;text-align:left;font-weight:700;color:#616161;white-space:nowrap;">ວັນທີ</th>
+            <th style="padding:7px 8px;text-align:left;font-weight:700;color:#616161;">ລູກຄ້າ</th>
+            <th style="padding:7px 8px;text-align:right;font-weight:700;color:#616161;white-space:nowrap;">ຈຳນວນ</th>
+            <th style="padding:7px 8px;text-align:center;font-weight:700;color:#616161;">ວິທີ</th>
+            <th style="padding:7px 8px;text-align:center;font-weight:700;color:#616161;">ສະຖານະ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${histData.map(c => {
+            let statusBadge = '<span style="color:#9e9e9e;font-size:.7rem;">ຍັງຄ້າງ</span>';
+            if (c.remitted && c.remittance_id) {
+              const st = remitStatusMap[c.remittance_id];
+              statusBadge = st === 'confirmed'
+                ? '<span style="padding:2px 6px;border-radius:10px;font-size:.68rem;font-weight:700;background:#e8f5e9;color:#2e7d32;white-space:nowrap;">✅ ສຳເລັດ</span>'
+                : '<span style="padding:2px 6px;border-radius:10px;font-size:.68rem;font-weight:700;background:#fff3e0;color:#e65100;white-space:nowrap;">⏳ ລໍຖ້າ</span>';
+            }
+            const methodIcon = c.method==='cash'?'💵':c.method==='bcel'?'🏦':'💳';
+            return `<tr style="border-bottom:1px solid #f5f5f5;">
+              <td style="padding:8px 8px;white-space:nowrap;color:#616161;">${fmtDate(c.created_at)}</td>
+              <td style="padding:8px 8px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.loan_name||c.loan_id}</td>
+              <td style="padding:8px 8px;text-align:right;font-weight:700;color:#1b5e20;white-space:nowrap;">${new Intl.NumberFormat('lo-LA').format(c.amount)}</td>
+              <td style="padding:8px 8px;text-align:center;">${methodIcon}</td>
+              <td style="padding:8px 8px;text-align:center;">${statusBadge}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`
+    : '<div style="text-align:center;color:#9e9e9e;padding:20px;font-size:.85rem;">ຍັງບໍ່ມີລາຍການໃນເດືອນນີ້</div>';
 }
 
 // ===== NAVIGATION =====
