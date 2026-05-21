@@ -6,6 +6,7 @@
   <title>Admin | Unjai Finance</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
   <style>
   /* ====== LOGIN ====== */
   .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1b5e20,#2e7d32); padding:20px; }
@@ -267,6 +268,7 @@
       <button class="atab" onclick="showTab('alerts',this)">🔔 ແຈ້ງເຕືອນ <span id="badge-alerts" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
+      <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
     </div>
 
     <!-- ====== TAB: REQUESTS ====== -->
@@ -540,6 +542,69 @@
       </div>
     </div>
 
+    <!-- ====== TAB: AGENTS ====== -->
+    <div id="tab-agents" class="tab-pane">
+
+      <!-- Create Agent Form -->
+      <div class="prod-form-card">
+        <h3 id="agentFormTitle">➕ ສ້າງບັນຊີ Agent ໃໝ່</h3>
+        <form id="agentForm" onsubmit="saveAgent(event)">
+          <input type="hidden" id="af-id" />
+          <div class="form-row">
+            <div class="fi">
+              <label>ຊື່-ນາມສະກຸນ *</label>
+              <input type="text" id="af-name" placeholder="ຊື່ Agent" required />
+            </div>
+            <div class="fi">
+              <label>ຊື່ຜູ້ໃຊ້ (username) *</label>
+              <input type="text" id="af-username" placeholder="ສຳລັບ Login" required autocomplete="off" />
+            </div>
+            <div class="fi">
+              <label>ລະຫັດຜ່ານ *</label>
+              <input type="password" id="af-password" placeholder="ຢ່າງໜ້ອຍ 4 ຕົວ" autocomplete="new-password" />
+            </div>
+            <div class="fi">
+              <label>ເບີໂທ</label>
+              <input type="text" id="af-phone" placeholder="020XXXXXXXX" />
+            </div>
+            <div class="fi">
+              <label>ຄ່າຈ້າງຄົງທີ່ (ກີບ) *</label>
+              <input type="text" id="af-rate" inputmode="numeric" placeholder="500,000" oninput="formatMoneyInput(this)" required />
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary" style="padding:10px 22px;">💾 ບັນທຶກ</button>
+            <button type="button" class="btn btn-outline" style="padding:10px 18px;" onclick="cancelAgentEdit()">ຍົກເລີກ</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Agent List -->
+      <div class="sec-title">👥 ລາຍຊື່ Agent</div>
+      <div class="prod-list-card" id="agentList"></div>
+
+      <!-- Pending Remittances -->
+      <div class="sec-title" style="margin-top:18px;color:#e65100;">⏳ ລໍຖ້າຢືນຢັນ Remittance</div>
+      <div id="remitList"></div>
+
+      <!-- Agent Performance -->
+      <div class="sec-title" style="margin-top:18px;">📊 ຜົນງານ Agent (ເດືອນນີ້)</div>
+      <div class="tbl-card" id="agentPerfWrap">
+        <div style="overflow-x:auto;">
+          <table id="agentPerfTable" style="width:100%;border-collapse:collapse;font-size:.83rem;">
+            <thead><tr>
+              <th style="background:#1b5e20;color:white;padding:10px 13px;text-align:left;">Agent</th>
+              <th style="background:#1b5e20;color:white;padding:10px 13px;text-align:right;">ລາຍການ</th>
+              <th style="background:#1b5e20;color:white;padding:10px 13px;text-align:right;">ຮັບທັງໝົດ</th>
+              <th style="background:#1b5e20;color:white;padding:10px 13px;text-align:right;">ຄ່າຈ້າງ</th>
+              <th style="background:#1b5e20;color:white;padding:10px 13px;text-align:right;">ສົ່ງແລ້ວ</th>
+            </tr></thead>
+            <tbody id="agentPerfBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9e9e9e;">ກຳລັງໂຫລດ...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /admin-wrap -->
 </div><!-- /admin-body -->
 
@@ -569,6 +634,14 @@
     <div id="md-pay-form"></div>
     <div id="md-topup-form"></div>
     <div class="ma" id="md-acts"></div>
+    <!-- Barcode Section -->
+    <div id="md-barcode-section" style="display:none;margin-top:14px;background:#f9fbe7;border:1px solid #c8e6c9;border-radius:10px;padding:14px;text-align:center;">
+      <div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">🔲 Barcode ສຳລັບ Agent</div>
+      <svg id="md-barcode-svg" style="max-width:100%;height:70px;"></svg>
+      <div style="margin-top:8px;">
+        <button class="btn btn-outline" style="padding:6px 16px;font-size:.8rem;" onclick="printBarcodeCard()">🖨️ ພິມບັດ</button>
+      </div>
+    </div>
     <button class="btn btn-outline btn-full" style="margin-top:10px;" onclick="closeLoanModal()">ປິດ</button>
   </div>
 </div>
@@ -756,6 +829,7 @@ function showTab(name, btn) {
   if (name==='alerts')   renderAlerts();
   if (name==='charts')   renderCharts();
   if (name==='credits')  renderCreditScore();
+  if (name==='agents')   renderAgents();
 }
 
 // ====== INIT ======
@@ -1080,7 +1154,48 @@ function openLoanModal(id, focus) {
     }
   }
 
+  // Barcode
+  const barcodeSection = document.getElementById('md-barcode-section');
+  const barcodeSvg     = document.getElementById('md-barcode-svg');
+  if (typeof JsBarcode !== 'undefined') {
+    try {
+      JsBarcode(barcodeSvg, loan.id, {
+        format: 'CODE128', width: 2, height: 60,
+        displayValue: true, fontSize: 12, margin: 6,
+        lineColor: '#1b5e20',
+      });
+      barcodeSection.style.display = 'block';
+    } catch(e) { barcodeSection.style.display = 'none'; }
+  } else {
+    barcodeSection.style.display = 'none';
+  }
+
   document.getElementById('loanModal').classList.add('open');
+}
+
+function printBarcodeCard() {
+  const loan = DB.loans.find(l => l.id === currentLoanId);
+  if (!loan) return;
+  const svg = document.getElementById('md-barcode-svg').outerHTML;
+  const win = window.open('', '_blank', 'width=400,height=300');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>ບັດ ${loan.id}</title>
+    <style>
+      body { font-family: sans-serif; text-align: center; padding: 20px; }
+      .card { border: 2px solid #1b5e20; border-radius: 12px; padding: 20px; display: inline-block; }
+      h2 { color: #1b5e20; font-size: 1.1rem; margin-bottom: 4px; }
+      p { font-size: .8rem; color: #616161; margin: 0 0 14px; }
+    </style>
+  </head><body>
+    <div class="card">
+      <h2>Unjai Finance</h2>
+      <p>${loan.name} · ${loan.phone}</p>
+      ${svg}
+      <p style="margin-top:10px;font-size:.9rem;font-weight:700;">${loan.id}</p>
+    </div>
+    <script>window.onload=()=>{ window.print(); window.close(); }<\/script>
+  </body></html>`);
+  win.document.close();
 }
 
 function closeLoanModal() {
@@ -2078,6 +2193,195 @@ async function approveDiscount(scoreId, loanId, year) {
     showToast('ອະນຸມັດສ່ວນຫຼຸດ ' + pct + '% ✅');
     renderCreditScore();
   } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+// ====== AGENTS TAB ======
+async function renderAgents() {
+  // Load agents
+  const { data: agents } = await sb.from('agents').select('*').order('created_at', { ascending: false });
+  const agList = agents || [];
+
+  // Render agent list
+  const listEl = document.getElementById('agentList');
+  if (!agList.length) {
+    listEl.innerHTML = '<p style="padding:24px;text-align:center;color:#9e9e9e;">ຍັງບໍ່ມີ Agent</p>';
+  } else {
+    listEl.innerHTML = agList.map(a => `
+      <div class="prod-item" style="${a.status==='inactive'?'opacity:.55':''}">
+        <div style="font-size:1.4rem;">👤</div>
+        <div class="pi-info">
+          <div class="pi-name">${a.full_name}</div>
+          <div class="pi-meta">@${a.username} · 📞 ${a.phone||'-'} · ຄ່າຈ້າງ ${formatMoney(a.commission_rate||0)}</div>
+        </div>
+        <div class="pi-actions">
+          <span class="sbadge ${a.status==='active'?'sb-active':'sb-rejected'}" style="font-size:.7rem;">${a.status==='active'?'ເປີດ':'ປິດ'}</span>
+          <button class="act-btn a-view" onclick="editAgent('${a.id}')">✏️ ແກ້ໄຂ</button>
+          <button class="act-btn a-warn" onclick="toggleAgent('${a.id}','${a.status}')">
+            ${a.status==='active'?'ປິດ':'ເປີດ'}
+          </button>
+          <button class="act-btn a-del" onclick="deleteAgent('${a.id}')">🗑</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // Load pending remittances
+  const { data: remits } = await sb.from('agent_remittances')
+    .select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  const pendingRemits = remits || [];
+
+  const remitEl = document.getElementById('remitList');
+  if (!pendingRemits.length) {
+    remitEl.innerHTML = '<div style="background:white;border-radius:12px;padding:20px;text-align:center;color:#9e9e9e;">✅ ບໍ່ມີ remittance ລໍຖ້າ</div>';
+  } else {
+    remitEl.innerHTML = pendingRemits.map(r => `
+      <div style="background:white;border-radius:13px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-weight:800;font-size:.95rem;">👤 ${r.agent_name||'Agent'}</div>
+            <div style="font-size:.75rem;color:#9e9e9e;">${new Date(r.created_at).toLocaleDateString('lo-LA',{year:'numeric',month:'short',day:'numeric'})}</div>
+            <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;">
+              <div><div style="font-size:.65rem;color:#9e9e9e;">ຮັບທັງໝົດ</div><div style="font-weight:700;">${formatMoney(r.total_amount)}</div></div>
+              <div><div style="font-size:.65rem;color:#9e9e9e;">ຄ່າຈ້າງ</div><div style="font-weight:700;color:#1565c0;">${formatMoney(r.commission)}</div></div>
+              <div><div style="font-size:.65rem;color:#9e9e9e;">ສົ່ງ</div><div style="font-weight:900;color:#1b5e20;font-size:.95rem;">${formatMoney(r.net_amount)}</div></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-direction:column;align-items:flex-end;">
+            ${r.slip_image
+              ? `<img src="${r.slip_image}" style="max-width:100px;max-height:70px;border-radius:6px;border:1px solid #e0e0e0;cursor:zoom-in;"
+                      onclick="this.style.maxWidth=this.style.maxWidth==='200px'?'100px':'200px'" />`
+              : '<div style="font-size:.78rem;color:#9e9e9e;">ບໍ່ມີ slip</div>'
+            }
+            <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem;" onclick="confirmRemittance('${r.id}')">
+              ✅ ຢືນຢັນໄດ້ຮັບເງິນ
+            </button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Agent performance (this month)
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const { data: cols } = await sb.from('agent_collections')
+    .select('*')
+    .gte('created_at', monthStart);
+  const collData = cols || [];
+
+  const perfByAgent = {};
+  collData.forEach(c => {
+    if (!perfByAgent[c.agent_id]) perfByAgent[c.agent_id] = { cols: 0, total: 0, remitted: 0 };
+    perfByAgent[c.agent_id].cols++;
+    perfByAgent[c.agent_id].total += c.amount;
+    if (c.remitted) perfByAgent[c.agent_id].remitted += c.amount;
+  });
+
+  const tbody = document.getElementById('agentPerfBody');
+  if (!agList.length || !Object.keys(perfByAgent).length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9e9e9e;">ຍັງບໍ່ມີຂໍ້ມູນ</td></tr>';
+  } else {
+    tbody.innerHTML = agList.map(a => {
+      const p = perfByAgent[a.id] || { cols: 0, total: 0, remitted: 0 };
+      const comm = a.commission_rate || 0;
+      return `<tr>
+        <td style="padding:10px 13px;font-weight:600;">${a.full_name}<div style="font-size:.7rem;color:#9e9e9e;">@${a.username}</div></td>
+        <td style="padding:10px 13px;text-align:right;">${p.cols}</td>
+        <td style="padding:10px 13px;text-align:right;font-weight:700;color:#1b5e20;">${formatMoney(p.total)}</td>
+        <td style="padding:10px 13px;text-align:right;color:#1565c0;">${formatMoney(comm)}</td>
+        <td style="padding:10px 13px;text-align:right;">${formatMoney(p.remitted)}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+async function saveAgent(e) {
+  e.preventDefault();
+  const id       = document.getElementById('af-id').value;
+  const fullName = document.getElementById('af-name').value.trim();
+  const username = document.getElementById('af-username').value.trim();
+  const password = document.getElementById('af-password').value;
+  const phone    = document.getElementById('af-phone').value.trim();
+  const rate     = getMoneyValue(document.getElementById('af-rate'));
+  if (!fullName || !username) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ', 'error'); return; }
+  if (!id && !password) { showToast('ໃສ່ລະຫັດຜ່ານ', 'error'); return; }
+  try {
+    if (id) {
+      const upd = { full_name: fullName, username, phone, commission_rate: rate };
+      if (password) upd.password = password;
+      const { error } = await sb.from('agents').update(upd).eq('id', id);
+      if (error) throw error;
+      showToast('ແກ້ໄຂ Agent ✅');
+    } else {
+      const newId = 'AGT' + Date.now().toString().slice(-6);
+      const { error } = await sb.from('agents').insert({
+        id: newId, full_name: fullName, username, password, phone,
+        commission_rate: rate, status: 'active',
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      showToast('ສ້າງ Agent ✅');
+    }
+    cancelAgentEdit();
+    renderAgents();
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+async function editAgent(id) {
+  const { data: a } = await sb.from('agents').select('*').eq('id', id).single();
+  if (!a) return;
+  document.getElementById('af-id').value       = a.id;
+  document.getElementById('af-name').value     = a.full_name;
+  document.getElementById('af-username').value = a.username;
+  document.getElementById('af-password').value = '';
+  document.getElementById('af-phone').value    = a.phone || '';
+  document.getElementById('af-rate').value     = a.commission_rate ? a.commission_rate.toLocaleString('en-US') : '';
+  document.getElementById('agentFormTitle').textContent = '✏️ ແກ້ໄຂ: ' + a.full_name;
+  document.getElementById('af-name').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelAgentEdit() {
+  document.getElementById('af-id').value       = '';
+  document.getElementById('af-name').value     = '';
+  document.getElementById('af-username').value = '';
+  document.getElementById('af-password').value = '';
+  document.getElementById('af-phone').value    = '';
+  document.getElementById('af-rate').value     = '';
+  document.getElementById('agentFormTitle').textContent = '➕ ສ້າງບັນຊີ Agent ໃໝ່';
+}
+
+async function toggleAgent(id, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  const { error } = await sb.from('agents').update({ status: newStatus }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast(newStatus === 'active' ? 'ເປີດ Agent ✅' : 'ປິດ Agent');
+  renderAgents();
+}
+
+function deleteAgent(id) {
+  openConfirm('🗑️', 'ລຶບ Agent?', 'ຂໍ້ມູນ Agent ຈະຖືກລຶບຖາວອນ', async () => {
+    try {
+      await sb.from('agents').delete().eq('id', id);
+      closeConfirm();
+      renderAgents();
+      showToast('ລຶບ Agent ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+async function confirmRemittance(remitId) {
+  openConfirm('✅', 'ຢືນຢັນໄດ້ຮັບເງິນ?', 'ໝາຍ remittance ນີ້ວ່າ confirmed', async () => {
+    try {
+      const { error } = await sb.from('agent_remittances').update({
+        status: 'confirmed',
+        confirmed_at: new Date().toISOString(),
+      }).eq('id', remitId);
+      if (error) throw error;
+      closeConfirm();
+      showToast('ຢືນຢັນ Remittance ✅');
+      renderAgents();
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
 }
 
 // Backdrop close
