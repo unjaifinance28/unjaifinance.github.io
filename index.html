@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ສະໝັກກູ້ເງິນ | Unjai Finance</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+  /* ====== BRAND LOGO ====== */
+  .brand-logo {
+    display:flex; align-items:center; gap:10px; text-decoration:none; color:white;
+  }
+  .brand-icon {
+    width:40px; height:40px; border-radius:10px;
+    background:white; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; overflow:hidden;
+  }
+  .brand-icon img { width:100%; height:100%; object-fit:cover; border-radius:10px; }
+  .brand-icon-fallback {
+    width:100%; height:100%; background:linear-gradient(135deg,#1b5e20,#4caf50);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.1rem; font-weight:900; color:white; border-radius:10px;
+    letter-spacing:0;
+  }
+  .brand-text { display:flex; flex-direction:column; line-height:1.2; }
+  .brand-name { font-size:1rem; font-weight:900; letter-spacing:.3px; }
+  .brand-sub  { font-size:.65rem; opacity:.75; font-weight:400; letter-spacing:.5px; }
+
+  /* ====== HERO ====== */
+  .hero-logo-wrap { margin-bottom:18px; }
+  .hero-brand-icon {
+    width:72px; height:72px; border-radius:18px;
+    background:rgba(255,255,255,.15); border:2px solid rgba(255,255,255,.3);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 10px; overflow:hidden; backdrop-filter:blur(10px);
+  }
+  .hero-brand-icon img { width:100%; height:100%; object-fit:cover; border-radius:16px; }
+  .hero-brand-icon .hbi-fb {
+    font-size:1.8rem; font-weight:900; color:white; letter-spacing:0;
+  }
+
+  /* ====== PRODUCTS ====== */
+  .prod-section { background:white; padding:40px 20px; }
+  .prod-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; max-width:880px; margin:0 auto; }
+  .prod-card {
+    border:2px solid var(--gray-mid); border-radius:16px; padding:22px 18px;
+    cursor:pointer; transition:all .2s; background:white; text-align:center;
+    position:relative; overflow:hidden;
+  }
+  .prod-card:hover { border-color:var(--green-main); background:var(--green-bg); transform:translateY(-3px); box-shadow:0 6px 20px rgba(46,125,50,.15); }
+  .prod-card.sel  { border-color:var(--green-main); background:var(--green-bg); box-shadow:0 0 0 3px rgba(76,175,80,.25); }
+  .pc-badge { position:absolute; top:0; left:0; right:0; background:var(--green-main); color:white; font-size:.68rem; font-weight:700; padding:3px 8px; letter-spacing:.3px; }
+  .pc-icon  { font-size:2rem; margin:20px 0 8px; }
+  .pc-name  { font-size:.95rem; font-weight:800; color:var(--green-dark); margin-bottom:6px; }
+  .pc-rate  { font-size:2rem; font-weight:900; color:var(--green-main); line-height:1; }
+  .pc-unit  { font-size:.75rem; color:var(--gray-text); margin-bottom:6px; }
+  .pc-desc  { font-size:.78rem; color:var(--gray-text); line-height:1.5; margin-top:8px; }
+  .pc-range { font-size:.72rem; color:var(--gray-text); margin-top:6px; background:var(--gray-light); border-radius:6px; padding:4px 8px; display:inline-block; }
+  .pc-sel-check { position:absolute; top:10px; right:10px; width:22px; height:22px; background:var(--green-main); border-radius:50%; display:none; align-items:center; justify-content:center; color:white; font-size:.8rem; }
+  .prod-card.sel .pc-sel-check { display:flex; }
+
+  /* ====== FORM ====== */
+  .form-section { padding:36px 20px; }
+  .apply-wrap   { max-width:720px; margin:0 auto; }
+  .prod-info-bar { background:var(--green-bg); border:1px solid var(--green-pale); border-radius:10px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:10px; font-size:.88rem; }
+  .prod-info-bar strong { color:var(--green-dark); }
+
+  /* Days field */
+  #daysGroup { display:none; }
+
+  /* Preview */
+  .preview-box { background:linear-gradient(135deg,var(--green-bg),#f1f8e9); border:2px solid var(--green-pale); border-radius:12px; padding:16px 20px; margin:18px 0; }
+  .pv-row { display:flex; justify-content:space-between; padding:5px 0; font-size:.9rem; }
+  .pv-row .pv-l { color:var(--gray-text); }
+  .pv-row .pv-v { font-weight:600; }
+  .pv-divider { border:none; border-top:1px dashed var(--green-pale); margin:6px 0; }
+  .pv-total { font-weight:900; font-size:1.05rem; color:var(--green-dark); }
+  .pv-note { font-size:.76rem; color:var(--gray-text); margin-top:4px; }
+
+  /* ====== DOCUMENT UPLOAD ====== */
+  .doc-type-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+  .doc-type-btn {
+    display:flex; align-items:center; gap:6px; padding:9px 16px;
+    border:2px solid var(--gray-mid); border-radius:10px; cursor:pointer;
+    font-size:.85rem; transition:.2s; background:white; user-select:none; line-height:1;
+  }
+  .doc-type-btn:hover { border-color:var(--green-light); background:var(--green-bg); }
+  .doc-type-btn input[type=radio] { display:none; }
+  .doc-type-btn.sel {
+    border-color:var(--green-main); background:var(--green-bg);
+    color:var(--green-dark); font-weight:700; box-shadow:0 0 0 2px rgba(76,175,80,.2);
+  }
+  .doc-upload-area {
+    border:2px dashed var(--gray-mid); border-radius:12px; padding:24px 20px;
+    text-align:center; cursor:pointer; transition:.2s; color:var(--gray-text);
+    font-size:.88rem; background:#fafafa; min-height:90px;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:6px;
+  }
+  .doc-upload-area:hover, .doc-upload-area.drag-over {
+    border-color:var(--green-main); background:var(--green-bg);
+  }
+  .doc-upload-area.has-file {
+    border-color:var(--green-light); background:white; padding:10px; border-style:solid;
+  }
+  #docImgWrap { display:none; width:100%; text-align:center; }
+  #docPreviewImg { max-width:100%; max-height:220px; border-radius:8px; object-fit:contain; }
+
+  /* ====== LOAN ID MODAL ====== */
+  .lid-box { background:var(--green-bg); border:2px solid var(--green-pale); border-radius:14px; padding:18px 24px; text-align:center; margin:14px 0; }
+  .lid-box .lid { font-size:2.2rem; font-weight:900; color:var(--green-dark); letter-spacing:4px; }
+  .lid-box p { font-size:.8rem; color:var(--gray-text); margin-top:4px; }
+
+  @media(max-width:560px){ .form-grid{grid-template-columns:1fr;} .prod-grid{grid-template-columns:1fr;} .doc-type-row{flex-direction:column;} }
+
+  /* ====== MONEY INPUT ====== */
+  .money-input { text-align:right; letter-spacing:.5px; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-container">
+    <a href="index.html" class="brand-logo">
+      <div class="brand-icon" id="navLogoIcon">
+        <div class="brand-icon-fallback">UF</div>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Unjai Finance</span>
+        <span class="brand-sub">ສິນເຊື່ອສ່ວນບຸກຄົນ</span>
+      </div>
+    </a>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span style="color:rgba(255,255,255,.7);font-size:.8rem;display:none;" id="navTelShow">📞 020 96498301</span>
+      <button onclick="openStatusCheck()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:white;padding:6px 14px;border-radius:8px;font-size:.82rem;cursor:pointer;font-family:inherit;">🔍 ຕິດຕາມ</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding:50px 20px 40px;">
+  <div class="hero-content">
+    <div class="hero-logo-wrap">
+      <div class="hero-brand-icon" id="heroLogoIcon">
+        <div class="hbi-fb">UF</div>
+      </div>
+      <div style="font-size:.8rem;opacity:.75;letter-spacing:1px;text-transform:uppercase;">Unjai Finance</div>
+    </div>
+    <h1 style="font-size:2.1rem;margin-bottom:10px;">ສະໝັກກູ້ເງິນ</h1>
+    <p style="margin-bottom:22px;opacity:.9;">ເລືອກຜະລິດຕະພັນ → ຕື່ມຟອມ → ທີມງານຕິດຕໍ່ 24 ຊົ່ວໂມງ</p>
+    <div class="hero-badges">
+      <span class="badge">✅ ອະນຸມັດໄວ</span>
+      <span class="badge">🔒 ຂໍ້ມູນລັບ</span>
+      <span class="badge">📱 ສະໝັກອອນລາຍ</span>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCT SELECTION -->
+<div class="prod-section">
+  <h2 class="section-title" style="margin-bottom:6px;">ເລືອກຜະລິດຕະພັນ</h2>
+  <p class="section-sub" style="margin-bottom:22px;">ຄລິກຜະລິດຕະພັນທີ່ເໝາະກັບທ່ານ</p>
+  <div class="prod-grid" id="prodGrid"></div>
+  <p class="error-msg" id="e-prod" style="text-align:center;margin-top:8px;"></p>
+</div>
+
+<!-- APPLICATION FORM -->
+<div class="form-section" id="formSection" style="display:none;">
+  <div class="apply-wrap">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📝</div>
+        <div>
+          <h2>ຟອມສະໝັກ</h2>
+          <p style="font-size:.82rem;color:var(--gray-text);margin:0;" id="selProdLabel"></p>
+        </div>
+      </div>
+
+      <div class="prod-info-bar" id="prodInfoBar"></div>
+      <div id="discount-banner" style="display:none;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #4caf50;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+        <div style="font-weight:800;color:#1b5e20;font-size:.9rem;">🎉 ສ່ວນຫຼຸດ Credit Score ສຳລັບທ່ານ!</div>
+        <div id="discount-detail" style="font-size:.84rem;color:#2e7d32;margin-top:3px;"></div>
+      </div>
+
+      <form id="applyForm" novalidate>
+        <div class="form-grid">
+
+          <!-- Personal info -->
+          <div class="form-group">
+            <label>ຊື່-ນາມສະກຸນ *</label>
+            <input type="text" id="f-name" placeholder="ເຊັ່ນ: ສົມຈິດ ພົມມາ" />
+            <span class="error-msg" id="e-name"></span>
+          </div>
+          <div class="form-group">
+            <label>ເບີໂທລະສັບ *</label>
+            <input type="tel" id="f-phone" placeholder="020 XXXX XXXX" oninput="checkPhoneDiscount()" />
+            <span class="error-msg" id="e-phone"></span>
+          </div>
+
+          <!-- Document type -->
+          <div class="form-group full">
+            <label>ປະເພດເອກະສານ *</label>
+            <div class="doc-type-row" id="docTypeRow">
+              <label class="doc-type-btn" id="dtBtn-id">
+                <input type="radio" name="docType" value="id" onchange="onDocTypeChange(this)" />
+                🪪 ບັດປະຈຳໂຕ
+              </label>
+              <label class="doc-type-btn" id="dtBtn-family">
+                <input type="radio" name="docType" value="family" onchange="onDocTypeChange(this)" />
+                📖 ສຳມະໂນຄົວ
+              </label>
+              <label class="doc-type-btn" id="dtBtn-passport">
+                <input type="radio" name="docType" value="passport" onchange="onDocTypeChange(this)" />
+                ✈️ ພາດສະປອດ
+              </label>
+            </div>
+            <span class="error-msg" id="e-doctype"></span>
+          </div>
+
+          <div class="form-group">
+            <label id="idCardLabel">ເລກເອກະສານ *</label>
+            <input type="text" id="f-idcard" placeholder="ໃສ່ເລກຕາມເອກະສານ" />
+            <span class="error-msg" id="e-idcard"></span>
+          </div>
+          <div class="form-group">
+            <label>ອາຊີບ *</label>
+            <select id="f-occ">
+              <option value="">-- ເລືອກ --</option>
+              <option>ພະນັກງານລັດ</option>
+              <option>ພະນັກງານເອກະຊົນ</option>
+              <option>ເຈົ້າຂອງທຸລະກິດ</option>
+              <option>ຄ້າຂາຍ</option>
+              <option>ຊາວກະສິກອນ</option>
+              <option>ອື່ນໆ</option>
+            </select>
+            <span class="error-msg" id="e-occ"></span>
+          </div>
+
+          <div class="form-group">
+            <label>ຈຳນວນກູ້ (ກີບ) *</label>
+            <input type="text" inputmode="numeric" id="f-amount" placeholder="ຈຳນວນ" class="money-input" oninput="formatMoneyInput(this);updatePreview()" />
+            <span class="error-msg" id="e-amount"></span>
+          </div>
+          <div class="form-group" id="daysGroup">
+            <label>ຈຳນວນວັນ * <small style="font-weight:400;color:var(--gray-text);">(1–365)</small></label>
+            <input type="number" id="f-days" placeholder="ຈຳນວນວັນ" min="1" max="365" oninput="updatePreview()" />
+            <span class="error-msg" id="e-days"></span>
+          </div>
+
+          <div class="form-group">
+            <label>ລາຍໄດ້/ເດືອນ (ກີບ) *</label>
+            <input type="text" inputmode="numeric" id="f-income" placeholder="ລາຍໄດ້ຕໍ່ເດືອນ" class="money-input" oninput="formatMoneyInput(this)" />
+            <span class="error-msg" id="e-income"></span>
+          </div>
+          <div class="form-group full">
+            <label>ທີ່ຢູ່ *</label>
+            <input type="text" id="f-address" placeholder="ບ້ານ, ເມືອງ, ແຂວງ" />
+            <span class="error-msg" id="e-address"></span>
+          </div>
+
+          <!-- Document upload -->
+          <div class="form-group full">
+            <label>ຮູບຖ່າຍເອກະສານ * <small style="font-weight:400;color:var(--gray-text);">JPG / PNG — ຖ່າຍໃຫ້ຊັດ ເຫັນເລກໃຫ້ຈະແຈ້ງ</small></label>
+            <div class="doc-upload-area" id="docUploadArea"
+                 onclick="document.getElementById('docFile').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="onDocDrop(event)">
+              <div id="docUploadPh">
+                <div style="font-size:2.4rem;">📷</div>
+                <div style="font-weight:600;">ຄລິກ ຫຼື ລາກຮູບໃສ່ບ່ອນນີ້</div>
+                <div style="font-size:.75rem;margin-top:4px;color:var(--gray-text);">ຮູບຖ່າຍໜ້າເອກະສານ (ບໍ່ເກີນ 10MB)</div>
+              </div>
+              <div id="docImgWrap">
+                <img id="docPreviewImg" alt="ເອກະສານ" />
+                <div style="font-size:.73rem;color:var(--gray-text);margin-top:6px;">ຄລິກ ຫຼື ລາກເພື່ອປ່ຽນຮູບ</div>
+              </div>
+              <input type="file" id="docFile" accept="image/*" style="display:none" onchange="onDocUpload(this)" />
+            </div>
+            <span class="error-msg" id="e-doc"></span>
+          </div>
+
+          <div class="form-group full">
+            <label>ຈຸດປະສົງ / ໝາຍເຫດ</label>
+            <input type="text" id="f-note" placeholder="ຈຸດປະສົງ ຫຼື ໝາຍເຫດ (ທາງເລືອກ)" />
+          </div>
+        </div>
+
+        <!-- LOAN PREVIEW -->
+        <div class="preview-box" id="previewBox" style="display:none;">
+          <div class="pv-row"><span class="pv-l">ຜະລິດຕະພັນ</span><span class="pv-v" id="pv-prod"></span></div>
+          <div class="pv-row"><span class="pv-l">ຈຳນວນກູ້</span><span class="pv-v" id="pv-amt"></span></div>
+          <div class="pv-row"><span class="pv-l">ດອກເບ້ຍ</span><span class="pv-v" id="pv-int" style="color:#c62828;"></span></div>
+          <div class="pv-row"><span class="pv-l">ໄລຍະ</span><span class="pv-v" id="pv-dur"></span></div>
+          <hr class="pv-divider"/>
+          <div class="pv-row pv-total"><span>ຍອດທີ່ຕ້ອງຊຳລະ</span><span id="pv-total"></span></div>
+          <p class="pv-note" id="pv-pay"></p>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary btn-lg" style="flex:1;min-width:180px;">📤 ສົ່ງຄຳຂໍ</button>
+          <button type="button" class="btn btn-outline" onclick="resetAll()">🔄 ລ້າງ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer style="background:var(--green-dark);color:rgba(255,255,255,.8);text-align:center;padding:32px 20px;font-size:.85rem;">
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">
+    <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;color:white;">UF</div>
+    <div style="font-size:1.05rem;font-weight:800;color:white;">Unjai Finance</div>
+  </div>
+  <div style="margin-bottom:4px;">📞 020 96498301</div>
+  <div style="opacity:.55;font-size:.78rem;margin-top:6px;">© 2026 Unjai Finance. ສະຫງວນລິຂະສິດ.</div>
+</footer>
+
+<!-- SUCCESS MODAL -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal">
+    <div class="modal-icon">🎉</div>
+    <h3>ສົ່ງຄຳຂໍສຳເລັດ!</h3>
+    <p style="margin-bottom:12px;color:var(--gray-text);">ທີ່ທີ່ງານຈະຕິດຕໍ່ທ່ານໂດຍໄວ.</p>
+    <div class="lid-box">
+      <div class="lid" id="modal-lid">LAO------</div>
+      <p>ລະຫັດຄຳຂໍ — ເກັບໄວ້ ຕ້ອງໃຊ້ຕິດຕາມສະຖານະ</p>
+    </div>
+    <button class="btn btn-outline btn-full" onclick="document.getElementById('successModal').classList.remove('open')">ປິດ</button>
+  </div>
+</div>
+
+<!-- STATUS CHECK MODAL -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-icon">🔍</div>
+    <h3>ຕິດຕາມຄຳຂໍ</h3>
+    <p style="font-size:.88rem;color:var(--gray-text);margin-bottom:16px;">ໃສ່ລະຫັດຄຳຂໍ ຫຼື ເບີໂທ</p>
+    <div class="form-group" style="margin-bottom:14px;">
+      <input type="text" id="statusQuery" placeholder="LAO------ ຫຼື 020XXXXXXXX" style="background:white;" oninput="doStatusSearch()" />
+    </div>
+    <div id="statusResult"></div>
+    <button class="btn btn-outline btn-full" style="margin-top:12px;" onclick="document.getElementById('statusModal').classList.remove('open')">ປິດ</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="app.js"></script>
+<script>
+let selectedProduct  = null;
+let docImageData     = null; // compressed base64
+let _activeDiscount  = null; // { cs, loan } if customer has approved discount
+
+// ====== LOGO: load company logo if saved ======
+(function() {
+  const saved = localStorage.getItem('uf_logo');
+  if (saved) {
+    // Replace fallback UF with actual image in nav and hero
+    const navEl  = document.getElementById('navLogoIcon');
+    const heroEl = document.getElementById('heroLogoIcon');
+    if (navEl)  navEl.innerHTML  = `<img src="${saved}" alt="Logo" />`;
+    if (heroEl) heroEl.innerHTML = `<img src="${saved}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" />`;
+  }
+})();
+
+// ====== RENDER PRODUCTS ======
+function renderProducts() {
+  const phoneRaw = (document.getElementById('f-phone')?.value || '').trim().replace(/\D/g,'');
+  const visible = DB.products.filter(p => {
+    if (p.status !== 'active') return false;
+    if (!p.isVip) return true;
+    if (!phoneRaw) return false;
+    return (p.vipCustomers || []).some(v => v.replace(/\D/g,'') === phoneRaw);
+  });
+  if (selectedProduct && !visible.find(p => p.id === selectedProduct.id)) {
+    selectedProduct = null;
+    document.getElementById('formSection').style.display = 'none';
+  }
+  const grid = document.getElementById('prodGrid');
+  if (!visible.length) {
+    grid.innerHTML = '<p style="text-align:center;color:var(--gray-text);padding:30px;grid-column:1/-1;">ຕິດຕໍ່ທີ່ທີ່ງານເພື່ອຮູ້ຂໍ້ມູນຜະລິດຕະພັນ</p>';
+    return;
+  }
+  const icons = { flat:'⚡', daily:'📅' };
+  grid.innerHTML = visible.map(p => {
+    const rateLabel = p.interestType === 'daily' ? p.interestRate + '%/ວັນ' : p.interestRate + '%';
+    const unitLabel = p.interestType === 'daily' ? 'ຕໍ່ວັນ' : (p.duration ? p.duration + ' ວັນ' : 'ດອກລວມ');
+    const vipStyle  = p.isVip ? 'border-color:#fdd835;box-shadow:0 0 0 2px rgba(253,216,53,.25);' : '';
+    const vipBadge  = p.isVip ? '<div class="pc-badge" style="background:linear-gradient(90deg,#f9a825,#ff8f00);">👑 VIP Exclusive</div>' : '';
+    const vipIcon   = p.isVip ? '👑' : (icons[p.interestType] || '💰');
+    return `<div class="prod-card" id="pc-${p.id}" onclick="selectProduct('${p.id}')" style="${vipStyle}">
+      ${vipBadge}
+      <div class="pc-sel-check">✓</div>
+      <div class="pc-icon">${vipIcon}</div>
+      <div class="pc-name">${p.name}</div>
+      <div class="pc-rate">${rateLabel}</div>
+      <div class="pc-unit">${unitLabel}</div>
+      <div class="pc-desc">${p.description}</div>
+      <div class="pc-range">${(p.minAmount/1000000).toFixed(1)}M – ${(p.maxAmount/1000000).toFixed(0)}M ກີບ</div>
+    </div>`;
+  }).join('');
+}
+
+function selectProduct(id) {
+  selectedProduct = DB.products.find(p => p.id === id);
+  if (!selectedProduct) return;
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('sel'));
+  const card = document.getElementById('pc-' + id);
+  if (card) card.classList.add('sel');
+  document.getElementById('e-prod').textContent = '';
+  document.getElementById('selProdLabel').textContent = selectedProduct.name;
+  document.getElementById('prodInfoBar').innerHTML =
+    `<span style="font-size:1.2rem;">📌</span>
+     <div><strong>${selectedProduct.name}</strong> — ${selectedProduct.description}</div>`;
+  document.getElementById('daysGroup').style.display =
+    selectedProduct.interestType === 'daily' ? 'flex' : 'none';
+  document.getElementById('formSection').style.display = 'block';
+  document.getElementById('formSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  updatePreview();
+}
+
+// ====== DISCOUNT CHECK ======
+function checkPhoneDiscount() {
+  const phone  = document.getElementById('f-phone').value.trim();
+  const banner = document.getElementById('discount-banner');
+  const detail = document.getElementById('discount-detail');
+  if (phone.length < 8) {
+    _activeDiscount = null;
+    banner.style.display = 'none';
+    updatePreview();
+    renderProducts();
+    return;
+  }
+  const found = DB.getCustomerDiscount(phone);
+  if (found) {
+    _activeDiscount = found;
+    banner.style.display = 'block';
+    detail.textContent = `ສ່ວນຫຼຸດ ${found.cs.discountPercent}% ກ່ຽວຂ້ອງກັບ ${found.loan.id} ຈາກ Credit Score ປີ ${found.cs.year}${found.cs.note ? ' · ' + found.cs.note : ''}`;
+  } else {
+    _activeDiscount = null;
+    banner.style.display = 'none';
+  }
+  updatePreview();
+  renderProducts();
+}
+
+// ====== DOCUMENT TYPE ======
+const DOC_CFG = {
+  id:       { label:'ເລກບັດປະຈຳໂຕ *',  ph:'ຕົວຢ່າງ: 0000000000' },
+  family:   { label:'ເລກສຳມະໂນຄົວ *',  ph:'ຕົວຢ່າງ: ກ000000' },
+  passport: { label:'ເລກພາດສະປອດ *',   ph:'ຕົວຢ່າງ: LA000000' },
+};
+function onDocTypeChange(radio) {
+  document.querySelectorAll('.doc-type-btn').forEach(b => b.classList.remove('sel'));
+  radio.closest('.doc-type-btn').classList.add('sel');
+  const cfg = DOC_CFG[radio.value] || DOC_CFG.id;
+  document.getElementById('idCardLabel').textContent = cfg.label;
+  document.getElementById('f-idcard').placeholder    = cfg.ph;
+  document.getElementById('e-doctype').textContent   = '';
+}
+
+// ====== DOCUMENT UPLOAD ======
+function onDocUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { showToast('ຮູບໃຫຍ່ເກີນ 10MB','error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => processDocImage(e.target.result);
+  reader.readAsDataURL(file);
+}
+
+function onDocDrop(e) {
+  e.preventDefault();
+  document.getElementById('docUploadArea').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) { showToast('ກະລຸນາເລືອກໄຟລ໌ຮູບ','error'); return; }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('docFile').files = dt.files;
+  const reader = new FileReader();
+  reader.onload = ev => processDocImage(ev.target.result);
+  reader.readAsDataURL(file);
+}
+
+function processDocImage(dataUrl) {
+  // Show preview
+  document.getElementById('docPreviewImg').src = dataUrl;
+  document.getElementById('docImgWrap').style.display  = 'block';
+  document.getElementById('docUploadPh').style.display = 'none';
+  document.getElementById('docUploadArea').classList.add('has-file');
+  document.getElementById('e-doc').textContent = '';
+
+  // Compress to ~600px wide for storage
+  compressImage(dataUrl, 600, 0.75, compressed => {
+    docImageData = compressed;
+  });
+}
+
+function compressImage(dataUrl, maxW, quality, cb) {
+  const img = new Image();
+  img.onload = function() {
+    let w = img.width, h = img.height;
+    if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    cb(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src = dataUrl;
+}
+
+// ====== PREVIEW ======
+function updatePreview() {
+  if (!selectedProduct) return;
+  const amt  = getMoneyValue(document.getElementById('f-amount'));
+  const days = parseInt(document.getElementById('f-days').value);
+  const box  = document.getElementById('previewBox');
+  const needDays = selectedProduct.interestType === 'daily';
+  if (!amt || amt <= 0 || (needDays && (!days || days < 1))) { box.style.display = 'none'; return; }
+  const customDays = needDays ? days : undefined;
+
+  // Apply discount if available
+  let effectiveProduct = selectedProduct;
+  if (_activeDiscount) {
+    const discPct      = _activeDiscount.cs.discountPercent;
+    const discountedRate = Math.max(0, selectedProduct.interestRate * (1 - discPct / 100));
+    effectiveProduct = { ...selectedProduct, interestRate: discountedRate };
+  }
+
+  const total    = calcLoanTotal(effectiveProduct, amt, customDays);
+  const origTotal = calcLoanTotal(selectedProduct, amt, customDays);
+  const interest = total - amt;
+  const dur      = needDays ? days + ' ວັນ' : (selectedProduct.duration + ' ວັນ');
+  let payNote    = selectedProduct.duration >= 60 && selectedProduct.interestType === 'flat'
+    ? `ຊຳລະ/ວັນ: ${formatMoney(Math.round(total / selectedProduct.duration))}`
+    : `ຊຳລະຄືນ 1 ຄັ້ງ: ${formatMoney(total)}`;
+  if (_activeDiscount && total < origTotal) {
+    payNote += ` · 🎉 ປະຢັດ ${formatMoney(origTotal - total)}`;
+  }
+  document.getElementById('pv-prod').textContent  = selectedProduct.name;
+  document.getElementById('pv-amt').textContent   = formatMoney(amt);
+  document.getElementById('pv-int').textContent   = formatMoney(interest);
+  document.getElementById('pv-dur').textContent   = dur;
+  document.getElementById('pv-total').textContent = formatMoney(total);
+  document.getElementById('pv-pay').textContent   = payNote;
+  box.style.display = 'block';
+}
+
+// ====== VALIDATE ======
+function validate() {
+  let ok = true;
+  const required = [
+    ['f-name','e-name','ກະລຸນາໃສ່ຊື່-ນາມສະກຸນ'],
+    ['f-phone','e-phone','ກະລຸນາໃສ່ເບີໂທ'],
+    ['f-idcard','e-idcard','ກະລຸນາໃສ່ເລກເອກະສານ'],
+    ['f-occ','e-occ','ກະລຸນາເລືອກອາຊີບ'],
+    ['f-income','e-income','ກະລຸນາໃສ່ລາຍໄດ້'],
+    ['f-address','e-address','ກະລຸນາໃສ່ທີ່ຢູ່'],
+  ];
+  required.forEach(([fid, eid, msg]) => {
+    const el = document.getElementById(fid);
+    if (!el.value.trim()) {
+      document.getElementById(eid).textContent = msg;
+      el.classList.add('error'); ok = false;
+    } else {
+      document.getElementById(eid).textContent = '';
+      el.classList.remove('error');
+    }
+  });
+
+  if (!document.querySelector('input[name="docType"]:checked')) {
+    document.getElementById('e-doctype').textContent = 'ກະລຸນາເລືອກປະເພດເອກະສານ';
+    ok = false;
+  } else document.getElementById('e-doctype').textContent = '';
+
+  if (!selectedProduct) {
+    document.getElementById('e-prod').textContent = 'ກະລຸນາເລືອກຜະລິດຕະພັນກ່ອນ';
+    ok = false;
+  }
+
+  const amt = getMoneyValue(document.getElementById('f-amount'));
+  if (!amt || amt <= 0) {
+    document.getElementById('e-amount').textContent = 'ກະລຸນາໃສ່ຈຳນວນ';
+    document.getElementById('f-amount').classList.add('error');
+    ok = false;
+  } else if (selectedProduct && (amt < selectedProduct.minAmount || amt > selectedProduct.maxAmount)) {
+    document.getElementById('e-amount').textContent =
+      `ຈຳນວນ ${(selectedProduct.minAmount/1000000).toFixed(1)}M – ${(selectedProduct.maxAmount/1000000).toFixed(0)}M ກີບ`;
+    ok = false;
+  } else {
+    document.getElementById('e-amount').textContent = '';
+    document.getElementById('f-amount').classList.remove('error');
+  }
+
+  if (selectedProduct?.interestType === 'daily') {
+    const d = parseInt(document.getElementById('f-days').value);
+    if (!d || d < 1 || d > 365) {
+      document.getElementById('e-days').textContent = 'ໃສ່ 1–365 ວັນ';
+      ok = false;
+    } else document.getElementById('e-days').textContent = '';
+  }
+
+  if (!document.getElementById('docFile').files.length) {
+    document.getElementById('e-doc').textContent = 'ກະລຸນາອັບໂຫລດຮູບເອກະສານ';
+    ok = false;
+  } else document.getElementById('e-doc').textContent = '';
+
+  return ok;
+}
+
+// ====== SUBMIT ======
+document.getElementById('applyForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!validate()) return;
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = '⏳ ກຳລັງສົ່ງ...';
+  try {
+    const amt = getMoneyValue(document.getElementById('f-amount'));
+    const customDays = selectedProduct.interestType === 'daily'
+      ? parseInt(document.getElementById('f-days').value) : undefined;
+    const dur  = customDays || selectedProduct.duration;
+
+    // Apply discount if available
+    let effectiveProduct = selectedProduct;
+    let discountApplied = 0, originalRate = null, discountedRate = null;
+    if (_activeDiscount) {
+      const discPct    = _activeDiscount.cs.discountPercent;
+      discountedRate   = Math.max(0, selectedProduct.interestRate * (1 - discPct / 100));
+      originalRate     = selectedProduct.interestRate;
+      discountApplied  = discPct;
+      effectiveProduct = { ...selectedProduct, interestRate: discountedRate };
+    }
+
+    const total = calcLoanTotal(effectiveProduct, amt, customDays);
+    const docTypeRadio = document.querySelector('input[name="docType"]:checked');
+
+    const loan = await DB.addLoan({
+      productId:   selectedProduct.id,
+      productName: selectedProduct.name,
+      name:     document.getElementById('f-name').value.trim(),
+      phone:    document.getElementById('f-phone').value.trim(),
+      idCard:   document.getElementById('f-idcard').value.trim(),
+      docType:  docTypeRadio ? docTypeRadio.value : 'id',
+      docImage: docImageData || null,
+      occupation: document.getElementById('f-occ').value,
+      income:   getMoneyValue(document.getElementById('f-income')),
+      address:  document.getElementById('f-address').value.trim(),
+      note:     document.getElementById('f-note').value.trim(),
+      amount:   amt,
+      duration: dur,
+      totalDue: total,
+      originalRate, discountedRate, discountApplied,
+    });
+
+    if (_activeDiscount) {
+      await DB.markDiscountUsed(_activeDiscount.cs.id).catch(() => {});
+      _activeDiscount = null;
+    }
+
+    document.getElementById('modal-lid').textContent = loan.id;
+    document.getElementById('successModal').classList.add('open');
+    resetAll();
+  } catch(err) {
+    showToast('ສົ່ງຄຳຂໍລົ້ມເຫລວ: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+});
+
+function resetAll() {
+  document.getElementById('applyForm').reset();
+  document.querySelectorAll('.error-msg').forEach(e => e.textContent = '');
+  document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('sel'));
+  document.querySelectorAll('.doc-type-btn').forEach(b => b.classList.remove('sel'));
+  document.getElementById('previewBox').style.display   = 'none';
+  document.getElementById('formSection').style.display  = 'none';
+  document.getElementById('daysGroup').style.display    = 'none';
+  document.getElementById('docUploadPh').style.display  = 'flex';
+  document.getElementById('docImgWrap').style.display   = 'none';
+  document.getElementById('docUploadArea').classList.remove('has-file');
+  document.getElementById('idCardLabel').textContent    = 'ເລກເອກະສານ *';
+  document.getElementById('f-idcard').placeholder       = 'ໃສ່ເລກຕາມເອກະສານ';
+  selectedProduct  = null;
+  docImageData     = null;
+  _activeDiscount  = null;
+  document.getElementById('discount-banner').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ====== STATUS CHECK ======
+function openStatusCheck() {
+  document.getElementById('statusQuery').value = '';
+  document.getElementById('statusResult').innerHTML = '';
+  document.getElementById('statusModal').classList.add('open');
+}
+const STATUS_LABELS = {
+  pending:      { label:'ລໍຖ້າ',    color:'#e65100', bg:'#fff3e0' },
+  approved:     { label:'ອະນຸມັດ',  color:'#1b5e20', bg:'#e8f5e9' },
+  active:       { label:'ດຳເນີນ',   color:'#1565c0', bg:'#e3f2fd' },
+  completed:    { label:'ສຳເລັດ',   color:'#6a1b9a', bg:'#f3e5f5' },
+  rejected:     { label:'ປະຕິເສດ',  color:'#c62828', bg:'#ffebee' },
+  restructured: { label:'ທົບຕົ້ນ',  color:'#3949ab', bg:'#e8eaf6' },
+};
+function doStatusSearch() {
+  const q = document.getElementById('statusQuery').value.trim().toLowerCase();
+  if (q.length < 3) { document.getElementById('statusResult').innerHTML = ''; return; }
+  const matches = DB.loans.filter(l =>
+    l.id.toLowerCase().includes(q) ||
+    l.phone.replace(/\D/g,'').includes(q.replace(/\D/g,''))
+  );
+  if (!matches.length) {
+    document.getElementById('statusResult').innerHTML =
+      '<p style="color:var(--gray-text);text-align:center;padding:12px;">ບໍ່ພົບຂໍ້ມູນ</p>';
+    return;
+  }
+  document.getElementById('statusResult').innerHTML = matches.map(l => {
+    const st        = STATUS_LABELS[l.status] || STATUS_LABELS.pending;
+    const isVipLoan = DB.products.find(p => p.id === l.productId)?.isVip || false;
+    const product   = DB.products.find(p => p.id === l.productId);
+
+    // ---- Core values ----
+    const principal    = l.remainingPrincipal ?? l.amount ?? 0;
+    const interestRate = product?.interestRate ?? 0;
+    const interestType = product?.interestType ?? 'flat';
+
+    // Full interest for one cycle, calculated from rate (never reads from totalDue)
+    const cycleInterest = interestType === 'daily'
+      ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
+      : Math.round(principal * (interestRate / 100));
+
+    // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
+    const interestPaidCycle = l.interestPaid || 0;
+    const interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
+
+    // Due date and countdown (always from createdAt + duration, the contract date)
+    const dueDate    = new Date(new Date(l.createdAt).getTime() + (l.duration || 30) * 86400000);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const dueStart   = new Date(dueDate); dueStart.setHours(0, 0, 0, 0);
+    const daysLeft   = Math.ceil((dueStart - todayStart) / 86400000);
+    const isOverdue  = daysLeft < 0;
+
+    const cycleInterestDisplay = cycleInterest;
+    const interestPaidDisplay  = interestPaidCycle;
+
+    // ---- Compound warning (uses interestOwed, not old interestDue) ----
+    let compoundWarning = '';
+    if (l.status === 'active' && l.duration > 0 && interestOwed > 0) {
+      const cDays        = product ? (product.compoundDays || 0) : 0;
+      const compoundDate = new Date(dueDate.getTime() + cDays * 86400000);
+      const compStart    = new Date(compoundDate); compStart.setHours(0, 0, 0, 0);
+      const daysUntilCompound = Math.ceil((compStart - todayStart) / 86400000);
+      if (daysUntilCompound > 0) {
+        compoundWarning = `<div style="color:#c62828;font-weight:700;font-size:.81rem;margin-top:8px;padding:6px 10px;background:#ffebee;border-radius:8px;">⚠️ ດອກຈະຖືກທົບຕົ້ນໃນອີກ ${daysUntilCompound} ວັນ</div>`;
+      } else {
+        compoundWarning = `<div style="color:#c62828;font-weight:700;font-size:.81rem;margin-top:8px;padding:6px 10px;background:#ffebee;border-radius:8px;">🔴 ດອກຖືກທົບຕົ້ນແລ້ວ — ກະລຸນາຕິດຕໍ່</div>`;
+      }
+    }
+
+    const cardBorder = isVipLoan ? '1.5px solid #fdd835' : '1.5px solid #e0e0e0';
+    const cardBg     = isVipLoan ? 'linear-gradient(135deg,#fffde7,white)' : 'white';
+
+    // ---- Payment details card (active loans only) ----
+    const paymentCard = (() => {
+      if (l.status !== 'active') return '';
+      const fmtDMY = iso => {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      };
+      const loanPayments = DB.getLoanPayments(l.id).sort((a,b) => new Date(a.date) - new Date(b.date));
+      const lastPay = loanPayments.length ? loanPayments[loanPayments.length - 1] : null;
+
+      const lastPayHtml = lastPay
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;">
+             <span style="color:#616161;">ຊຳລະລ່າສຸດ</span>
+             <span style="font-weight:700;">${fmtDMY(lastPay.date)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຈຳນວນ</span>
+             <span style="font-weight:700;color:#2e7d32;">${formatMoney(lastPay.amount)}</span>
+           </div>`
+        : `<div style="font-size:.82rem;color:#9e9e9e;font-style:italic;">ຍັງບໍ່ທັນຊຳລະ</div>`;
+
+      let countdownBg, countdownColor, countdownIcon, countdownText;
+      if (daysLeft > 7) {
+        countdownBg = '#e8f5e9'; countdownColor = '#2e7d32'; countdownIcon = '🟢';
+        countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+      } else if (daysLeft >= 1) {
+        countdownBg = '#fff3e0'; countdownColor = '#e65100'; countdownIcon = '🟡';
+        countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+      } else {
+        countdownBg = '#ffebee'; countdownColor = '#c62828'; countdownIcon = '🔴';
+        countdownText = `ເກີນກຳນົດ ${Math.abs(daysLeft)} ວັນແລ້ວ`;
+      }
+
+      // Warning per spec: urgent if <= 7 days and still owe interest
+      let warningHtml = '';
+      if (interestOwed > 0 && !isOverdue && daysLeft <= 7) {
+        warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:.81rem;font-weight:700;color:#e65100;">⚠️ ກະລຸນາຊຳລະດອກ ${formatMoney(interestOwed)} ກ່ອນວັນທີ ${fmtDMY(dueDate)}</div>`;
+      } else if (interestOwed > 0 && isOverdue) {
+        warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`;
+      }
+
+      const interestNextHtml = interestOwed > 0
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ດອກທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:#e65100;">${formatMoney(interestOwed)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຕ່ຳສຸດທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:#c62828;">${formatMoney(interestOwed)}</span>
+           </div>`
+        : `<div style="font-size:.81rem;color:#2e7d32;margin-top:3px;">✅ ດອກຊຳລະຄົບແລ້ວ</div>`;
+
+      return `<div style="margin-top:10px;background:linear-gradient(135deg,#f1f8e9,#e8f5e9);border:1px solid #c8e6c9;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:.72rem;font-weight:800;color:#1b5e20;margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase;">💳 ຂໍ້ມູນການຊຳລະ</div>
+        <div style="padding-bottom:9px;border-bottom:1px dashed #c8e6c9;">
+          ${lastPayHtml}
+        </div>
+        <div style="padding-top:8px;padding-bottom:6px;border-bottom:1px dashed #c8e6c9;">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;">
+            <span style="color:#616161;">ກຳນົດຊຳລະ</span>
+            <span style="font-weight:700;">${fmtDMY(dueDate)}</span>
+          </div>
+          ${interestNextHtml}
+        </div>
+        ${warningHtml}
+        <div style="margin-top:9px;padding:7px 10px;background:${countdownBg};border-radius:8px;font-size:.83rem;font-weight:700;color:${countdownColor};text-align:center;">
+          ${countdownIcon} ${countdownText}
+        </div>
+      </div>`;
+    })();
+
+    // ---- Main info grid ----
+    // Active loans: 4-line interest breakdown; other statuses: simple summary
+    const gridRows = l.status === 'active' ? `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="color:#616161;">ດອກເບ້ຍງວດນີ້</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterestDisplay)}</span>
+      <span style="color:#616161;">ຊຳລະດອກແລ້ວ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">− ${formatMoney(interestPaidDisplay)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຍັງຕ້ອງຊຳລະ</span>
+      <span style="font-weight:900;color:${interestOwed > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${interestOwed > 0 ? formatMoney(interestOwed) : '✅ ດອກຊຳລະຄົບ'}</span>
+      <span style="color:#616161;">ສະຖານະ</span>
+      <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    ` : `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="color:#616161;">ດອກເບ້ຍ</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(interestInDb)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ລວມທັງໝົດ</span>
+      <span style="font-weight:900;color:#1b5e20;border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
+      <span style="color:#616161;">ສະຖານະ</span>
+      <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    `;
+
+    return `<div style="background:${cardBg};border:${cardBorder};border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;">
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:800;color:#1b5e20;font-size:.9rem;">${l.id}</span>
+          ${isVipLoan ? '<span style="background:linear-gradient(90deg,#f9a825,#ff8f00);color:white;padding:1px 8px;border-radius:50px;font-size:.7rem;font-weight:700;">👑 VIP</span>' : ''}
+        </div>
+        <div style="font-size:.75rem;color:#9e9e9e;margin-top:1px;">${l.name} · ${l.productName}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:.83rem;align-items:center;">
+        ${gridRows}
+      </div>
+      ${paymentCard}
+      ${compoundWarning}
+      ${(() => {
+        const hist = DB.getCompoundHistory(l.id);
+        if (!hist.length) return '';
+        return `<div style="margin-top:10px;border-top:1px solid #f0f0f0;padding-top:8px;">
+          <div style="font-size:.74rem;font-weight:700;color:#3949ab;margin-bottom:6px;">📋 ປະຫວັດທົບຕົ້ນ (${hist.length} ຄັ້ງ)</div>
+          ${[...hist].reverse().map(h=>`<div style="font-size:.76rem;color:#616161;padding:3px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;gap:8px;">
+            <span style="color:#3949ab;font-weight:600;flex-shrink:0;">${formatDate(h.date)}</span>
+            <span>ດອກຄ້າງ <strong style="color:#c62828;">${formatMoney(h.unpaidInterest)}</strong> → ຕົ້ນໃໝ່ <strong>${formatMoney(h.newPrincipal)}</strong></span>
+          </div>`).join('')}
+        </div>`;
+      })()}
+      ${l.status === 'active' ? `
+      <div id="barcode-card-${l.id.replace(/[^a-zA-Z0-9]/g,'_')}" style="margin-top:12px;background:white;border:2px solid #c8e6c9;border-radius:12px;padding:14px 12px;text-align:center;">
+        <div style="font-size:.72rem;font-weight:800;color:#1b5e20;letter-spacing:.4px;margin-bottom:10px;">🔲 ບາໂຄດສຳລັບຊຳລະກັບຜູ້ຊ່ວຍ</div>
+        <svg id="barcode-svg-${l.id.replace(/[^a-zA-Z0-9]/g,'_')}" style="max-width:100%;display:block;margin:0 auto;"></svg>
+        <div style="font-size:.7rem;color:#9e9e9e;margin-top:5px;letter-spacing:1px;">${l.id}</div>
+        <div style="font-size:.72rem;color:#616161;margin:5px 0 10px;">ສະແດງໃຫ້ຜູ້ຊ່ວຍສະແກນເພື່ອຊຳລະເງິນ</div>
+        <button onclick="printBarcode('${l.id}')" style="background:white;border:2px solid #2e7d32;color:#2e7d32;padding:7px 18px;border-radius:9px;font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;">🖨️ ພິມບາໂຄດ</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  if (typeof JsBarcode !== 'undefined') {
+    matches.filter(l => l.status === 'active').forEach(l => {
+      const el = document.getElementById('barcode-svg-' + l.id.replace(/[^a-zA-Z0-9]/g,'_'));
+      if (el) try {
+        JsBarcode(el, l.id, {
+          format: 'CODE128', width: 2, height: 60,
+          displayValue: true, fontSize: 14, margin: 10,
+          lineColor: '#1b5e20',
+        });
+      } catch(e) {}
+    });
+  }
+}
+
+function printBarcode(loanId) {
+  const el = document.getElementById('barcode-svg-' + loanId.replace(/[^a-zA-Z0-9]/g,'_'));
+  if (!el) return;
+  const win = window.open('', '', 'width=420,height=320');
+  win.document.write(`<html><head><title>ບາໂຄດ — ${loanId}</title></head>
+    <body style="text-align:center;font-family:sans-serif;padding:24px;margin:0;">
+      <div style="font-size:13px;font-weight:700;color:#1b5e20;margin-bottom:12px;">🏦 Unjai Finance</div>
+      ${el.outerHTML}
+      <div style="font-size:13px;color:#616161;margin-top:8px;letter-spacing:1px;">${loanId}</div>
+      <div style="font-size:11px;color:#9e9e9e;margin-top:4px;">ສະແດງໃຫ້ຜູ້ຊ່ວຍສະແກນເພື່ອຊຳລະເງິນ</div>
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+  win.close();
+}
+
+['successModal','statusModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === document.getElementById(id))
+      document.getElementById(id).classList.remove('open');
+  });
+});
+
+(async () => {
+  const grid = document.getElementById('prodGrid');
+  grid.innerHTML = '<p style="text-align:center;color:var(--gray-text);padding:30px;grid-column:1/-1;">ກຳລັງໂຫລດ...</p>';
+  try {
+    await DB.loadAll();
+    renderProducts();
+  } catch(err) {
+    console.error(err);
+    grid.innerHTML = '<p style="text-align:center;color:#c62828;padding:30px;grid-column:1/-1;">ໂຫລດຂໍ້ມູນລົ້ມເຫລວ</p>';
+  }
+})();
+</script>
+</body>
+</html>

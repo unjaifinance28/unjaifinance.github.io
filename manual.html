@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ຄູ່ມືການໃຊ້ງານ | Unjai Finance</title>
+  <style>
+    :root {
+      --green-dark:   #1b5e20;
+      --green-main:   #2e7d32;
+      --green-med:    #4caf50;
+      --green-light:  #81c784;
+      --green-bg:     #e8f5e9;
+      --green-pale:   #c8e6c9;
+      --gray-text:    #616161;
+      --gray-light:   #f5f5f5;
+      --gray-mid:     #e0e0e0;
+      --red:          #c62828;
+      --orange:       #e65100;
+      --blue:         #1565c0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Phetsarath OT', 'Noto Sans Lao', 'Lao UI', sans-serif;
+      background: #f0f4f0;
+      color: #212121;
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      .sidebar, .top-bar { display: none !important; }
+      .main-content { margin-left: 0 !important; padding: 20px !important; }
+      .section { page-break-inside: avoid; }
+      .content-pane { display: block !important; }
+      body { background: white; }
+    }
+
+    /* ===== TOP BAR ===== */
+    .top-bar {
+      background: var(--green-dark);
+      color: white;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 300;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+    .top-bar .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1rem; font-weight: 800; letter-spacing: .3px;
+    }
+    .top-bar .brand .icon {
+      width: 34px; height: 34px; background: rgba(255,255,255,.18);
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; font-size: 1.1rem;
+    }
+    .top-bar .sub { font-size: .7rem; opacity: .7; font-weight: 400; }
+    .top-bar-right { display: flex; gap: 10px; align-items: center; }
+    .btn-print {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
+      color: white; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: .8rem;
+    }
+    .btn-print:hover { background: rgba(255,255,255,.25); }
+    .btn-home {
+      color: rgba(255,255,255,.7); text-decoration: none; font-size: .78rem;
+    }
+    .btn-home:hover { color: white; }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      position: fixed;
+      top: 56px; left: 0; bottom: 0;
+      width: 260px;
+      background: white;
+      border-right: 1px solid var(--gray-mid);
+      overflow-y: auto;
+      padding: 16px 0 40px;
+      z-index: 200;
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--green-pale); border-radius: 4px; }
+
+    .nav-section-label {
+      font-size: .68rem; font-weight: 800; color: var(--gray-text);
+      letter-spacing: .8px; text-transform: uppercase;
+      padding: 14px 18px 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px; cursor: pointer; font-size: .85rem;
+      color: #424242; border-left: 3px solid transparent;
+      transition: .15s;
+    }
+    .nav-item:hover { background: var(--green-bg); color: var(--green-dark); }
+    .nav-item.active {
+      background: var(--green-bg); color: var(--green-dark);
+      border-left-color: var(--green-main); font-weight: 700;
+    }
+    .nav-item .ni-icon { font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
+    .nav-divider { border: none; border-top: 1px solid var(--gray-mid); margin: 8px 0; }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      margin-left: 260px;
+      margin-top: 56px;
+      padding: 28px 32px 60px;
+      min-height: calc(100vh - 56px);
+    }
+
+    .content-pane { display: none; }
+    .content-pane.active { display: block; }
+
+    /* ===== SECTIONS ===== */
+    .page-title {
+      font-size: 1.5rem; font-weight: 900; color: var(--green-dark);
+      margin-bottom: 6px;
+    }
+    .page-sub {
+      font-size: .88rem; color: var(--gray-text); margin-bottom: 28px;
+    }
+
+    .section {
+      background: white; border-radius: 14px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .section-header {
+      background: linear-gradient(135deg, var(--green-dark), var(--green-main));
+      color: white; padding: 14px 22px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-header .sh-icon { font-size: 1.3rem; }
+    .section-header h2 { font-size: .97rem; font-weight: 800; margin: 0; }
+    .section-body { padding: 20px 22px; }
+
+    /* Steps */
+    .step-list { list-style: none; counter-reset: step; }
+    .step-list li {
+      counter-increment: step;
+      display: flex; gap: 14px; margin-bottom: 14px; align-items: flex-start;
+    }
+    .step-list li::before {
+      content: counter(step);
+      flex-shrink: 0; width: 28px; height: 28px;
+      background: var(--green-main); color: white;
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: .8rem; font-weight: 800;
+      margin-top: 1px;
+    }
+    .step-list li .step-content { flex: 1; }
+    .step-list li strong { color: var(--green-dark); }
+
+    /* Info box */
+    .info-box {
+      background: var(--green-bg); border: 1px solid var(--green-pale);
+      border-radius: 10px; padding: 12px 16px; margin: 12px 0;
+      font-size: .85rem;
+    }
+    .info-box.warn {
+      background: #fff3e0; border-color: #ffcc80; color: var(--orange);
+    }
+    .info-box.danger {
+      background: #ffebee; border-color: #ef9a9a; color: var(--red);
+    }
+    .info-box.blue {
+      background: #e3f2fd; border-color: #90caf9; color: var(--blue);
+    }
+
+    /* Field display */
+    .field-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin: 10px 0; }
+    .field-table th {
+      text-align: left; padding: 8px 12px;
+      background: var(--green-bg); color: var(--green-dark);
+      font-weight: 700; font-size: .78rem;
+    }
+    .field-table td { padding: 8px 12px; border-bottom: 1px solid var(--gray-mid); vertical-align: top; }
+    .field-table tr:last-child td { border-bottom: none; }
+    .field-table td:first-child { font-weight: 600; color: #333; white-space: nowrap; }
+
+    /* Badge */
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 50px;
+      font-size: .73rem; font-weight: 700;
+    }
+    .badge-green  { background: var(--green-bg);  color: var(--green-dark); }
+    .badge-orange { background: #fff3e0; color: var(--orange); }
+    .badge-red    { background: #ffebee; color: var(--red); }
+    .badge-blue   { background: #e3f2fd; color: var(--blue); }
+    .badge-purple { background: #f3e5f5; color: #6a1b9a; }
+    .badge-gold   { background: #fff8e1; color: #f57f17; border: 1px solid #fdd835; }
+
+    /* Tip callout */
+    .tip {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: #f9fbe7; border-left: 3px solid var(--green-med);
+      border-radius: 8px; padding: 10px 14px; margin: 10px 0;
+      font-size: .84rem; color: #33691e;
+    }
+    .tip .tip-icon { flex-shrink: 0; font-size: 1.1rem; }
+
+    /* Inline code / shortcut */
+    code {
+      background: var(--gray-light); border: 1px solid var(--gray-mid);
+      border-radius: 4px; padding: 1px 6px; font-size: .83rem;
+      font-family: monospace; color: var(--green-dark);
+    }
+
+    /* Score grid */
+    .score-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0;
+    }
+    .score-card {
+      border-radius: 10px; padding: 12px; text-align: center; font-size: .82rem;
+    }
+    .score-card .sc-icon { font-size: 1.4rem; margin-bottom: 4px; }
+    .score-card .sc-label { font-weight: 700; margin-bottom: 2px; }
+    .score-card.good   { background: var(--green-bg); color: var(--green-dark); }
+    .score-card.warn   { background: #fff3e0; color: var(--orange); }
+    .score-card.danger { background: #ffebee; color: var(--red); }
+
+    /* Status row */
+    .status-row {
+      display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0;
+    }
+    .status-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--gray-light); border-radius: 8px;
+      padding: 7px 12px; font-size: .82rem;
+    }
+    .status-chip .chip-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    /* ===== MOBILE ===== */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s;
+        z-index: 250;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; padding: 18px 14px 50px; }
+      .score-grid { grid-template-columns: 1fr; }
+      .field-table { font-size: .8rem; }
+      .top-bar .sub { display: none; }
+      .overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,.35); z-index: 240;
+      }
+      .overlay.open { display: block; }
+    }
+
+    /* ===== MOBILE MENU TOGGLE ===== */
+    .menu-toggle {
+      display: none; background: transparent; border: none;
+      color: white; font-size: 1.4rem; cursor: pointer; padding: 4px 8px;
+    }
+    @media (max-width: 768px) { .menu-toggle { display: block; } }
+
+    /* ===== COVER PAGE ===== */
+    .cover {
+      text-align: center; padding: 40px 20px 30px;
+    }
+    .cover .cover-logo {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--green-dark), var(--green-med));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; margin: 0 auto 20px;
+      box-shadow: 0 8px 24px rgba(27,94,32,.25);
+    }
+    .cover h1 { font-size: 2rem; font-weight: 900; color: var(--green-dark); margin-bottom: 8px; }
+    .cover .cover-sub { font-size: .9rem; color: var(--gray-text); margin-bottom: 30px; }
+    .cover-cards {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      max-width: 480px; margin: 0 auto;
+    }
+    .cover-card {
+      background: white; border: 2px solid var(--green-pale);
+      border-radius: 14px; padding: 20px 16px; cursor: pointer;
+      transition: .2s; text-align: center;
+    }
+    .cover-card:hover {
+      border-color: var(--green-main);
+      box-shadow: 0 6px 20px rgba(46,125,50,.15);
+      transform: translateY(-2px);
+    }
+    .cover-card .cc-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .cover-card .cc-title { font-size: .95rem; font-weight: 800; color: var(--green-dark); }
+    .cover-card .cc-sub { font-size: .78rem; color: var(--gray-text); margin-top: 4px; }
+    @media (max-width: 460px) { .cover-cards { grid-template-columns: 1fr; } }
+
+    /* ===== VERSION TAG ===== */
+    .version-tag {
+      display: inline-block; background: var(--green-bg);
+      color: var(--green-dark); border-radius: 50px;
+      padding: 3px 12px; font-size: .75rem; font-weight: 700;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- OVERLAY for mobile sidebar -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="brand">
+      <div class="icon">🏦</div>
+      <div>
+        <div>Unjai Finance</div>
+        <div class="sub">ຄູ່ມືການໃຊ້ງານ</div>
+      </div>
+    </div>
+  </div>
+  <div class="top-bar-right">
+    <a href="index.html" class="btn-home">← ໜ້າລູກຄ້າ</a>
+    <button class="btn-print" onclick="window.print()">🖨️ ພິມ</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="nav-section-label">ໜ້າຫຼັກ</div>
+  <div class="nav-item active" onclick="showPage('cover',this)">
+    <span class="ni-icon">📖</span> ໜ້າຫຼັກ
+  </div>
+
+  <hr class="nav-divider" />
+  <div class="nav-section-label">🔐 ຄູ່ມືແອັດມິນ</div>
+
+  <div class="nav-item" onclick="showPage('a-login',this)">
+    <span class="ni-icon">🔓</span> ການເຂົ້າສູ່ລະບົບ
+  </div>
+  <div class="nav-item" onclick="showPage('a-products',this)">
+    <span class="ni-icon">📦</span> ການຈັດການຜະລິດຕະພັນ
+  </div>
+  <div class="nav-item" onclick="showPage('a-requests',this)">
+    <span class="ni-icon">📥</span> ການອະນຸມັດລາຍການ
+  </div>
+  <div class="nav-item" onclick="showPage('a-loans',this)">
+    <span class="ni-icon">💰</span> ລາຍການກູ້
+  </div>
+  <div class="nav-item" onclick="showPage('a-perf',this)">
+    <span class="ni-icon">📊</span> ຜົນດຳເນີນງານ
+  </div>
+  <div class="nav-item" onclick="showPage('a-credit',this)">
+    <span class="ni-icon">⭐</span> Credit Score
+  </div>
+  <div class="nav-item" onclick="showPage('a-alerts',this)">
+    <span class="ni-icon">🔔</span> ການແຈ້ງເຕືອນ
+  </div>
+  <div class="nav-item" onclick="showPage('a-export',this)">
+    <span class="ni-icon">⬇️</span> Export CSV
+  </div>
+
+  <hr class="nav-divider" />
+  <div class="nav-section-label">👤 ຄູ່ມືລູກຄ້າ</div>
+
+  <div class="nav-item" onclick="showPage('c-apply',this)">
+    <span class="ni-icon">📝</span> ການສະໝັກກູ້ເງິນ
+  </div>
+  <div class="nav-item" onclick="showPage('c-status',this)">
+    <span class="ni-icon">🔍</span> ການຕິດຕາມສະຖານະ
+  </div>
+  <div class="nav-item" onclick="showPage('c-compound',this)">
+    <span class="ni-icon">⚠️</span> ຄຳເຕືອນດອກທົບຕົ້ນ
+  </div>
+  <div class="nav-item" onclick="showPage('c-vip',this)">
+    <span class="ni-icon">👑</span> ຜະລິດຕະພັນ VIP
+  </div>
+
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main-content" id="mainContent">
+
+  <!-- ============ COVER ============ -->
+  <div class="content-pane active" id="page-cover">
+    <div class="cover">
+      <div class="cover-logo">🏦</div>
+      <h1>ຄູ່ມືການໃຊ້ງານ</h1>
+      <div class="cover-sub">Unjai Finance — ລະບົບຈັດການສິນເຊື່ອ</div>
+      <div class="version-tag">📅 ສ້າງ: ພຶດສະພາ 2026</div>
+
+      <div class="cover-cards" style="margin-top:30px;">
+        <div class="cover-card" onclick="showPage('a-login', null)">
+          <div class="cc-icon">🔐</div>
+          <div class="cc-title">ຄູ່ມືແອັດມິນ</div>
+          <div class="cc-sub">ສຳລັບທີ່ທີ່ງານ / ເຈົ້າໜ້າທີ່</div>
+        </div>
+        <div class="cover-card" onclick="showPage('c-apply', null)">
+          <div class="cc-icon">👤</div>
+          <div class="cc-title">ຄູ່ມືລູກຄ້າ</div>
+          <div class="cc-sub">ສຳລັບຜູ້ສະໝັກກູ້ເງິນ</div>
+        </div>
+      </div>
+
+      <div style="margin-top:32px;max-width:520px;margin-inline:auto;">
+        <div class="info-box blue" style="text-align:left;">
+          📞 ຕ້ອງການຄວາມຊ່ວຍເຫລືອ? ຕິດຕໍ່: <strong>020 96498301</strong><br/>
+          🌐 ສະໝັກກູ້: <a href="index.html" style="color:var(--blue);">index.html</a> &nbsp;|&nbsp;
+          ✏️ ຈັດການ: <a href="admin.html" style="color:var(--blue);">admin.html</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: LOGIN ============ -->
+  <div class="content-pane" id="page-a-login">
+    <div class="page-title">🔓 ການເຂົ້າສູ່ລະບົບ</div>
+    <div class="page-sub">ວິທີເຂົ້າໃຊ້ງານໜ້າ Admin</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🌐</span><h2>URL ໜ້າ Admin</h2></div>
+      <div class="section-body">
+        <p>ເປີດ browser ແລ້ວໄປທີ່:</p>
+        <div class="info-box blue" style="margin-top:10px;font-size:1rem;font-weight:700;letter-spacing:.5px;">
+          📍 /admin.html
+        </div>
+        <p style="margin-top:12px;color:var(--gray-text);font-size:.85rem;">ໜ້າ Login ຈະສະແດງຂຶ້ນໃຫ້ໃສ່ລະຫັດຜ່ານ.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔑</span><h2>ລະຫັດຜ່ານ</h2></div>
+      <div class="section-body">
+        <table class="field-table">
+          <tr><th>ລະຫັດເລີ່ມຕົ້ນ</th><th>ໝາຍເຫດ</th></tr>
+          <tr>
+            <td><code>admin1234</code></td>
+            <td>ລະຫັດທີ່ຕ້ອງປ່ຽນທັນທີຫຼັງໃຊ້ຄັ້ງທຳອິດ</td>
+          </tr>
+        </table>
+        <div class="info-box warn" style="margin-top:10px;">
+          ⚠️ ກະລຸນາປ່ຽນລະຫັດຜ່ານເລີ່ມຕົ້ນໂດຍໄວ ເພື່ອຄວາມປອດໄພ
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔄</span><h2>ວິທີປ່ຽນລະຫັດຜ່ານ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ຫຼັງ Login ສຳເລັດ → ຄລິກ tab <strong>⚙️ ຕັ້ງຄ່າ</strong></div></li>
+          <li><div class="step-content">ເລື່ອນລົງຫາສ່ວນ <strong>"🔑 ປ່ຽນລະຫັດຜ່ານ"</strong></div></li>
+          <li><div class="step-content">ໃສ່ <strong>ລະຫັດໃໝ່</strong> ແລ້ວໃສ່ <strong>ຢືນຢັນ</strong> ອີກຄັ້ງ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>"ປ່ຽນ"</strong> — ຈະມີຂໍ້ຄວາມຢືນຢັນ</div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ລະຫັດຜ່ານຖືກເກັບໄວ້ໃນ Browser (localStorage) ຂອງຄອມພ໌ທ່ານ. ຫາກເປີດ Browser ໃໝ່ ຫຼື ຜ່ານ Private Mode ອາດຕ້ອງໃສ່ລະຫັດໃໝ່.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: PRODUCTS ============ -->
+  <div class="content-pane" id="page-a-products">
+    <div class="page-title">📦 ການຈັດການຜະລິດຕະພັນ</div>
+    <div class="page-sub">ສ້າງ, ແກ້ໄຂ ແລະ ຈັດການຜະລິດຕະພັນກູ້ເງິນ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">➕</span><h2>ສ້າງຜະລິດຕະພັນໃໝ່</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ຄລິກ tab <strong>📦 ຜະລິດຕະພັນ</strong> ໃນໜ້າ Admin</div></li>
+          <li><div class="step-content">ຕື່ມຂໍ້ມູນໃນຟອມດ້ານເທິງ:</div></li>
+        </ol>
+        <table class="field-table" style="margin-top:4px;">
+          <tr><th>ຊ່ອງ</th><th>ຄຳອະທິບາຍ</th><th>ຕົວຢ່າງ</th></tr>
+          <tr><td>ຊື່ຜະລິດຕະພັນ</td><td>ຊື່ທີ່ສະແດງໃຫ້ລູກຄ້າເຫັນ</td><td>ເງິນກູ້ 30 ວັນ</td></tr>
+          <tr><td>ອັດຕາດອກເບ້ຍ (%)</td><td>ດອກໃນ 1 ງວດ ຫຼື ຕໍ່ວັນ</td><td>15, 0.5</td></tr>
+          <tr><td>ປະເພດດອກ</td><td>Flat = ດອກລວມ; ລາຍວັນ = %/ວັນ</td><td>Flat</td></tr>
+          <tr><td>ໄລຍະ (ວັນ)</td><td>ໃສ່ 0 ຖ້າໃຫ້ລູກຄ້າເລືອກໄລຍະເອງ</td><td>30</td></tr>
+          <tr><td>ຈຳນວນຕ່ຳສຸດ</td><td>ວົງເງິນຕ່ຳທີ່ສຸດທີ່ກູ້ໄດ້ (ກີບ)</td><td>500,000</td></tr>
+          <tr><td>ຈຳນວນສູງສຸດ</td><td>ວົງເງິນສູງທີ່ສຸດ (ກີບ)</td><td>50,000,000</td></tr>
+          <tr><td>ຄຳອະທິບາຍ</td><td>ເງື່ອນໄຂ ຫຼື ໝາຍເຫດ</td><td>ທາງເລືອກ</td></tr>
+        </table>
+        <ol class="step-list" style="margin-top:14px;" start="3">
+          <li><div class="step-content">ຄລິກ <strong>"💾 ບັນທຶກ"</strong> — ຜະລິດຕະພັນຈະສະແດງໃນໜ້າລູກຄ້າທັນທີ</div></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">👑</span><h2>ຜະລິດຕະພັນ VIP</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ຜະລິດຕະພັນ VIP ຈະ <strong>ບໍ່ສະແດງ</strong> ໃຫ້ລູກຄ້າທົ່ວໄປ — ເຫັນສະເພາະລູກຄ້າ VIP ທີ່ກຳໜົດໄວ້ເທົ່ານັ້ນ.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ໃນຟອມຜະລິດຕະພັນ → ໝາຍ tick <strong>"👑 ຜະລິດຕະພັນ VIP"</strong></div></li>
+          <li><div class="step-content">ຊ່ອງ <strong>"ເບີໂທລູກຄ້າ VIP"</strong> ຈະເປີດຂຶ້ນ — ໃສ່ເບີໂທລູກຄ້າ VIP ຄັ່ນດ້ວຍ <code>,</code></div></li>
+          <li><div class="step-content">ຕົວຢ່າງ: <code>020xxxxxxxx, 030xxxxxxxx</code></div></li>
+          <li><div class="step-content">ຄລິກ <strong>"💾 ບັນທຶກ"</strong></div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ລູກຄ້າ VIP ຈະເຫັນ badge <span class="badge badge-gold">👑 VIP Exclusive</span> ໃນໜ້າເລືອກຜະລິດຕະພັນ ຫຼັງຈາກໃສ່ເບີໂທຂອງຕົນ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔁</span><h2>ການຕັ້ງດອກທົບຕົ້ນ (Compound)</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ດອກທົບຕົ້ນໝາຍຄວາມວ່າ: ຖ້າລູກຄ້າ <strong>ບໍ່ຊຳລະທັນກຳໜົດ</strong>, ຍອດດອກຄ້າງຈະຖືກລວມໃສ່ຕົ້ນ ແລ້ວຄິດດອກໃໝ່.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ໃນຟອມຜະລິດຕະພັນ → ໝາຍ tick <strong>"ດອກທົບຕົ້ນ (Compound)"</strong></div></li>
+          <li><div class="step-content">ໃສ່ <strong>"ທົບຕົ້ນຫຼັງຈາກ (ວັນ)"</strong> — ຈຳນວນວັນຫຼັງຄົບກຳໜົດທີ່ຈະທົບ</div></li>
+        </ol>
+        <table class="field-table" style="margin-top:10px;">
+          <tr><th>ຄ່າ</th><th>ຄວາມໝາຍ</th></tr>
+          <tr><td><code>0</code></td><td>ທົບຕົ້ນທັນທີເມື່ອຄົບກຳໜົດ</td></tr>
+          <tr><td><code>7</code></td><td>ທົບຕົ້ນຫຼັງຈາກ 7 ວັນ ຫຼັງຄົບກຳໜົດ</td></tr>
+        </table>
+        <div class="info-box warn" style="margin-top:12px;">
+          ⚠️ ລະບົບຈະສ້າງ "ສັນຍາກູ້ໃໝ່" ໂດຍໃຊ້ (ຕົ້ນ + ດອກຄ້າງ) ເປັນຕົ້ນໃໝ່. ລູກຄ້າຈະເຫັນຄຳເຕືອນໃນໜ້າຕິດຕາມສະຖານະ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">⚡</span><h2>ການຈັດການຜະລິດຕະພັນທີ່ມີຢູ່</h2></div>
+      <div class="section-body">
+        <table class="field-table">
+          <tr><th>ປຸ່ມ</th><th>ການກະທຳ</th></tr>
+          <tr><td>✏️ ແກ້ໄຂ</td><td>ໂຫລດຂໍ້ມູນຜະລິດຕະພັນໃສ່ຟອມດ້ານເທິງ ແລ້ວສາມາດປ່ຽນໄດ້</td></tr>
+          <tr><td>✅/⏸ ເປີດ/ປິດ</td><td>ສະລັບສະຖານະ active/inactive — ຜະລິດຕະພັນທີ່ inactive ຈະບໍ່ສະແດງໃຫ້ລູກຄ້າ</td></tr>
+          <tr><td>🗑 ລຶບ</td><td>ລຶບຜະລິດຕະພັນຖາວອນ (ຈະຖາມຢືນຢັນ)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: REQUESTS ============ -->
+  <div class="content-pane" id="page-a-requests">
+    <div class="page-title">📥 ການອະນຸມັດລາຍການກູ້</div>
+    <div class="page-sub">ຈັດການຄຳຮ້ອງທີ່ຍັງລໍຖ້າ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">👁️</span><h2>ເບິ່ງຄຳຮ້ອງ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ຄລິກ tab <strong>📥 ຄຳຮ້ອງ</strong> — ຈໍານວນລາຍການລໍຖ້າຈະສະແດງໃນ badge ສີສົ້ມ</div></li>
+          <li><div class="step-content">ຕາຕະລາງສະແດງ: ວັນທີ, ຊື່ລູກຄ້າ, ເບີໂທ, ຜະລິດຕະພັນ, ຈຳນວນ, ຍອດລວມ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>👁 ເບິ່ງ</strong> ເພື່ອເປີດ Modal ລາຍລະອຽດ — ລວມທັງຮູບຖ່າຍເອກະສານ</div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ໃນ Modal ລາຍລະອຽດ ທ່ານສາມາດຂະຫຍາຍ/ດາວໂຫລດຮູບຖ່າຍເອກະສານ (ບັດ, ສຳມະໂນ, ພາດສະປອດ) ຂອງລູກຄ້າໄດ້.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">✅</span><h2>ອະນຸມັດ / ປະຕິເສດ</h2></div>
+      <div class="section-body">
+        <table class="field-table">
+          <tr><th>ປຸ່ມ</th><th>ການກະທຳ</th><th>ສະຖານະໃໝ່</th></tr>
+          <tr>
+            <td>✅ ອະນຸມັດ</td>
+            <td>ຮັບຄຳຮ້ອງ — ລາຍການຍ້າຍໄປ Tab "ລາຍການກູ້" ສະຖານະ "ດຳເນີນ"</td>
+            <td><span class="badge badge-blue">💰 ດຳເນີນ</span></td>
+          </tr>
+          <tr>
+            <td>❌ ປະຕິເສດ</td>
+            <td>ຖືກລົ້ມ — ລາຍການຍ້າຍໄປ Tab "ລາຍການກູ້" ສະຖານະ "ປະຕິເສດ"</td>
+            <td><span class="badge badge-red">❌ ປະຕິເສດ</span></td>
+          </tr>
+        </table>
+        <div class="info-box">
+          ✅ ຫຼັງອະນຸມັດ, ລາຍການຈະປາກົດໃນ Tab <strong>💰 ລາຍການກູ້</strong> ທັນທີ ແລ້ວສາມາດບັນທຶກການຊຳລະໄດ້.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">💳</span><h2>ບັນທຶກການຊຳລະ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ໄປ tab <strong>💰 ລາຍການກູ້</strong> → ຄລິກ <strong>👁 ເບິ່ງ</strong> ໃນລາຍການທີ່ຕ້ອງການ</div></li>
+          <li><div class="step-content">ໃນ Modal → ສ່ວນ <strong>"💳 ບັນທຶກຊຳລະ"</strong> ຕື່ມ:</div></li>
+        </ol>
+        <table class="field-table" style="margin-top:4px;">
+          <tr><th>ຊ່ອງ</th><th>ຄຳອະທິບາຍ</th></tr>
+          <tr><td>ຈຳນວນຊຳລະ</td><td>ຍອດທີ່ລູກຄ້າຊຳລະມາ (ກີບ)</td></tr>
+          <tr><td>ວິທີຊຳລະ</td><td>ເງິນສົດ / BCEL / LDB / ໂອນ</td></tr>
+          <tr><td>ວັນທີ</td><td>ວັນທີຊຳລະຕົວຈິງ</td></tr>
+          <tr><td>ໝາຍເຫດ</td><td>ທາງເລືອກ</td></tr>
+        </table>
+        <ol class="step-list" style="margin-top:14px;" start="3">
+          <li><div class="step-content">ຄລິກ <strong>"✅ ບັນທຶກ"</strong> — ຍອດໃນລາຍການຈະອັບເດດທັນທີ</div></li>
+          <li><div class="step-content">ຖ້າຍອດຊຳລະຄົບ → ລາຍການຈະປ່ຽນສະຖານະເປັນ <span class="badge badge-purple">🎉 ສຳເລັດ</span></div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: LOANS ============ -->
+  <div class="content-pane" id="page-a-loans">
+    <div class="page-title">💰 ລາຍການກູ້</div>
+    <div class="page-sub">ຄົ້ນຫາ, ເບິ່ງລາຍລະອຽດ ແລ້ວຈັດການລາຍການກູ້ທັງໝົດ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔍</span><h2>ຄົ້ນຫາ ແລ້ວ ກອງ</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ຢູ່ດ້ານເທິງຂອງ Tab ລາຍການກູ້ ມີ Filter Bar:</p>
+        <div class="status-row">
+          <div class="status-chip"><div class="chip-dot" style="background:#9e9e9e;"></div>ທັງໝົດ</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#1565c0;"></div>💰 ດຳເນີນ</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#e65100;"></div>⚠️ ເກີນກຳໜົດ</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#6a1b9a;"></div>🎉 ສຳເລັດ</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#c62828;"></div>❌ ປະຕິເສດ</div>
+        </div>
+        <p style="margin-top:12px;">ນອກຈາກນີ້ ສາມາດ <strong>ຄົ້ນຫາ</strong> ໂດຍ: ຊື່ລູກຄ້າ, ເບີໂທ ຫຼື ລະຫັດກູ້ (<code>LAO------</code>)</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📋</span><h2>ເບິ່ງລາຍລະອຽດ</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:10px;">ຄລິກ <strong>👁 ເບິ່ງ</strong> ຫຼື ຄລິກແຖວໃດໜຶ່ງ → Modal ລາຍລະອຽດຈະເປີດ:</p>
+        <table class="field-table">
+          <tr><th>ຂໍ້ມູນ</th><th>ຄຳອະທິບາຍ</th></tr>
+          <tr><td>ລະຫັດກູ້</td><td>ລະຫັດ LAO ທີ່ລູກຄ້າໄດ້ຮັບ</td></tr>
+          <tr><td>ເງິນຕົ້ນ</td><td>ຈຳນວນທີ່ໄດ້ກູ້ (ຫຼັງຈາກ top-up/restructure ຈະອັບເດດ)</td></tr>
+          <tr><td>ດອກເບ້ຍ</td><td>ດອກລວມ ຫຼື ດອກ/ວັນ ຕາມຜະລິດຕະພັນ</td></tr>
+          <tr><td>ຄວາມຄືບໜ້າ</td><td>ແຖບສີສະແດງ % ການຊຳລະ</td></tr>
+          <tr><td>ຮູບເອກະສານ</td><td>ຮູບຖ່າຍ ບັດ/ສຳມະໂນ/ພາດສະປອດ</td></tr>
+          <tr><td>ປະຫວັດຊຳລະ</td><td>ລາຍການຊຳລະທັງໝົດ ພ້ອມວັນທີ ແລ້ວ ວິທີຊຳລະ</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📤</span><h2>ຢືມເພີ່ມ (Top-up)</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">Top-up ໃຊ້ສຳລັບລູກຄ້າທີ່ຕ້ອງການ <strong>ກູ້ເພີ່ມ</strong> ໃນຂະນະທີ່ຍັງມີລາຍການດຳເນີນຢູ່.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ເປີດ Modal ລາຍລະອຽດຂອງລາຍການ Active</div></li>
+          <li><div class="step-content">ຊອກຫາ section <strong>"📤 ຢືມເພີ່ມ (Top-up)"</strong></div></li>
+          <li><div class="step-content">ໃສ່ <strong>ຈຳນວນເພີ່ມ</strong> ທີ່ລູກຄ້າຕ້ອງການ</div></li>
+          <li><div class="step-content">ຢືນຢັນ → ຕົ້ນໃໝ່ = ຕົ້ນເກົ່າ + ຈຳນວນເພີ່ມ; ດອກຄຳນວນໃໝ່</div></li>
+        </ol>
+        <div class="info-box warn">
+          ⚠️ Top-up ຈະ <strong>ຮີເຊັດ</strong> ໄລຍະ ແລ້ວ ດອກຄຳນວນໃໝ່ຈາກຕົ້ນລວມ. ກວດໃຫ້ຖ່ວງຖ່ຽນກ່ອນຢືນຢັນ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔁</span><h2>ທົບຕົ້ນດອກ (Restructure)</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ທົບຕົ້ນດອກໃຊ້ເມື່ອ: ລູກຄ້າ <strong>ຄ້າງດອກ</strong> ແລ້ວ ຕ້ອງການ <strong>ຮວມດອກລົງໃສ່ຕົ້ນ</strong>.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ເປີດ Modal ລາຍລະອຽດ → ຊອກຫາປຸ່ມ <strong>"🔁 ທົບຕົ້ນ"</strong></div></li>
+          <li><div class="step-content">ລະບົບຈະສ້າງ "ສັນຍາໃໝ່": ຕົ້ນໃໝ່ = ຕົ້ນ + ດອກຄ້າງ</div></li>
+          <li><div class="step-content">ປະຫວັດທົບຕົ້ນຈະສະແດງໃນ Modal ແລ້ວ ສະຖານະປ່ຽນເປັນ <span class="badge" style="background:#e8eaf6;color:#3949ab;">🔄 ທົບຕົ້ນ</span></div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ທ່ານ (ແລ້ວ ລູກຄ້າ) ສາມາດເຫັນ "ປະຫວັດທົບຕົ້ນ" ໃນ Modal ວ່າທົບຕົ້ນກີ່ຄັ້ງ, ແຕ່ລ່ວັນທີ, ດອກຄ້າງ ແລ້ວ ຕົ້ນໃໝ່.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: PERFORMANCE ============ -->
+  <div class="content-pane" id="page-a-perf">
+    <div class="page-title">📊 ຜົນດຳເນີນງານ</div>
+    <div class="page-sub">ລາຍຮັບ, ລາຍຈ່າຍ, ໜີ້ສິນ ແລ້ວ ສະຫຼຸບຕາມຜະລິດຕະພັນ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">💵</span><h2>ລາຍຮັບດອກເບ້ຍ</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ໄປ tab <strong>📊 ຜົນດຳເນີນງານ</strong> — KPI Cards ດ້ານເທິງສະແດງ:</p>
+        <table class="field-table">
+          <tr><th>KPI</th><th>ຄຳອະທິບາຍ</th></tr>
+          <tr><td>💵 ລາຍຮັບດອກ</td><td>ດອກທີ່ໄດ້ຮັບຈາກການຊຳລະທັງໝົດ</td></tr>
+          <tr><td>💰 ຕົ້ນ Outstanding</td><td>ຕົ້ນທີ່ຍັງດຳເນີນຢູ່ທັງໝົດ</td></tr>
+          <tr><td>📤 ລາຍຈ່າຍ</td><td>ລາຍຈ່າຍດຳເນີນງານທີ່ບັນທຶກ</td></tr>
+          <tr><td>📈 ກຳໄລ</td><td>ລາຍຮັບດອກ − ລາຍຈ່າຍ</td></tr>
+        </table>
+        <p style="margin-top:12px;">ສ່ວນ <strong>"💵 ລາຍຮັບດອກເບ້ຍ"</strong> ທາງຂວາ ສະແດງລາຍລະອຽດຕາມຜະລິດຕະພັນ.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📤</span><h2>ລາຍຈ່າຍດຳເນີນງານ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ໃນ Tab ຜົນດຳເນີນງານ → ສ່ວນ <strong>"📤 ລາຍຈ່າຍດຳເນີນງານ"</strong></div></li>
+          <li><div class="step-content">ເລືອກ <strong>ໝວດ</strong>: ເງິນເດືອນ, ຄ່າເຊົ່າ, ຄ່ານ້ຳ/ໄຟ, ຄ່າຂົນສົ່ງ, ອື່ນໆ</div></li>
+          <li><div class="step-content">ໃສ່ <strong>ຈຳນວນ</strong> (ກີບ) ແລ້ວ <strong>ໝາຍເຫດ</strong> (ທາງເລືອກ)</div></li>
+          <li><div class="step-content">ຄລິກ <strong>"+ ບັນທຶກ"</strong></div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ລາຍຈ່າຍທີ່ບັນທຶກ ສາມາດລຶບໄດ້ໂດຍຄລິກ 🗑 ໃນລາຍການ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🏦</span><h2>ໜີ້ສິນບໍລິສັດ (ທຶນກູ້ຢືມ)</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ໃຊ້ສ່ວນນີ້ເພື່ອບັນທຶກ <strong>ທຶນທີ່ບໍລິສັດກູ້ມາ</strong> ສຳລັບໃຊ້ປ່ອຍກູ້ຕໍ່.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ໃສ່ <strong>ຊື່ເຈົ້າໜີ້</strong>, <strong>ຈຳນວນ</strong>, <strong>ອັດຕາດອກ (%/ເດືອນ)</strong></div></li>
+          <li><div class="step-content">ກຳໜົດ <strong>ວັນທີກູ້</strong> ແລ້ວ <strong>ວັນຄົບກຳໜົດ</strong></div></li>
+          <li><div class="step-content">ຄລິກ <strong>"+ ບັນທຶກໜີ້"</strong></div></li>
+        </ol>
+        <div class="info-box" style="margin-top:10px;">
+          📊 ສ່ວນ <strong>"ສະຫຼຸບໜີ້"</strong> ຈະສະແດງ: ໜີ້ລວມ, ດອກ/ເດືອນ, ຈຳນວນເຈົ້າໜີ້.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">💸</span><h2>ການຊຳລະໜີ້ (ຄືນທຶນ)</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ໃນລາຍການໜີ້ → ຄລິກ <strong>"💸 ຊຳລະ"</strong> ຂ້າງໜີ້ທີ່ຕ້ອງການ</div></li>
+          <li><div class="step-content">Modal ຊຳລະໜີ້ຈະເປີດ → ໃສ່ຈຳນວນ, ວິທີຊຳລະ, ວັນທີ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>"✅ ຢືນຢັນຊຳລະ"</strong> — ຍອດໜີ້ຈະລົດລົງ</div></li>
+          <li><div class="step-content">ຫາກໜີ້ = 0 → ໜີ້ຈະຖືກໝາຍວ່າ "ຊຳລະຄົບ"</div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: CREDIT SCORE ============ -->
+  <div class="content-pane" id="page-a-credit">
+    <div class="page-title">⭐ Credit Score</div>
+    <div class="page-sub">ລະບົບຄະແນນ ແລ້ວ ສ່ວນຫຼຸດສຳລັບລູກຄ້າດີ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📅</span><h2>ການໃຫ້ຄະແນນລາຍເດືອນ</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:14px;">ໄປ tab <strong>⭐ Credit Score</strong> — ລະບົບສະແດງຕາຕະລາງລູກຄ້າ 12 ເດືອນ.</p>
+
+        <div class="score-grid">
+          <div class="score-card good">
+            <div class="sc-icon">✅</div>
+            <div class="sc-label">ປົກກະຕິ</div>
+            <div>ຊຳລະທັນ − 0 ຄະແນນ</div>
+          </div>
+          <div class="score-card warn">
+            <div class="sc-icon">⚠️</div>
+            <div class="sc-label">ຊ້າ</div>
+            <div>ຊຳລະຊ້າ − 5 ຄະແນນ</div>
+          </div>
+          <div class="score-card danger">
+            <div class="sc-icon">🔴</div>
+            <div class="sc-label">ທົບຕົ້ນ</div>
+            <div>ໜີ້ຖືກທົບ − 15 ຄະແນນ</div>
+          </div>
+        </div>
+
+        <p style="margin-top:14px;margin-bottom:10px;">ໃນຕາຕະລາງ ແຕ່ລ່ລູກຄ້າ:</p>
+        <ol class="step-list">
+          <li><div class="step-content">ຄລິກ <strong>ຕາລາງເດືອນ</strong> (M1–M12) ເພື່ອສະລັບລະຫວ່າງ ✅ ປົກກະຕິ / ⚠️ ຊ້າ / 🔴 ທົບຕົ້ນ</div></li>
+          <li><div class="step-content">ລະບົບຄິດຄະແນນໃຫ້ອັດຕະໂນມັດ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>"💾 ບັນທຶກ"</strong> ຂ້າງລູກຄ້ານັ້ນ</div></li>
+        </ol>
+
+        <div class="info-box" style="margin-top:12px;">
+          📅 ໃຊ້ dropdown <strong>"ສະແດງປີ"</strong> ດ້ານເທິງ ເພື່ອສະລັບລະຫວ່າງປີ 2025, 2026 ເປັນຕົ້ນ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🎁</span><h2>ການໃຫ້ສ່ວນຫຼຸດ</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;"><strong>ເງື່ອນໄຂຄຸນສົມບັດ</strong> ລູກຄ້າຕ້ອງມີ <strong>ທັງ 3 ຂໍ້</strong>:</p>
+        <ul style="padding-left:24px;margin-bottom:14px;line-height:2;">
+          <li>ກູ້ <strong>ກ່ອນ 1 ມັງກອນ</strong> ຂອງປີທີ່ຄິດຄະແນນ</li>
+          <li>ຊຳລະ <strong>ປົກກະຕິ ≥ 10 ເດືອນ</strong></li>
+          <li><strong>0 ເດືອນ</strong> ທົບຕົ້ນ</li>
+        </ul>
+
+        <p style="margin-bottom:10px;">ລູກຄ້າທີ່ຄຸນສົມບັດ → ສ່ວນ <strong>"🎁 ລູກຄ້າທີ່ມີສິດຮັບສ່ວນຫຼຸດ"</strong> ຈະສະແດງ.</p>
+        <ol class="step-list">
+          <li><div class="step-content">ກຳໜົດ <strong>% ສ່ວນຫຼຸດ</strong> ສຳລັບລູກຄ້ານັ້ນ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>"💾 ໃຫ້ສ່ວນຫຼຸດ"</strong></div></li>
+          <li><div class="step-content">ລູກຄ້າຈະເຫັນ banner ສ່ວນຫຼຸດໃນໜ້າສະໝັກ ຫຼັງໃສ່ເບີໂທ</div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ສ່ວນຫຼຸດ <strong>ໃຊ້ໄດ້ 1 ຄັ້ງ</strong> ຕໍ່ 1 ການສະໝັກ. ຫຼັງໃຊ້ແລ້ວ banner ຈະຫາຍໄປ.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: ALERTS ============ -->
+  <div class="content-pane" id="page-a-alerts">
+    <div class="page-title">🔔 ການແຈ້ງເຕືອນ</div>
+    <div class="page-sub">ຕິດຕາມລູກຄ້າຄ້າງຊຳລະ ແລ້ວ ໃກ້ຄົບກຳໜົດ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔴</span><h2>ລູກຄ້າຄ້າງຊຳລະ (ເກີນກຳໜົດ)</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ຄລິກ tab <strong>🔔 ແຈ້ງເຕືອນ</strong> — badge ສີແດງ ສະແດງຈຳນວນລາຍການ</div></li>
+          <li><div class="step-content">ສ່ວນ <strong>"🔴 ລາຍການເກີນກຳໜົດ"</strong> ສະແດງລາຍຊື່ທີ່ <strong>ຄ້າງດອກ ແລ້ວ ເກີນກຳໜົດ</strong></div></li>
+        </ol>
+        <table class="field-table" style="margin-top:10px;">
+          <tr><th>ຂໍ້ມູນທີ່ສະແດງ</th><th>ຄຳອະທິບາຍ</th></tr>
+          <tr><td>ຊື່ / ລະຫັດ</td><td>ຊື່ລູກຄ້າ ແລ້ວ ລະຫັດ LAO</td></tr>
+          <tr><td>ເກີນກຳໜົດ</td><td>ຈຳນວນວັນທີ່ເກີນ</td></tr>
+          <tr><td>ດອກຄ້າງ</td><td>ຍອດດອກທີ່ຕ້ອງຊຳລະ</td></tr>
+          <tr><td>ເບີໂທ</td><td>ເບີໂທເພື່ອຕິດຕໍ່</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🟠</span><h2>ໃກ້ຄົບກຳໜົດ (ພາຍໃນ 7 ວັນ)</h2></div>
+      <div class="section-body">
+        <p>ສ່ວນ <strong>"🟠 ໃກ້ຄົບກຳໜົດ"</strong> ສະແດງລາຍການທີ່ <strong>ຍັງເຫຼືອ ≤ 7 ວັນ</strong> ກ່ອນຄົບກຳໜົດ.</p>
+        <div class="info-box warn" style="margin-top:12px;">
+          ⚠️ ຕິດຕໍ່ລູກຄ້າລ່ວງໜ້າ ເພື່ອແຈ້ງໃຫ້ກຽມຊຳລະ ແລ້ວ ຫຼີກເວັ້ນ ໜີ້ທົບຕົ້ນ.
+        </div>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          KPI Cards ດ້ານເທິງ Tab ແຈ້ງເຕືອນ ສະແດງ: ລາຍການທີ່ເກີນ, ໃກ້ຄົບ, ດອກຄ້າງລວມ, ແລ້ວ ລາຍການ active ທັງໝົດ.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN: EXPORT ============ -->
+  <div class="content-pane" id="page-a-export">
+    <div class="page-title">⬇️ Export CSV</div>
+    <div class="page-sub">ດາວໂຫລດຂໍ້ມູນລາຍການກູ້ ສຳລັບ Excel / Google Sheets</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">⬇️</span><h2>ການ Export</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ໄປ tab <strong>💰 ລາຍການກູ້</strong></div></li>
+          <li><div class="step-content">ຄລິກ <strong>"⬇️ Export CSV"</strong> (ສີຟ້າ ດ້ານຂວາຂອງ Filter Bar)</div></li>
+          <li><div class="step-content">ໄຟລ໌ <code>.csv</code> ຈະດາວໂຫລດໄປຫາ Downloads folder ທາງທ່ານ</div></li>
+          <li><div class="step-content">ເປີດດ້ວຍ Excel ຫຼື Google Sheets ໄດ້ທັນທີ</div></li>
+        </ol>
+        <div class="info-box">
+          📋 ໄຟລ໌ CSV ສະຫຼຸບ: ລະຫັດ, ຊື່, ຜະລິດຕະພັນ, ຈຳນວນ, ຍອດລວມ, ສະຖານະ, ວັນທີ, ກຳໜົດ.
+        </div>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          Filter ກ່ອນ Export ຈະ Export ສະເພາະລາຍການທີ່ Filter ໄວ້. ຕ້ອງການທັງໝົດ → ເລືອກ "ທັງໝົດ" ກ່ອນ Export.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER: APPLY ============ -->
+  <div class="content-pane" id="page-c-apply">
+    <div class="page-title">📝 ການສະໝັກກູ້ເງິນ</div>
+    <div class="page-sub">ຂັ້ນຕອນການຍື່ນຄຳຮ້ອງກູ້ເງິນໃນໜ້າລູກຄ້າ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🏷️</span><h2>ຂັ້ນຕອນທີ 1 — ເລືອກຜະລິດຕະພັນ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ເປີດໜ້າ <strong>index.html</strong> — ຜະລິດຕະພັນທີ່ active ຈະສະແດງຂຶ້ນ</div></li>
+          <li><div class="step-content">ຄລິກ <strong>ການ໌ດຜະລິດຕະພັນ</strong> ທີ່ຕ້ອງການ — ກ່ອງຈະຮ່ຽວ ✓ ສີຂຽວ</div></li>
+          <li><div class="step-content">ຟອມສະໝັກຈະເລື່ອນລົງໃຫ້ຢັດ</div></li>
+        </ol>
+        <div class="info-box">
+          📌 ບາງຜະລິດຕະພັນຕ້ອງ <strong>ໃສ່ເບີໂທ</strong> ກ່ອນ ຈຶ່ງເຫັນ (ຜະລິດຕະພັນ VIP ສຳລັບລູກຄ້າ VIP).
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📋</span><h2>ຂັ້ນຕອນທີ 2 — ກອກຟອມ</h2></div>
+      <div class="section-body">
+        <table class="field-table">
+          <tr><th>ຊ່ອງ</th><th>ຄຳອະທິບາຍ</th><th>ໝາຍເຫດ</th></tr>
+          <tr><td>ຊື່-ນາມສະກຸນ</td><td>ຊື່ຕາມເອກະສານ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ເບີໂທລະສັບ</td><td>ເບີ 020 / 030</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ປະເພດເອກະສານ</td><td>ບັດ / ສຳມະໂນ / ພາດສະປອດ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ເລກເອກະສານ</td><td>ເລກຕາມເອກະສານທີ່ເລືອກ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ອາຊີບ</td><td>ເລືອກຈາກລາຍຊື່</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ຈຳນວນກູ້ (ກີບ)</td><td>ໃນຂອບເຂດ min–max ຂອງຜະລິດຕະພັນ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ຈຳນວນວັນ</td><td>ເຫັນສະເພາະຜະລິດຕະພັນ "ລາຍວັນ"</td><td>1–365 ວັນ</td></tr>
+          <tr><td>ລາຍໄດ້/ເດືອນ</td><td>ລາຍໄດ້ຮວມ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ທີ່ຢູ່</td><td>ບ້ານ, ເມືອງ, ແຂວງ</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ຮູບຖ່າຍເອກະສານ</td><td>JPG/PNG ໜ້າເອກະສານ ≤ 10MB</td><td>ຈຳເປັນ</td></tr>
+          <tr><td>ຈຸດປະສົງ</td><td>ຈຸດປະສົງ ຫຼື ໝາຍເຫດ</td><td>ທາງເລືອກ</td></tr>
+        </table>
+        <div class="info-box" style="margin-top:12px;">
+          💡 ກ່ອງ <strong>"ສະຫຼຸບລາຍການ"</strong> ຈະສະແດງ: ດອກ, ໄລຍະ ແລ້ວ ຍອດທີ່ຕ້ອງຊຳລະ — ກ່ອນ Submit ກວດກ່ອນ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📤</span><h2>ຂັ້ນຕອນທີ 3 — ສົ່ງໃບສະໝັກ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ກວດຂໍ້ມູນໃຫ້ຖືກຕ້ອງ → ຄລິກ <strong>"📤 ສົ່ງຄຳຂໍ"</strong></div></li>
+          <li><div class="step-content">Modal ຈະສະແດງ <strong>ລະຫັດຄຳຂໍ</strong> ຮູບແບບ <code>LAO------</code></div></li>
+          <li><div class="step-content"><strong>ຈົດ ຫຼື ບັນທຶກ</strong> ລະຫັດນີ້ໄວ້ — ໃຊ້ຕິດຕາມສະຖານະ</div></li>
+        </ol>
+        <div class="info-box warn">
+          ⚠️ ຮູບຖ່າຍເອກະສານ <strong>ຕ້ອງ</strong>ຊັດ ເຫັນເລກໃຫ້ຈະແຈ້ງ — ຖ້າຮູບບໍ່ຊັດ ທີ່ທີ່ງານອາດຂໍໃໝ່.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">⏰</span><h2>ຂັ້ນຕອນທີ 4 — ລໍຖ້າການອະນຸມັດ</h2></div>
+      <div class="section-body">
+        <p>ຫຼັງ Submit ທີ່ທີ່ງານຈະຕິດຕໍ່ພາຍໃນ <strong>24 ຊົ່ວໂມງ</strong>. ທ່ານສາມາດຕິດຕາມສະຖານະດ້ວຍ ລະຫັດ <code>LAO</code> ຫຼື ເບີໂທ.</p>
+        <div class="status-row" style="margin-top:14px;">
+          <div class="status-chip"><div class="chip-dot" style="background:#e65100;"></div>ລໍຖ້າ (Pending)</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#1565c0;"></div>ດຳເນີນ (Active)</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#6a1b9a;"></div>ສຳເລັດ</div>
+          <div class="status-chip"><div class="chip-dot" style="background:#c62828;"></div>ປະຕິເສດ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER: STATUS ============ -->
+  <div class="content-pane" id="page-c-status">
+    <div class="page-title">🔍 ການຕິດຕາມສະຖານະ</div>
+    <div class="page-sub">ຕິດຕາມຄວາມຄືບໜ້າ ແລ້ວ ຂໍ້ມູນການຊຳລະ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🔍</span><h2>ວິທີຕິດຕາມ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content">ໃນໜ້າ <strong>index.html</strong> → ຄລິກ <strong>"🔍 ຕິດຕາມ"</strong> ດ້ານຂວາເທິງ</div></li>
+          <li><div class="step-content">Modal ຈະເປີດ → ໃສ່ <strong>ລະຫັດ LAO</strong> ຫຼື <strong>ເບີໂທລະສັບ</strong></div></li>
+          <li><div class="step-content">ຜົນການຄົ້ນຫາຈະສະແດງທໍາທີ — ບໍ່ຕ້ອງ Submit</div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ໃສ່ຢ່າງໜ້ອຍ <strong>3 ຕົວອັກສອນ</strong> ຈຶ່ງຈະຄົ້ນຫາ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📊</span><h2>ເຂົ້າໃຈຂໍ້ມູນທີ່ສະແດງ</h2></div>
+      <div class="section-body">
+        <table class="field-table">
+          <tr><th>ຊ່ອງ</th><th>ຄວາມໝາຍ</th></tr>
+          <tr>
+            <td>💚 ເງິນຕົ້ນ</td>
+            <td>ຍອດທີ່ທ່ານຍັງຕ້ອງຄືນ (ຫຼັງຫັກການຊຳລະ). ຖ້ າ Top-up ຫຼື ທົບຕົ້ນ ຍອດນີ້ຈະອັບເດດ.</td>
+          </tr>
+          <tr>
+            <td>🟠 ດອກເບ້ຍງວດນີ້</td>
+            <td>ດອກທັງໝົດຂອງງວດ (ຄຳນວນຈາກ ອັດຕາ × ຕົ້ນ)</td>
+          </tr>
+          <tr>
+            <td>✅ ຊຳລະດອກແລ້ວ</td>
+            <td>ດອກທີ່ທ່ານຊຳລະໄປແລ້ວໃນງວດນີ້</td>
+          </tr>
+          <tr>
+            <td>🔴 ຍັງຕ້ອງຊຳລະ</td>
+            <td>ດອກທີ່ຍັງຄ້າງ = ດອກງວດ − ດອກທີ່ຊຳລະ. ຖ້ານ້ອຍ = 0 → ✅ ດອກຊຳລະຄົບ</td>
+          </tr>
+          <tr>
+            <td>📅 ກຳໜົດຊຳລະ</td>
+            <td>ວັນທີສຸດທ້າຍທີ່ຕ້ອງຊຳລະ (ຄຳນວນຈາກ ວັນທີກູ້ + ໄລຍະ)</td>
+          </tr>
+        </table>
+
+        <div style="margin-top:16px;">
+          <p style="font-weight:700;margin-bottom:8px;color:var(--green-dark);">ສຽງ Countdown:</p>
+          <div class="status-row">
+            <div class="status-chip"><div class="chip-dot" style="background:#2e7d32;"></div>🟢 &gt; 7 ວັນ — ສະບາຍ</div>
+            <div class="status-chip"><div class="chip-dot" style="background:#e65100;"></div>🟡 1–7 ວັນ — ໃກ້ຄົບ</div>
+            <div class="status-chip"><div class="chip-dot" style="background:#c62828;"></div>🔴 ເກີນ — ຄ້າງ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🧾</span><h2>ປະຫວັດທົບຕົ້ນ</h2></div>
+      <div class="section-body">
+        <p>ຖ້າລາຍການຂອງທ່ານ<strong>ຖືກທົບຕົ້ນ</strong> ຈະມີສ່ວນ <strong>"📋 ປະຫວັດທົບຕົ້ນ"</strong> ສະແດງ:</p>
+        <ul style="padding-left:24px;margin-top:10px;line-height:2;font-size:.88rem;">
+          <li>ວັນທີທີ່ທົບ</li>
+          <li>ດອກຄ້າງທີ່ຖືກລວມ (ສີແດງ)</li>
+          <li>ຕົ້ນໃໝ່ຫຼັງທົບ</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER: COMPOUND ============ -->
+  <div class="content-pane" id="page-c-compound">
+    <div class="page-title">⚠️ ດອກທົບຕົ້ນ</div>
+    <div class="page-sub">ເຂົ້າໃຈ ແລ້ວ ຮູ້ວິທີຫຼີກເວັ້ນ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">❓</span><h2>ດອກທົບຕົ້ນໝາຍຄວາມວ່າຫຍັງ?</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:14px;">ດອກທົບຕົ້ນ ຫຼື Compound Interest ໝາຍຄວາມວ່າ: ຖ້າທ່ານ <strong>ບໍ່ຊຳລະດອກທັນກຳໜົດ</strong>, ດອກຄ້າງຈະ <strong>ຖືກລວມໃສ່ຕົ້ນ</strong> ແລ້ວ ລະບົບຄິດດອກໃໝ່ຈາກຍອດລວມ.</p>
+        <div class="info-box danger">
+          🔴 ຕົວຢ່າງ: ກູ້ 5,000,000 ດອກ 15% → ຍອດ 5,750,000<br/>
+          ຖ້າຄ້າງດອກ 750,000 → ຕົ້ນໃໝ່ = 5,750,000 → ດອກໃໝ່ = 862,500 ກີບ (ສູງຂຶ້ນ!)
+        </div>
+        <p style="margin-top:14px;">ທ່ານຈະເຫັນຄຳເຕືອນ <strong>ສີແດງ</strong> ໃນໜ້າຕິດຕາມສະຖານະ:</p>
+        <div class="info-box danger" style="margin-top:8px;">
+          ⚠️ ດອກຈະຖືກທົບຕົ້ນໃນອີກ <strong>X ວັນ</strong> — ກະລຸນາຊຳລະດ່ວນ!
+        </div>
+        <div class="info-box danger">
+          🔴 ດອກຖືກທົບຕົ້ນແລ້ວ — ກະລຸນາຕິດຕໍ່ທີ່ທີ່ງານ
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🛡️</span><h2>ວິທີຫຼີກເວັ້ນດອກທົບຕົ້ນ</h2></div>
+      <div class="section-body">
+        <ol class="step-list">
+          <li><div class="step-content"><strong>ຊຳລະທັນ</strong> ກ່ອນ ຫຼື ໃນວັນທີ​ຄົບກຳໜົດ</div></li>
+          <li><div class="step-content">ຕິດຕາມ <strong>countdown ໃນໜ້ານີ້</strong> ທຸກໆ ອາທິດ</div></li>
+          <li><div class="step-content">ຖ້າຊຳລະບໍ່ໄດ້ → <strong>ຕິດຕໍ່ທີ່ທີ່ງານ</strong> ລ່ວງໜ້າ ເພື່ອຂໍຜ່ອນ / Top-up</div></li>
+          <li><div class="step-content">ໂທ: <strong>020 96498301</strong> ກ່ອນ ຄົບກຳໜົດ</div></li>
+        </ol>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ຖ້ານ ≤ 7 ວັນ ກ່ອນຄົບ ແລ້ວ ຍັງຕ້ອງຊຳລະດອກ → ລາຍການຂອງທ່ານຈະ <strong>ຂຶ້ນ banner ສີສົ້ມ</strong> ເຕືອນຢູ່ໜ້າຕິດຕາມ.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER: VIP ============ -->
+  <div class="content-pane" id="page-c-vip">
+    <div class="page-title">👑 ຜະລິດຕະພັນ VIP</div>
+    <div class="page-sub">ສ່ວນຫຼຸດ ແລ້ວ ຜະລິດຕະພັນພິເສດສຳລັບລູກຄ້າດີ</div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🌟</span><h2>ຜະລິດຕະພັນ VIP ຄືຫຍັງ?</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:12px;">ຜະລິດຕະພັນ VIP ແມ່ນ <strong>ຜະລິດຕະພັນພິເສດ</strong> ທີ່ Admin ສ້າງໄວ້ສຳລັບລູກຄ້າທີ່ຮ່ວມງານດົນ ຫຼື ລູກຄ້າທີ່ Admin ເຊີນ.</p>
+        <ul style="padding-left:24px;line-height:2;font-size:.88rem;">
+          <li>ອາດມີ <strong>ດອກຕ່ຳກວ່າ</strong> ຜະລິດຕະພັນທົ່ວໄປ</li>
+          <li>ອາດມີ <strong>ວົງເງິນສູງກວ່າ</strong></li>
+          <li>ສະແດງ badge <span class="badge badge-gold">👑 VIP Exclusive</span></li>
+          <li><strong>ບໍ່ສະແດງ</strong> ໃຫ້ລູກຄ້າທົ່ວໄປ</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">🏆</span><h2>ວິທີໄດ້ຮັບສິດ VIP</h2></div>
+      <div class="section-body">
+        <p style="margin-bottom:14px;">ມີ 2 ທາງ:</p>
+        <table class="field-table">
+          <tr><th>ທາງ</th><th>ຄວາມໝາຍ</th></tr>
+          <tr>
+            <td>🎁 Credit Score ດີ</td>
+            <td>ຊຳລະຄົບ ≥ 10 ເດືອນ ໂດຍບໍ່ທົບຕົ້ນ → Admin ໃຫ້ <strong>ສ່ວນຫຼຸດ</strong> ໃນໜ້າສະໝັກ</td>
+          </tr>
+          <tr>
+            <td>📞 Admin ເຊີນ</td>
+            <td>Admin ໃສ່ <strong>ເບີໂທ</strong> ຂອງທ່ານໃນຜະລິດຕະພັນ VIP → ທ່ານເຫັນຜະລິດຕະພັນ VIP</td>
+          </tr>
+        </table>
+
+        <div class="info-box" style="margin-top:14px;">
+          💡 ສ່ວນຫຼຸດ Credit Score ຈະສະແດງ <strong>banner ສີຂຽວ</strong> ໃນໜ້າສະໝັກ ຫຼັງທ່ານໃສ່ເບີໂທ. ສ່ວນຫຼຸດໃຊ້ໄດ້ <strong>1 ຄັ້ງ</strong> ຕໍ່ 1 ໃບສະໝັກ.
+        </div>
+
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          ເພື່ອ<strong>ຮັກສາ</strong>ຄຸນສົມບັດ VIP: ຊຳລະທັນ, ຫຼີກເວັ້ນທົບຕົ້ນ ແລ້ວ ຮ່ວມງານຕໍ່ເນື່ອງ.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="sh-icon">📞</span><h2>ຕິດຕໍ່ທີ່ທີ່ງານ</h2></div>
+      <div class="section-body">
+        <div class="info-box blue" style="font-size:.95rem;">
+          📞 <strong>020 96498301</strong><br/>
+          🏦 Unjai Finance — ສິນເຊື່ອສ່ວນບຸກຄົນ<br/>
+          🌐 <a href="index.html" style="color:var(--blue);">index.html</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<script>
+function showPage(id, el) {
+  // Hide all
+  document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  // Show target
+  const pane = document.getElementById('page-' + id);
+  if (pane) pane.classList.add('active');
+  // Activate nav item
+  if (el) el.classList.add('active');
+  else {
+    // find matching nav item
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) {
+        n.classList.add('active');
+      }
+    });
+  }
+  // Close sidebar on mobile
+  closeSidebar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+</script>
+</body>
+</html>

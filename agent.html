@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Agent | Unjai Finance</title>
+  <meta name="theme-color" content="#1b5e20" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <style>
+    :root {
+      --green-dark:  #1b5e20;
+      --green-main:  #2e7d32;
+      --green-med:   #4caf50;
+      --green-bg:    #e8f5e9;
+      --green-pale:  #c8e6c9;
+      --gray-text:   #616161;
+      --gray-light:  #f5f5f5;
+      --gray-mid:    #e0e0e0;
+      --red:         #c62828;
+      --orange:      #e65100;
+      --blue:        #1565c0;
+      --nav-h:       64px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Phetsarath OT', 'Noto Sans Lao', 'Lao UI', sans-serif;
+      background: #f0f4f0;
+      color: #212121;
+      font-size: 15px;
+      overflow-x: hidden;
+    }
+
+    /* ===== LOGIN ===== */
+    .login-wrap {
+      min-height: 100vh;
+      background: linear-gradient(160deg, var(--green-dark) 0%, #388e3c 100%);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .login-box {
+      background: white; border-radius: 22px;
+      padding: 40px 28px; width: 100%; max-width: 360px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.35); text-align: center;
+    }
+    .login-box .lb-icon { font-size: 52px; margin-bottom: 10px; }
+    .login-box h1 { font-size: 1.3rem; color: var(--green-dark); margin-bottom: 4px; }
+    .login-box p  { font-size: .82rem; color: var(--gray-text); margin-bottom: 24px; }
+    .fi { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; text-align: left; }
+    .fi label { font-size: .8rem; font-weight: 700; color: var(--green-dark); }
+    .fi input  { padding: 12px 14px; border: 2px solid var(--gray-mid); border-radius: 10px;
+                 font-family: inherit; font-size: .9rem; outline: none; }
+    .fi input:focus { border-color: var(--green-med); }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      padding: 14px 20px; border: none; border-radius: 12px;
+      font-family: inherit; font-size: .95rem; font-weight: 700;
+      cursor: pointer; transition: .15s; display: inline-flex;
+      align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--green-main); color: white; }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-outline { background: white; color: var(--green-main); border: 2px solid var(--green-main); }
+    .btn-danger  { background: #ffebee; color: var(--red); }
+    .btn-full    { width: 100%; }
+    .btn-lg      { padding: 16px; font-size: 1rem; border-radius: 14px; }
+
+    /* ===== APP SHELL ===== */
+    .app-shell { display: none; height: 100vh; flex-direction: column; }
+    .app-shell.show { display: flex; }
+
+    /* Top bar */
+    .top-bar {
+      background: var(--green-dark); color: white;
+      padding: 0 16px; height: 52px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    .top-bar .tb-brand { font-size: .9rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .top-bar .tb-agent { font-size: .75rem; opacity: .8; }
+    .top-bar .tb-right  { display: flex; gap: 8px; }
+
+    /* Content area */
+    .content-area {
+      flex: 1; overflow-y: auto; padding-bottom: calc(var(--nav-h) + 8px);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Bottom nav */
+    .bottom-nav {
+      height: var(--nav-h); background: white;
+      border-top: 1px solid var(--gray-mid);
+      display: flex; flex-shrink: 0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    }
+    .bn-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 4px; cursor: pointer; transition: .15s;
+      color: var(--gray-text); font-size: .7rem; font-weight: 600;
+      border: none; background: transparent; font-family: inherit;
+      padding: 0;
+    }
+    .bn-item .bn-icon { font-size: 1.5rem; line-height: 1; }
+    .bn-item.active { color: var(--green-main); }
+    .bn-item:active { background: var(--green-bg); }
+
+    /* Badge on nav */
+    .bn-badge {
+      position: absolute; top: 6px;
+      background: var(--red); color: white;
+      border-radius: 50%; width: 18px; height: 18px;
+      font-size: .62rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      transform: translate(12px, 0);
+    }
+
+    /* Screens */
+    .screen { display: none; padding: 0 0 8px; }
+    .screen.active { display: block; }
+
+    /* ===== SCANNER SCREEN ===== */
+    .scan-header {
+      background: var(--green-dark); color: white;
+      padding: 16px; text-align: center;
+    }
+    .scan-header h2 { font-size: 1rem; font-weight: 800; margin-bottom: 4px; }
+    .scan-header p  { font-size: .8rem; opacity: .8; }
+
+    #reader {
+      width: 100% !important;
+      max-width: 100%;
+      background: black;
+    }
+    #reader video { width: 100% !important; }
+    /* Style html5-qrcode UI */
+    #reader__scan_region { position: relative; }
+    #reader__dashboard { padding: 8px 12px !important; background: #f0f4f0 !important; }
+    #reader__filescan_input { display: none; }
+
+    .manual-section {
+      padding: 14px 16px;
+      background: white; border-top: 1px solid var(--gray-mid);
+    }
+    .manual-row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .manual-row input {
+      flex: 1; padding: 12px 14px; border: 2px solid var(--gray-mid);
+      border-radius: 12px; font-family: inherit; font-size: .9rem; outline: none;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .manual-row input:focus { border-color: var(--green-med); }
+    .manual-row button { flex-shrink: 0; border-radius: 12px; padding: 12px 16px; }
+
+    /* Loan info card */
+    .loan-card {
+      margin: 14px 16px;
+      background: white; border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1); overflow: hidden;
+    }
+    .loan-card .lc-head {
+      background: linear-gradient(135deg, var(--green-dark), var(--green-main));
+      color: white; padding: 14px 18px;
+    }
+    .loan-card .lc-id   { font-size: .72rem; opacity: .8; margin-bottom: 2px; }
+    .loan-card .lc-name { font-size: 1.1rem; font-weight: 900; }
+    .loan-card .lc-prod { font-size: .78rem; opacity: .8; margin-top: 2px; }
+    .loan-card .lc-body { padding: 14px 18px; }
+
+    .info-row {
+      display: flex; justify-content: space-between;
+      padding: 7px 0; border-bottom: 1px solid #f5f5f5;
+      font-size: .88rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .ir-l { color: var(--gray-text); }
+    .info-row .ir-v { font-weight: 700; }
+    .info-row .ir-v.red { color: var(--red); }
+    .info-row .ir-v.green { color: var(--green-main); }
+    .info-row .ir-v.orange { color: var(--orange); }
+
+    .pay-section {
+      margin: 0 16px 16px; background: white;
+      border-radius: 16px; padding: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .pay-section h3 { font-size: .9rem; font-weight: 800; color: var(--green-dark); margin-bottom: 14px; }
+    .pay-section .ps-field { margin-bottom: 12px; }
+    .pay-section .ps-field label { font-size: .78rem; font-weight: 700; color: var(--green-dark); display: block; margin-bottom: 5px; }
+    .pay-section .ps-field input,
+    .pay-section .ps-field select {
+      width: 100%; padding: 13px 14px; border: 2px solid var(--gray-mid);
+      border-radius: 12px; font-family: inherit; font-size: .95rem; outline: none;
+    }
+    .pay-section .ps-field input:focus,
+    .pay-section .ps-field select:focus { border-color: var(--green-med); }
+    .money-input { text-align: right; letter-spacing: .5px; }
+
+    /* Status warning */
+    .status-warning {
+      margin: 14px 16px; padding: 18px;
+      background: #ffebee; border: 2px solid #ef9a9a;
+      border-radius: 14px; text-align: center;
+    }
+    .status-warning .sw-icon { font-size: 2rem; margin-bottom: 8px; }
+    .status-warning .sw-msg  { font-weight: 700; color: var(--red); font-size: .95rem; }
+    .status-warning .sw-sub  { font-size: .82rem; color: #b71c1c; margin-top: 4px; }
+
+    /* Receipt */
+    .receipt {
+      margin: 14px 16px; padding: 20px;
+      background: var(--green-bg); border: 2px solid var(--green-pale);
+      border-radius: 16px; text-align: center;
+    }
+    .receipt .rc-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .receipt .rc-amt  { font-size: 1.6rem; font-weight: 900; color: var(--green-dark); }
+    .receipt .rc-name { font-size: .88rem; color: var(--gray-text); margin-top: 4px; }
+    .receipt .rc-ref  { font-size: .72rem; color: #9e9e9e; margin-top: 8px; }
+
+    /* ===== COLLECTIONS SCREEN ===== */
+    .screen-header {
+      padding: 16px; background: white;
+      border-bottom: 1px solid var(--gray-mid);
+    }
+    .screen-header h2 { font-size: 1rem; font-weight: 800; color: var(--green-dark); }
+    .screen-header p  { font-size: .8rem; color: var(--gray-text); margin-top: 2px; }
+
+    .coll-table-wrap { padding: 14px 16px; }
+    .coll-table { width: 100%; border-collapse: collapse; font-size: .82rem; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+    .coll-table thead th { background: var(--green-dark); color: white; padding: 10px 12px; text-align: left; font-size: .76rem; }
+    .coll-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f5f5f5; }
+    .coll-table tbody tr:last-child td { border-bottom: none; }
+    .empty-state { text-align: center; padding: 32px; color: #9e9e9e; font-size: .88rem; }
+
+    .summary-card {
+      margin: 0 16px 16px; background: white;
+      border-radius: 16px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .summary-card h3 { font-size: .9rem; font-weight: 800; color: var(--green-dark); margin-bottom: 14px; }
+    .sum-row {
+      display: flex; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid #f5f5f5;
+      font-size: .88rem;
+    }
+    .sum-row:last-child { border-bottom: none; }
+    .sum-row .sr-l { color: var(--gray-text); }
+    .sum-row .sr-v { font-weight: 700; }
+    .sum-total { background: var(--green-bg); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+    .sum-total .st-l { font-size: .82rem; color: var(--green-dark); font-weight: 700; }
+    .sum-total .st-v { font-size: 1.3rem; font-weight: 900; color: var(--green-dark); margin-top: 2px; }
+
+    .remit-section { padding: 0 16px 16px; }
+    .remit-pending {
+      background: #fff8e1; border: 2px solid #ffe082;
+      border-radius: 14px; padding: 16px; margin-bottom: 12px;
+      text-align: center; font-size: .88rem;
+    }
+    .remit-pending .rp-icon { font-size: 1.6rem; margin-bottom: 6px; }
+    .remit-pending strong { color: var(--orange); }
+
+    /* Slip upload */
+    .slip-upload {
+      background: #fafafa; border: 2px dashed var(--gray-mid);
+      border-radius: 12px; padding: 24px; text-align: center;
+      cursor: pointer; transition: .2s; margin-bottom: 12px;
+    }
+    .slip-upload:hover { border-color: var(--green-med); background: var(--green-bg); }
+    .slip-upload.has-file { border-style: solid; border-color: var(--green-light, #81c784); }
+    .slip-upload .su-icon { font-size: 2rem; margin-bottom: 6px; }
+    .slip-upload p { font-size: .82rem; color: var(--gray-text); }
+    #slipPreview { max-width: 100%; border-radius: 8px; margin-top: 8px; display: none; }
+
+    /* ===== PROFILE SCREEN ===== */
+    .profile-card {
+      margin: 14px 16px; background: white;
+      border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); overflow: hidden;
+    }
+    .profile-card .pc-head {
+      background: linear-gradient(135deg, var(--green-dark), var(--green-main));
+      color: white; padding: 24px; text-align: center;
+    }
+    .profile-card .pc-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(255,255,255,.2); border: 3px solid rgba(255,255,255,.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; margin: 0 auto 10px;
+    }
+    .profile-card .pc-name { font-size: 1.1rem; font-weight: 900; }
+    .profile-card .pc-role { font-size: .78rem; opacity: .8; margin-top: 2px; }
+    .profile-card .pc-body { padding: 16px; }
+
+    .stat-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+    }
+    .stat-cell {
+      background: var(--green-bg); border-radius: 12px;
+      padding: 14px; text-align: center;
+    }
+    .stat-cell .sc-v { font-size: 1.2rem; font-weight: 900; color: var(--green-dark); }
+    .stat-cell .sc-l { font-size: .72rem; color: var(--gray-text); margin-top: 3px; }
+
+    .hist-list { margin-top: 14px; }
+    .hist-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid #f5f5f5;
+      font-size: .83rem;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item .hi-name { font-weight: 600; }
+    .hist-item .hi-sub  { font-size: .72rem; color: #9e9e9e; margin-top: 2px; }
+    .hist-item .hi-amt  { font-weight: 700; color: var(--green-main); white-space: nowrap; }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed; bottom: calc(var(--nav-h) + 14px); left: 50%; transform: translateX(-50%);
+      background: #323232; color: white; padding: 12px 20px; border-radius: 50px;
+      font-size: .85rem; white-space: nowrap; opacity: 0;
+      transition: opacity .3s; z-index: 9999; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--green-main); }
+    .toast.error   { background: var(--red); }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: none; align-items: flex-end; z-index: 500;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 24px 24px 0 0;
+      padding: 24px 20px 36px; width: 100%;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal h3 { font-size: 1rem; font-weight: 800; color: var(--green-dark); margin-bottom: 16px; }
+
+    /* ===== SECTION DIVIDER ===== */
+    .sect-title {
+      padding: 10px 16px; font-size: .72rem; font-weight: 800;
+      color: var(--gray-text); letter-spacing: .6px; text-transform: uppercase;
+      background: var(--gray-light);
+    }
+
+    /* ===== SPINNER ===== */
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid rgba(27,94,32,.2);
+      border-top-color: var(--green-main);
+      border-radius: 50%; animation: spin .8s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-placeholder { text-align: center; padding: 32px; color: #9e9e9e; }
+  </style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="lb-icon">🚗</div>
+      <h1>Agent Login</h1>
+      <p>Unjai Finance — ຜູ້ເກັບຊຳລະ</p>
+      <div class="fi">
+        <label>ຊື່ຜູ້ໃຊ້</label>
+        <input type="text" id="agUsername" placeholder="username" autocomplete="username" />
+      </div>
+      <div class="fi">
+        <label>ລະຫັດຜ່ານ</label>
+        <input type="password" id="agPassword" placeholder="password" autocomplete="current-password" />
+      </div>
+      <div id="loginErr" style="color:#c62828;font-size:.82rem;margin-bottom:10px;min-height:18px;"></div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="doAgentLogin()">🔓 ເຂົ້າສູ່ລະບົບ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== APP SHELL ===== -->
+<div class="app-shell" id="appShell">
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div>
+      <div class="tb-brand">🚗 Unjai Agent</div>
+      <div class="tb-agent" id="topAgentName"></div>
+    </div>
+    <div class="tb-right">
+      <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:6px 12px;border-radius:8px;font-family:inherit;font-size:.78rem;cursor:pointer;">ອອກ</button>
+    </div>
+  </div>
+
+  <!-- Content Area -->
+  <div class="content-area" id="contentArea">
+
+    <!-- ===== MODE 1: SCANNER ===== -->
+    <div class="screen active" id="screenScan">
+      <div class="scan-header">
+        <h2>📷 ສະແກນລະຫັດລູກຄ້າ</h2>
+        <p>ສະແກນ barcode ຫຼື ພິມລະຫັດດ້ວຍມື</p>
+      </div>
+
+      <!-- Camera scanner -->
+      <div id="reader"></div>
+
+      <!-- Scanner toggle -->
+      <div style="text-align:center;padding:8px;background:#111;">
+        <button onclick="toggleScanner()" id="scanToggleBtn"
+          style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:8px 18px;border-radius:8px;font-family:inherit;font-size:.82rem;cursor:pointer;">
+          ⏹ ຢຸດສະແກນ
+        </button>
+      </div>
+
+      <!-- Manual input -->
+      <div class="manual-section">
+        <div style="font-size:.78rem;font-weight:700;color:var(--gray-text);margin-bottom:8px;">ຫຼື ພິມລະຫັດດ້ວຍມື:</div>
+        <div class="manual-row">
+          <input type="text" id="manualId" placeholder="LAO000000" maxlength="20"
+            oninput="this.value=this.value.toUpperCase()"
+            onkeydown="if(event.key==='Enter') lookupLoan(this.value)" />
+          <button class="btn btn-primary" onclick="lookupLoan(document.getElementById('manualId').value)">🔍</button>
+        </div>
+      </div>
+
+      <!-- Loan result area -->
+      <div id="loanResult"></div>
+    </div>
+
+    <!-- ===== MODE 2: COLLECTIONS ===== -->
+    <div class="screen" id="screenCollections">
+      <div class="screen-header">
+        <h2>💰 ຍອດລວມ & ສົ່ງເງິນ</h2>
+        <p>ລາຍການທີ່ຮັບມາ ຍັງບໍ່ທັນສົ່ງ Admin</p>
+      </div>
+
+      <div class="coll-table-wrap">
+        <div id="collTable"><div class="loading-placeholder"><div class="spinner"></div></div></div>
+      </div>
+
+      <div id="collSummary"></div>
+      <div class="remit-section" id="remitSection" style="display:none;"></div>
+    </div>
+
+    <!-- ===== MODE 3: PROFILE ===== -->
+    <div class="screen" id="screenProfile">
+      <div class="profile-card">
+        <div class="pc-head">
+          <div class="pc-avatar">👤</div>
+          <div class="pc-name" id="profName">—</div>
+          <div class="pc-role">Agent | Unjai Finance</div>
+        </div>
+        <div class="pc-body">
+          <div id="profInfo"></div>
+          <div class="stat-grid" id="profStats"></div>
+          <div style="font-size:.8rem;font-weight:700;color:var(--green-dark);margin-bottom:8px;">📋 ປະຫວັດ 30 ວັນ</div>
+          <div class="hist-list" id="profHistory"></div>
+        </div>
+      </div>
+      <div style="padding:0 16px 20px;">
+        <button class="btn btn-danger btn-full" onclick="doLogout()">🚪 ອອກຈາກລະບົບ</button>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="bn-item active" id="nav-scan" onclick="switchMode('scan')">
+      <span class="bn-icon">📷</span>
+      <span>ສະແກນ</span>
+    </button>
+    <button class="bn-item" id="nav-coll" onclick="switchMode('coll')" style="position:relative;">
+      <span class="bn-icon">💰</span>
+      <span>ຍອດລວມ</span>
+      <span class="bn-badge" id="collBadge" style="display:none;"></span>
+    </button>
+    <button class="bn-item" id="nav-prof" onclick="switchMode('prof')">
+      <span class="bn-icon">👤</span>
+      <span>ໂປຣໄຟລ໌</span>
+    </button>
+  </nav>
+
+</div><!-- /app-shell -->
+
+<div id="toast" class="toast"></div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+// ===== SUPABASE =====
+const sb = window.supabase.createClient(
+  'https://cucptovzyvrxvhpgppom.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Y3B0b3Z6eXZyeHZocGdwcG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTQxMDcsImV4cCI6MjA5NDY3MDEwN30.IG-Ly_Bv3pmYW5N2jscAQ_MDxXSY-SMX5lOs07aam5Q'
+);
+
+// ===== STATE =====
+let agentSession = null;
+let html5QrCode  = null;
+let scannerActive = false;
+let currentLoan  = null;
+let currentProduct = null;
+let myCollections = [];
+let myRemittances = [];
+let pendingRemit  = null;
+
+// ===== UTILS =====
+function fmt(n) {
+  if (n == null || isNaN(n)) return '0 ກີບ';
+  return new Intl.NumberFormat('lo-LA').format(Math.round(n)) + ' ກີບ';
+}
+function fmtDate(iso) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleDateString('lo-LA', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+function fmtDMY(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function fmtMoneyInput(el) {
+  let v = el.value.replace(/,/g,'').replace(/[^0-9]/g,'');
+  el.value = v ? parseInt(v).toLocaleString('en-US') : '';
+}
+function getMoneyVal(el) {
+  return parseFloat((el.value||'').replace(/,/g,'')) || 0;
+}
+
+// ===== AUTH =====
+async function doAgentLogin() {
+  const uname = document.getElementById('agUsername').value.trim();
+  const pwd   = document.getElementById('agPassword').value;
+  const errEl = document.getElementById('loginErr');
+  if (!uname || !pwd) { errEl.textContent = 'ກະລຸນາຕື່ມຂໍ້ມູນ'; return; }
+
+  errEl.textContent = '⏳ ກຳລັງເຂົ້າລະບົບ...';
+  try {
+    const { data, error } = await sb.from('agents')
+      .select('*')
+      .eq('username', uname)
+      .eq('password', pwd)
+      .eq('status', 'active')
+      .single();
+    if (error || !data) {
+      errEl.textContent = '❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານຜິດ';
+      return;
+    }
+    agentSession = data;
+    sessionStorage.setItem('agent_session', JSON.stringify(data));
+    startApp();
+  } catch(e) {
+    errEl.textContent = '❌ ຂໍ້ຜິດພາດ: ' + e.message;
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('agent_session');
+  stopScanner();
+  location.reload();
+}
+
+// ===== APP START =====
+function startApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').classList.add('show');
+  document.getElementById('topAgentName').textContent = agentSession.full_name;
+  document.getElementById('profName').textContent = agentSession.full_name;
+  loadCollections();
+  initScanner();
+}
+
+// ===== SCANNER =====
+function initScanner() {
+  html5QrCode = new Html5Qrcode('reader');
+  startScanner();
+}
+
+function startScanner() {
+  if (scannerActive) return;
+  Html5Qrcode.getCameras().then(cameras => {
+    if (!cameras || cameras.length === 0) return;
+    const camId = cameras.find(c => /back|rear|environment/i.test(c.label))?.id || cameras[cameras.length-1]?.id;
+    html5QrCode.start(
+      camId || { facingMode: 'environment' },
+      { fps: 12, qrbox: { width: 260, height: 130 }, aspectRatio: 1.5 },
+      onScanSuccess,
+      () => {}
+    ).then(() => {
+      scannerActive = true;
+      document.getElementById('scanToggleBtn').textContent = '⏹ ຢຸດສະແກນ';
+    }).catch(err => {
+      console.warn('Scanner start failed:', err);
+    });
+  }).catch(() => {
+    document.getElementById('scanToggleBtn').textContent = '📵 ບໍ່ມີກ້ອງ';
+  });
+}
+
+function stopScanner() {
+  if (!html5QrCode || !scannerActive) return;
+  html5QrCode.stop().then(() => {
+    scannerActive = false;
+    document.getElementById('scanToggleBtn').textContent = '▶ ເລີ່ມສະແກນ';
+  }).catch(() => {});
+}
+
+function toggleScanner() {
+  if (scannerActive) stopScanner();
+  else startScanner();
+}
+
+let lastScanned = '';
+function onScanSuccess(text) {
+  if (text === lastScanned) return;
+  lastScanned = text;
+  setTimeout(() => { lastScanned = ''; }, 3000);
+  stopScanner();
+  lookupLoan(text.trim().toUpperCase());
+}
+
+// ===== LOAN LOOKUP =====
+async function lookupLoan(id) {
+  if (!id) { showToast('ໃສ່ລະຫັດກ່ອນ', 'error'); return; }
+  const res = document.getElementById('loanResult');
+  res.innerHTML = '<div class="loading-placeholder"><div class="spinner"></div><p style="margin-top:8px;">ກຳລັງຊອກຫາ...</p></div>';
+
+  try {
+    let { data: loan, error } = await sb.from('loans').select('*').eq('id', id).single();
+    if (error || !loan) {
+      // fallback: search by id containing the query
+      const { data: rows } = await sb.from('loans').select('*').ilike('id', `%${id}%`).limit(1);
+      loan = rows?.[0] || null;
+    }
+    if (!loan) {
+      res.innerHTML = `<div class="status-warning">
+        <div class="sw-icon">🔍</div>
+        <div class="sw-msg">ບໍ່ພົບລາຍການ</div>
+        <div class="sw-sub">ລະຫັດ: ${id}</div>
+      </div>`;
+      return;
+    }
+
+    currentLoan = loan;
+    // Fetch product
+    const { data: prod } = await sb.from('products').select('*').eq('id', loan.product_id).single();
+    currentProduct = prod;
+
+    if (loan.status === 'completed' || loan.status === 'rejected') {
+      const ST = { completed: 'ສຳເລັດ', rejected: 'ປະຕິເສດ' };
+      res.innerHTML = `<div class="status-warning">
+        <div class="sw-icon">❌</div>
+        <div class="sw-msg">ລາຍການນີ້ບໍ່ສາມາດຊຳລະໄດ້</div>
+        <div class="sw-sub">ສະຖານະ: ${ST[loan.status] || loan.status}</div>
+      </div>`;
+      return;
+    }
+
+    renderLoanCard(loan, prod);
+  } catch(e) {
+    res.innerHTML = `<div class="status-warning"><div class="sw-icon">⚠️</div><div class="sw-msg">${e.message}</div></div>`;
+  }
+}
+
+function calcInterest(loan, prod) {
+  if (!prod) return { cycleInterest: 0, interestOwed: 0, principal: 0 };
+  const principal    = loan.remaining_principal ?? loan.amount ?? 0;
+  const rate         = prod.interest_rate ?? 0;
+  const itype        = prod.interest_type ?? 'flat';
+  const dur          = loan.duration || 30;
+  const cycleInterest = itype === 'daily'
+    ? Math.round(principal * (rate / 100) * dur)
+    : Math.round(principal * (rate / 100));
+  const interestInDb      = Math.max(0, (loan.total_due || 0) - principal);
+  const interestOwed      = interestInDb;
+  return { cycleInterest, interestOwed, principal };
+}
+
+function renderLoanCard(loan, prod) {
+  const { cycleInterest, interestOwed, principal } = calcInterest(loan, prod);
+  const dueDate = new Date(new Date(loan.created_at).getTime() + (loan.duration||30)*86400000);
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const dueStart   = new Date(dueDate); dueStart.setHours(0,0,0,0);
+  const daysLeft   = Math.ceil((dueStart - todayStart) / 86400000);
+  const isOverdue  = daysLeft < 0;
+  const dueCls     = isOverdue ? 'red' : daysLeft <= 7 ? 'orange' : 'green';
+  const dueTxt     = isOverdue ? `ເກີນ ${Math.abs(daysLeft)} ວັນ` : `ຄ້ຽວໃນ ${daysLeft} ວັນ`;
+  const ST = { pending:'ລໍຖ້າ', active:'ດຳເນີນ', approved:'ອະນຸມັດ' };
+
+  document.getElementById('loanResult').innerHTML = `
+    <div class="loan-card">
+      <div class="lc-head">
+        <div class="lc-id">${loan.id}</div>
+        <div class="lc-name">${loan.name}</div>
+        <div class="lc-prod">📞 ${loan.phone} · ${prod?.name || loan.product_name || ''}</div>
+      </div>
+      <div class="lc-body">
+        <div class="info-row"><span class="ir-l">ສະຖານະ</span><span class="ir-v">${ST[loan.status]||loan.status}</span></div>
+        <div class="info-row"><span class="ir-l">💚 ເງິນຕົ້ນ</span><span class="ir-v green">${fmt(principal)}</span></div>
+        <div class="info-row"><span class="ir-l">🟠 ດອກເບ້ຍງວດນີ້</span><span class="ir-v orange">${fmt(cycleInterest)}</span></div>
+        <div class="info-row"><span class="ir-l">🔴 ຍັງຕ້ອງຊຳລະ</span><span class="ir-v ${interestOwed>0?'red':'green'}">${interestOwed>0?fmt(interestOwed):'✅ ດອກຊຳລະຄົບ'}</span></div>
+        <div class="info-row"><span class="ir-l">📅 ກຳນົດຊຳລະ</span><span class="ir-v ${dueCls}">${fmtDMY(dueDate.toISOString())} (${dueTxt})</span></div>
+      </div>
+    </div>
+    <div class="pay-section">
+      <h3>💳 ຮັບຊຳລະ</h3>
+      <div class="ps-field">
+        <label>ຈຳນວນຮັບ (ກີບ)</label>
+        <input type="text" inputmode="numeric" id="payAmt" class="money-input" placeholder="0"
+          oninput="fmtMoneyInput(this)" />
+      </div>
+      <div class="ps-field">
+        <label>ວິທີຮັບ</label>
+        <select id="payMethod">
+          <option value="cash">💵 ເງິນສົດ</option>
+          <option value="bcel">🏦 BCEL</option>
+          <option value="ldb">🏦 LDB</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="confirmPayment()">
+        ✅ ຢືນຢັນຮັບເງິນ
+      </button>
+      <button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="clearLoan()">
+        ✕ ຍົກເລີກ / ສະແກນໃໝ່
+      </button>
+    </div>`;
+}
+
+function clearLoan() {
+  currentLoan = null;
+  currentProduct = null;
+  document.getElementById('loanResult').innerHTML = '';
+  document.getElementById('manualId').value = '';
+  startScanner();
+}
+
+// ===== PAYMENT =====
+async function confirmPayment() {
+  if (!currentLoan) return;
+  const amt    = getMoneyVal(document.getElementById('payAmt'));
+  const method = document.getElementById('payMethod').value;
+  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+
+  const btn = document.querySelector('#loanResult .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ ກຳລັງບັນທຶກ...'; }
+
+  try {
+    const loan     = currentLoan;
+    const principal    = loan.remaining_principal ?? loan.amount ?? 0;
+    const interestDue  = Math.max(0, (loan.total_due || 0) - principal);
+    let interestCollected, principalReduced;
+    if (amt >= interestDue) { interestCollected = interestDue; principalReduced = amt - interestDue; }
+    else { interestCollected = amt; principalReduced = 0; }
+    const newRemainingPrincipal = Math.max(0, principal - principalReduced);
+    const newTotalDue           = Math.max(0, (loan.total_due || 0) - amt);
+    const newPaid               = (loan.paid_amount || 0) + amt;
+    const newInterestPaid       = (loan.interest_paid || 0) + interestCollected;
+    const ref = 'PAY' + Date.now().toString().slice(-8);
+
+    // 1. Insert payment record
+    await sb.from('payments').insert({
+      id: ref, loan_id: loan.id, amount: amt, method,
+      note: `[Agent: ${agentSession.full_name}]`,
+      date: new Date().toISOString(), ref,
+    });
+
+    // 2. Update loan
+    await sb.from('loans').update({
+      paid_amount:         newPaid,
+      remaining_principal: newRemainingPrincipal,
+      total_due:           newTotalDue,
+      interest_paid:       newInterestPaid,
+    }).eq('id', loan.id);
+
+    // 3. Save to agent_collections
+    const colId = 'COL' + Date.now();
+    console.log('[agent] saving collection — agent_id:', agentSession.id, '| loan_id:', loan.id, '| amount:', amt);
+    const { error: colErr } = await sb.from('agent_collections').insert({
+      id: colId,
+      agent_id:  agentSession.id,
+      loan_id:   loan.id,
+      loan_name: loan.name,
+      amount:    amt,
+      method,
+      remitted:  false,
+      created_at: new Date().toISOString(),
+    });
+    if (colErr) console.error('[agent] agent_collections insert FAILED:', colErr.message, colErr);
+
+    // Show receipt
+    document.getElementById('loanResult').innerHTML = `
+      <div class="receipt">
+        <div class="rc-icon">✅</div>
+        <div class="rc-amt">${fmt(amt)}</div>
+        <div class="rc-name">ຮັບຈາກ ${loan.name}</div>
+        <div style="margin:12px 0;font-size:.82rem;color:var(--gray-text);">
+          <div>ລະຫັດ: ${loan.id}</div>
+          <div>ຍອດຄ້າງ: ${fmt(Math.max(0, newTotalDue))}</div>
+          <div>ວິທີ: ${method === 'cash' ? 'ເງິນສົດ' : method.toUpperCase()}</div>
+        </div>
+        <div class="rc-ref">🧾 ${ref} · ${fmtDMY(new Date().toISOString())}</div>
+      </div>
+      <div style="padding:0 16px 16px;display:flex;gap:10px;flex-direction:column;">
+        <button class="btn btn-primary btn-full" onclick="clearLoan()">📷 ສະແກນໃໝ່</button>
+        <button class="btn btn-outline btn-full" onclick="switchMode('coll')">💰 ເບິ່ງຍອດລວມ</button>
+      </div>`;
+
+    showToast(`✅ ຮັບ ${fmt(amt)} ສຳເລັດ`);
+    loadCollections();
+  } catch(e) {
+    showToast('ຜິດພາດ: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ ຢືນຢັນຮັບເງິນ'; }
+  }
+}
+
+// ===== LOAD COLLECTIONS =====
+async function loadCollections() {
+  try {
+    console.log('[agent] loadCollections — agent_id:', agentSession.id);
+    const { data: cols, error: colsErr } = await sb.from('agent_collections')
+      .select('*')
+      .eq('agent_id', agentSession.id)
+      .eq('remitted', false)
+      .order('created_at', { ascending: false });
+    if (colsErr) console.error('[agent] agent_collections query FAILED:', colsErr.message, colsErr);
+    console.log('[agent] unremitted collections found:', cols?.length ?? 0, cols);
+    myCollections = cols || [];
+
+    const { data: remits } = await sb.from('agent_remittances')
+      .select('*')
+      .eq('agent_id', agentSession.id)
+      .eq('status', 'pending');
+    pendingRemit = remits?.[0] || null;
+
+    // Re-fetch agent row so commission_paid_month is always up-to-date
+    const { data: freshAgent } = await sb.from('agents').select('*').eq('id', agentSession.id).single();
+    if (freshAgent) {
+      agentSession = { ...agentSession, ...freshAgent };
+      sessionStorage.setItem('agent_session', JSON.stringify(agentSession));
+    }
+
+    updateCollBadge();
+    renderCollections();
+    renderProfile();
+  } catch(e) {
+    console.warn('loadCollections error:', e.message);
+  }
+}
+
+function updateCollBadge() {
+  const b = document.getElementById('collBadge');
+  const n = myCollections.length;
+  b.textContent = n;
+  b.style.display = n > 0 ? 'flex' : 'none';
+}
+
+function renderCollections() {
+  const total           = myCollections.reduce((s, c) => s + c.amount, 0);
+  const currentMonth    = new Date().toISOString().slice(0, 7);
+  const commAlreadyPaid = agentSession.commission_paid_month === currentMonth;
+  const commAmt         = commAlreadyPaid ? 0 : (agentSession.commission_rate || 0);
+  const netAmt          = total - commAmt;
+
+  // Table
+  const tblEl = document.getElementById('collTable');
+  if (!myCollections.length) {
+    tblEl.innerHTML = `<div class="empty-state">
+      <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+      <div>ຍັງບໍ່ມີລາຍການຮັບ</div>
+      <div style="font-size:.78rem;margin-top:4px;">ສະແກນຮັບຊຳລະຈາກລູກຄ້າ</div>
+    </div>`;
+  } else {
+    tblEl.innerHTML = `<table class="coll-table">
+      <thead><tr>
+        <th>ຊື່ລູກຄ້າ</th>
+        <th>ລະຫັດ</th>
+        <th style="text-align:right;">ຮັບ (ກີບ)</th>
+        <th>ວິທີ</th>
+      </tr></thead>
+      <tbody>
+        ${myCollections.map(c => `<tr>
+          <td><div style="font-weight:600;">${c.loan_name||'-'}</div>
+              <div style="font-size:.7rem;color:#9e9e9e;">${fmtDate(c.created_at)}</div></td>
+          <td style="font-size:.75rem;color:#1b5e20;">${c.loan_id}</td>
+          <td style="text-align:right;font-weight:700;color:#1b5e20;">${new Intl.NumberFormat('lo-LA').format(c.amount)}</td>
+          <td style="font-size:.75rem;">${c.method==='cash'?'💵':c.method==='bcel'?'🏦':'💳'} ${c.method}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  // Summary
+  const sumEl = document.getElementById('collSummary');
+  sumEl.innerHTML = myCollections.length > 0 ? `
+    <div class="summary-card">
+      <h3>📊 ສະຫຼຸບ</h3>
+      <div class="sum-row">
+        <span class="sr-l">ຈຳນວນລາຍການ</span>
+        <span class="sr-v">${myCollections.length} ລາຍການ</span>
+      </div>
+      <div class="sum-row">
+        <span class="sr-l">ລວມຮັບທັງໝົດ</span>
+        <span class="sr-v">${fmt(total)}</span>
+      </div>
+      <div class="sum-row">
+        <span class="sr-l">ຄ່າຈ້າງ</span>
+        <span class="sr-v" style="color:${commAlreadyPaid ? '#9e9e9e' : '#1565c0'};">
+          ${commAlreadyPaid
+            ? 'ຖືກຫັກແລ້ວ (0 ກີບ ຮອບນີ້)'
+            : fmt(agentSession.commission_rate || 0) + ' (ຫັກຄັ້ງດຽວເດືອນນີ້)'}
+        </span>
+      </div>
+      <div class="sum-total">
+        <div class="st-l">ຕ້ອງສົ່ງຄືນ Admin</div>
+        <div class="st-v">${fmt(Math.max(0, netAmt))}</div>
+      </div>
+      ${!commAlreadyPaid && total < (agentSession.commission_rate || 0)
+        ? `<div style="margin-top:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;padding:10px 12px;font-size:.82rem;color:#e65100;font-weight:700;text-align:center;">⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ</div>`
+        : ''}
+    </div>` : '';
+
+  // Remit section
+  const remitEl = document.getElementById('remitSection');
+  if (!myCollections.length) { remitEl.style.display = 'none'; return; }
+  remitEl.style.display = 'block';
+
+  if (pendingRemit) {
+    remitEl.innerHTML = `<div class="remit-pending">
+      <div class="rp-icon">⏳</div>
+      <div><strong>ລໍຖ້າ Admin ຢືນຢັນ</strong></div>
+      <div style="font-size:.78rem;color:var(--gray-text);margin-top:4px;">ສົ່ງ: ${fmt(pendingRemit.net_amount)} · ${fmtDate(pendingRemit.created_at)}</div>
+    </div>`;
+    return;
+  }
+
+  remitEl.innerHTML = `
+    <div style="font-size:.82rem;font-weight:700;color:var(--green-dark);margin-bottom:10px;">📤 ສົ່ງເງິນໃຫ້ Admin</div>
+    <div class="slip-upload" id="slipZone" onclick="document.getElementById('slipFile').click()">
+      <div class="su-icon">📸</div>
+      <p>ຄລິກເພື່ອອັບໂຫລດ slip ໂອນເງິນ</p>
+      <img id="slipPreview" alt="slip" />
+      <input type="file" id="slipFile" accept="image/*" style="display:none;" onchange="onSlipUpload(this)" />
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitRemittance()">
+      📤 ສົ່ງເງິນ ${fmt(netAmt)} ໃຫ້ Admin
+    </button>`;
+}
+
+let slipImageData = null;
+function onSlipUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > 800) { h = Math.round(h * 800 / w); w = 800; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      slipImageData = canvas.toDataURL('image/jpeg', 0.75);
+      const prev = document.getElementById('slipPreview');
+      const zone = document.getElementById('slipZone');
+      prev.src = slipImageData;
+      prev.style.display = 'block';
+      zone.classList.add('has-file');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitRemittance() {
+  const total           = myCollections.reduce((s, c) => s + c.amount, 0);
+  const currentMonth    = new Date().toISOString().slice(0, 7);
+  const commAlreadyPaid = agentSession.commission_paid_month === currentMonth;
+  const commAmt         = commAlreadyPaid ? 0 : (agentSession.commission_rate || 0);
+  const netAmt          = total - commAmt;
+  if (!slipImageData) { showToast('ກະລຸນາອັບໂຫລດ slip ກ່ອນ', 'error'); return; }
+  if (!commAlreadyPaid && total < commAmt) { showToast('⚠️ ຍອດຮັບໜ້ອຍກວ່າຄ່າຈ້າງ', 'error'); return; }
+
+  const btn = document.querySelector('#remitSection .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ ກຳລັງສົ່ງ...'; }
+
+  try {
+    const remitId = 'REM' + Date.now();
+    const colIds  = myCollections.map(c => c.id);
+
+    await sb.from('agent_remittances').insert({
+      id: remitId, agent_id: agentSession.id,
+      agent_name: agentSession.full_name,
+      total_amount: total, commission: commAmt, net_amount: netAmt,
+      slip_image: slipImageData, status: 'pending',
+      collection_ids: colIds,
+      created_at: new Date().toISOString(),
+    });
+
+    // Mark collections as remitted
+    await sb.from('agent_collections')
+      .update({ remitted: true, remittance_id: remitId })
+      .in('id', colIds);
+
+    showToast('ສົ່ງສຳເລັດ! ລໍຖ້າ Admin ຢືນຢັນ ✅');
+    slipImageData = null;
+    await loadCollections();
+  } catch(e) {
+    showToast('ຜິດພາດ: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '📤 ສົ່ງ'; }
+  }
+}
+
+// ===== PROFILE =====
+async function renderProfile() {
+  document.getElementById('profName').textContent = agentSession.full_name;
+
+  document.getElementById('profInfo').innerHTML = `
+    <div class="info-row"><span class="ir-l">📱 ເບີໂທ</span><span class="ir-v">${agentSession.phone||'-'}</span></div>
+    <div class="info-row"><span class="ir-l">💼 ຊື່ຜູ້ໃຊ້</span><span class="ir-v">${agentSession.username}</span></div>
+    <div class="info-row"><span class="ir-l">💰 ຄ່າຈ້າງ</span><span class="ir-v green">${fmt(agentSession.commission_rate||0)}</span></div>
+    <div class="info-row"><span class="ir-l">📅 ຄ່າຈ້າງເດືອນນີ້</span><span class="ir-v" style="color:${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'#2e7d32':'#e65100'};">${agentSession.commission_paid_month===new Date().toISOString().slice(0,7)?'✅ ຖືກຫັກແລ້ວ':'⏳ ຍັງບໍ່ຖືກຫັກ'}</span></div>`;
+
+  // Load history
+  const now30 = new Date(Date.now() - 30*86400000).toISOString();
+  const { data: hist } = await sb.from('agent_collections')
+    .select('*')
+    .eq('agent_id', agentSession.id)
+    .gte('created_at', now30)
+    .order('created_at', { ascending: false });
+
+  const histData = hist || [];
+  const monthTotal = histData.reduce((s, c) => s + c.amount, 0);
+  const commEarned = agentSession.commission_rate || 0;
+
+  document.getElementById('profStats').innerHTML = `
+    <div class="stat-cell"><div class="sc-v">${histData.length}</div><div class="sc-l">ລາຍການ (30 ວັນ)</div></div>
+    <div class="stat-cell"><div class="sc-v" style="font-size:.9rem;">${fmt(monthTotal)}</div><div class="sc-l">ຮັບທັງໝົດ</div></div>
+    <div class="stat-cell"><div class="sc-v" style="font-size:.9rem;color:#1565c0;">${fmt(commEarned)}</div><div class="sc-l">ຄ່າຈ້າງ</div></div>
+    <div class="stat-cell"><div class="sc-v">${myCollections.length}</div><div class="sc-l">ຍັງບໍ່ສົ່ງ</div></div>`;
+
+  document.getElementById('profHistory').innerHTML = histData.length
+    ? histData.map(c => `
+        <div class="hist-item">
+          <div>
+            <div class="hi-name">${c.loan_name||c.loan_id}</div>
+            <div class="hi-sub">${fmtDate(c.created_at)} · ${c.method} ${c.remitted?'· ✅ ສົ່งແລ້ວ':''}</div>
+          </div>
+          <div class="hi-amt">+${new Intl.NumberFormat('lo-LA').format(c.amount)}</div>
+        </div>`).join('')
+    : '<div style="text-align:center;color:#9e9e9e;padding:16px;font-size:.85rem;">ຍັງບໍ່ມີລາຍການ</div>';
+}
+
+// ===== NAVIGATION =====
+function switchMode(mode) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
+
+  if (mode === 'scan') {
+    document.getElementById('screenScan').classList.add('active');
+    document.getElementById('nav-scan').classList.add('active');
+    if (!scannerActive && !currentLoan) startScanner();
+  } else if (mode === 'coll') {
+    document.getElementById('screenCollections').classList.add('active');
+    document.getElementById('nav-coll').classList.add('active');
+    stopScanner();
+    loadCollections();
+  } else if (mode === 'prof') {
+    document.getElementById('screenProfile').classList.add('active');
+    document.getElementById('nav-prof').classList.add('active');
+    stopScanner();
+    renderProfile();
+  }
+}
+
+// ===== LOGIN ENTER KEY =====
+document.getElementById('agPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doAgentLogin();
+});
+document.getElementById('agUsername').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('agPassword').focus();
+});
+
+// ===== AUTO LOGIN (session restore) =====
+(function() {
+  const saved = sessionStorage.getItem('agent_session');
+  if (saved) {
+    try { agentSession = JSON.parse(saved); startApp(); }
+    catch(e) { sessionStorage.removeItem('agent_session'); }
+  }
+})();
+</script>
+</body>
+</html>
