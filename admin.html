@@ -959,11 +959,20 @@ document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key
 
 // ====== DEVICE SECURITY ======
 function getDeviceId() {
-  try {
-    return btoa(navigator.userAgent + screen.width + screen.height).slice(0, 40);
-  } catch {
-    return btoa(screen.width + 'x' + screen.height).slice(0, 20);
+  const raw = navigator.userAgent + screen.width + screen.height + navigator.language;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash = hash & hash;
   }
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = '';
+  let n = Math.abs(hash);
+  for (let i = 0; i < 8; i++) {
+    id += chars[n % chars.length];
+    n = Math.floor(n / chars.length);
+  }
+  return id.slice(0, 4) + '-' + id.slice(4);
 }
 async function getApprovedDevices() {
   try {
