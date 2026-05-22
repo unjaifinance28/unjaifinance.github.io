@@ -261,6 +261,7 @@
       <input type="password" id="pwdInput" placeholder="ໃສ່ລະຫັດຜ່ານ" style="background:white;" />
       <span class="error-msg" id="pwdErr"></span>
     </div>
+    <div id="deviceErr" style="display:none;margin-top:10px;background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:12px;font-size:.82rem;text-align:left;"></div>
     <button class="btn btn-primary btn-full" onclick="doLogin()">🔓 ເຂົ້າສູ່ລະບົບ</button>
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e0e0e0;">
       <a href="index.html" style="font-size:.8rem;color:#9e9e9e;text-decoration:none;">← ໜ້າລູກຄ້າ</a>
@@ -538,6 +539,24 @@
           <button class="btn btn-primary" style="padding:9px 16px;white-space:nowrap;" onclick="addWorkOption()">+ ເພີ່ມ</button>
         </div>
         <span id="workMsg" style="font-size:.8rem;display:block;margin-top:8px;min-height:18px;"></span>
+      </div>
+
+      <!-- Device management -->
+      <div class="settings-card" style="margin-top:16px;">
+        <h3>📱 ອຸປະກອນທີ່ອະນຸຍາດ</h3>
+        <p style="font-size:.82rem;color:#9e9e9e;margin-bottom:14px;">ສະເພາະອຸປະກອນທີ່ລົງທະບຽນແລ້ວເທົ່ານັ້ນທີ່ສາມາດເຂົ້າ Admin ໄດ້ (ຫຼັງຈາກໃສ່ລະຫັດຖືກ)</p>
+        <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+          <div style="font-size:.77rem;font-weight:700;color:#1b5e20;margin-bottom:4px;">📍 ID ອຸປະກອນນີ້</div>
+          <div id="currentDeviceId" style="font-family:monospace;font-size:.7rem;color:#424242;word-break:break-all;"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+          <input type="text" id="deviceNameInput" placeholder="ຊື່ອຸປະກອນ (ເຊັ່ນ: ໂທລະສັບຂ້ອຍ)"
+            style="flex:1;min-width:160px;padding:9px 13px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;"
+            onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'"
+            onkeydown="if(event.key==='Enter')addCurrentDevice()" />
+          <button class="btn btn-primary" style="padding:9px 14px;font-size:.82rem;white-space:nowrap;" onclick="addCurrentDevice()">➕ ເພີ່ມອຸປະກອນນີ້</button>
+        </div>
+        <div id="deviceList"></div>
       </div>
     </div>
 
@@ -879,15 +898,25 @@ async function saveAdminPwd(newPwd) {
   await sb.from('app_settings').upsert({ key:'admin_password', value:newPwd, updated_at:new Date().toISOString() });
 }
 
+function _allowLogin() {
+  sessionStorage.setItem('admin_auth','1');
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminBody').style.display = 'block';
+  initAdmin();
+}
+
 async function doLogin() {
   const v = document.getElementById('pwdInput').value;
   const errEl = document.getElementById('pwdErr');
+  const devEl = document.getElementById('deviceErr');
   const btn = document.querySelector('#loginScreen .btn-primary');
   if (!v) { errEl.textContent = 'ໃສ່ລະຫັດ'; return; }
   errEl.textContent = '';
+  devEl.style.display = 'none';
   btn.textContent = 'ກຳລັງກວດສອບ...';
   btn.disabled = true;
   try {
+    // 1. Check password
     const correctPwd = await getAdminPwd();
     if (v !== correctPwd) {
       errEl.textContent = '❌ ລະຫັດຜ່ານຜິດ';
@@ -896,10 +925,29 @@ async function doLogin() {
       btn.disabled = false;
       return;
     }
-    sessionStorage.setItem('admin_auth','1');
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminBody').style.display = 'block';
-    initAdmin();
+
+    // 2. Check device
+    const devices = await getApprovedDevices();
+    const myId = getDeviceId();
+
+    if (devices.length === 0) {
+      // First-time setup: auto-register this device
+      await saveApprovedDevices([{ id: myId, name: 'ອຸປະກອນທຳອິດ', addedAt: new Date().toISOString() }]);
+      _allowLogin();
+      setTimeout(() => showToast('✅ ອຸປະກອນນີ້ຖືກເພີ່ມໂດຍອັດຕະໂນມັດ (ຄັ້ງທຳອິດ)'), 800);
+    } else if (devices.find(d => d.id === myId)) {
+      // Recognised device
+      _allowLogin();
+    } else {
+      // Unrecognised device
+      errEl.textContent = '⛔ ອຸປະກອນນີ້ບໍ່ໄດ້ຮັບອະນຸຍາດ';
+      devEl.style.display = 'block';
+      devEl.innerHTML = `<div style="font-weight:700;color:#e65100;margin-bottom:6px;">⛔ ອຸປະກອນນີ້ບໍ່ໄດ້ຮັບອະນຸຍາດ</div>
+        <div style="color:#616161;margin-bottom:8px;">ກະລຸນາສົ່ງ ID ນີ້ໃຫ້ Admin ເພື່ອເພີ່ມໃນລາຍການ:</div>
+        <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:7px 10px;font-family:monospace;font-size:.72rem;word-break:break-all;color:#424242;user-select:all;">${myId}</div>`;
+      btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
+      btn.disabled = false;
+    }
   } catch(err) {
     errEl.textContent = '❌ ເກີດຂໍ້ຜິດພາດ ກະລຸນາລອງໃໝ່';
     btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
@@ -908,6 +956,74 @@ async function doLogin() {
 }
 function doLogout() { sessionStorage.removeItem('admin_auth'); location.reload(); }
 document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+// ====== DEVICE SECURITY ======
+function getDeviceId() {
+  try {
+    return btoa(navigator.userAgent + screen.width + screen.height).slice(0, 40);
+  } catch {
+    return btoa(screen.width + 'x' + screen.height).slice(0, 20);
+  }
+}
+async function getApprovedDevices() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','approved_devices').single();
+    return JSON.parse(data?.value || '[]');
+  } catch { return []; }
+}
+async function saveApprovedDevices(devices) {
+  await sb.from('app_settings').upsert({ key: 'approved_devices', value: JSON.stringify(devices), updated_at: new Date().toISOString() });
+}
+async function renderDeviceList() {
+  const myId = getDeviceId();
+  const el = document.getElementById('currentDeviceId');
+  if (el) el.textContent = myId;
+  const list = document.getElementById('deviceList');
+  if (!list) return;
+  list.innerHTML = '<div style="font-size:.8rem;color:#9e9e9e;">ກຳລັງໂຫລດ...</div>';
+  const devices = await getApprovedDevices();
+  if (!devices.length) {
+    list.innerHTML = '<div style="font-size:.83rem;color:#9e9e9e;padding:10px 0;">ຍັງບໍ່ມີອຸປະກອນທີ່ລົງທະບຽນ</div>';
+    return;
+  }
+  list.innerHTML = devices.map((d, i) => {
+    const isCurrent = d.id === myId;
+    const addedDate = d.addedAt ? new Date(d.addedAt).toLocaleDateString('lo-LA') : '-';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${isCurrent ? '#e8f5e9' : 'white'};border:1.5px solid ${isCurrent ? '#a5d6a7' : '#e0e0e0'};border-radius:10px;margin-bottom:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:.85rem;">${d.name || '(ບໍ່ມີຊື່)'}${isCurrent ? '&nbsp;<span style="color:#1b5e20;font-size:.7rem;font-weight:400;">(ອຸປະກອນນີ້)</span>' : ''}</div>
+        <div style="font-size:.7rem;color:#9e9e9e;margin-top:2px;font-family:monospace;">${d.id.slice(0,20)}… · ${addedDate}</div>
+      </div>
+      <button class="act-btn a-del" onclick="removeDevice(${i})" title="ລຶບ">🗑</button>
+    </div>`;
+  }).join('');
+}
+async function addCurrentDevice() {
+  const nameEl = document.getElementById('deviceNameInput');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { showToast('ໃສ່ຊື່ອຸປະກອນກ່ອນ', 'error'); return; }
+  const myId = getDeviceId();
+  const devices = await getApprovedDevices();
+  if (devices.find(d => d.id === myId)) { showToast('ອຸປະກອນນີ້ຖືກລົງທະບຽນແລ້ວ', 'error'); return; }
+  devices.push({ id: myId, name, addedAt: new Date().toISOString() });
+  await saveApprovedDevices(devices);
+  if (nameEl) nameEl.value = '';
+  renderDeviceList();
+  showToast('ເພີ່ມອຸປະກອນ ✅');
+}
+async function removeDevice(idx) {
+  const devices = await getApprovedDevices();
+  const removed = devices[idx];
+  const myId = getDeviceId();
+  if (removed?.id === myId) {
+    if (!confirm('ທ່ານກຳລັງລຶບອຸປະກອນທີ່ໃຊ້ຢູ່ — ທ່ານຈະຖືກລ໋ອກໂດຍອັດຕະໂນມັດ. ຢືນຢັນ?')) return;
+  }
+  devices.splice(idx, 1);
+  await saveApprovedDevices(devices);
+  renderDeviceList();
+  showToast('ລຶບອຸປະກອນ ✅');
+  if (removed?.id === myId) doLogout();
+}
 async function changePwd() {
   const p1=document.getElementById('np1').value, p2=document.getElementById('np2').value;
   const msg=document.getElementById('pwdMsg');
@@ -960,7 +1076,7 @@ function showTab(name, btn) {
   if (name==='credits')  renderCreditScore();
   if (name==='agents')   renderAgents();
   if (name==='remit')    renderRemittances();
-  if (name==='settings') loadWorkOptionsAdmin();
+  if (name==='settings') { loadWorkOptionsAdmin(); renderDeviceList(); }
 }
 
 // ====== INIT ======
