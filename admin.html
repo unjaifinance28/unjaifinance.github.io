@@ -1464,7 +1464,7 @@ function openLoanModal(id, focus) {
     acts.innerHTML += `<button class="btn btn-primary" style="flex:1;min-width:120px;" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
     acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
     if (DB.products.some(p => p.isVip && p.status === 'active')) {
-      acts.innerHTML += `<button class="btn btn-vip" onclick="doInviteVip('${id}')">👑 VIP</button>`;
+      acts.innerHTML += `<button class="btn btn-vip" onclick="openVipModal('${id}')">👑 VIP</button>`;
     }
     const product = DB.products.find(p => p.id === loan.productId);
     if (overdue && rem > 0 && product?.compound) {
@@ -2372,41 +2372,170 @@ function onVipChange() {
   document.getElementById('pf-vip-phones-group').style.display = checked ? 'flex' : 'none';
 }
 
-function doInviteVip(loanId) {
-  const loan     = DB.loans.find(l => l.id === loanId);
+// ====== VIP UPGRADE MODAL ======
+let _vipLoanId = null;
+
+function openVipModal(loanId) {
+  _vipLoanId = loanId;
+  const loan = DB.loans.find(l => l.id === loanId);
   if (!loan) return;
   const vipProds = DB.products.filter(p => p.isVip && p.status === 'active');
   if (!vipProds.length) { showToast('ຍັງບໍ່ມີຜະລິດຕະພັນ VIP', 'error'); return; }
-  const opts = vipProds.map(p =>
-    `<option value="${p.id}">${p.name} (${p.interestRate}%${p.isVip?' · '+((p.vipCustomers||[]).length)+' ເບີ':''})</option>`
-  ).join('');
+
+  const remaining   = loan.remainingPrincipal ?? loan.amount;
+  const interestDue = Math.max(0, (loan.totalDue || 0) - remaining);
+
   const already = vipProds.filter(p =>
-    (p.vipCustomers||[]).some(v => v.replace(/\D/g,'') === loan.phone.replace(/\D/g,''))
+    (p.vipCustomers || []).some(v => v.replace(/\D/g,'') === loan.phone.replace(/\D/g,''))
   ).map(p => p.name);
-  const alreadyMsg = already.length
-    ? `<div style="color:#2e7d32;font-size:.78rem;margin-top:6px;">✅ ເປັນ VIP ຢູ່ແລ້ວ: ${already.join(', ')}</div>`
+  const alreadyBadge = already.length
+    ? `<div style="margin-top:6px;font-size:.75rem;color:#2e7d32;font-weight:600;">✅ VIP ຢູ່ແລ້ວ: ${already.join(', ')}</div>`
     : '';
-  const msg = `ລູກຄ້າ: <strong>${loan.name}</strong> (${loan.phone})${alreadyMsg}
-    <div style="margin-top:10px;">
-      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ຜະລິດຕະພັນ VIP:</label>
-      <select id="vip-prod-sel" style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;">${opts}</select>
-    </div>
-    <div style="margin-top:8px;">
-      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ໝາຍເຫດ (ທາງເລືອກ):</label>
-      <input type="text" id="vip-note-inp" placeholder="ໝາຍເຫດ"
-        style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;" />
-    </div>`;
-  openConfirm('👑', 'ເຊີນລູກຄ້າ VIP', msg, async () => {
-    const productId = document.getElementById('vip-prod-sel')?.value;
-    const note      = document.getElementById('vip-note-inp')?.value.trim() || '';
-    if (!productId) return;
-    try {
-      await DB.addVipInvitation(loanId, productId, loan.phone, note);
-      closeConfirm();
-      renderProducts();
-      showToast('ເຊີນລູກຄ້າເຂົ້າ VIP ສຳເລັດ ✅');
-    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+
+  document.getElementById('vip-cust-info').innerHTML = `
+    <div style="font-weight:800;font-size:.95rem;color:#e65100;margin-bottom:4px;">👤 ${loan.name}</div>
+    <div style="font-size:.82rem;color:#616161;">📞 ${loan.phone} &nbsp;·&nbsp; ${loan.productName || '-'}</div>
+    <div style="display:flex;gap:20px;margin-top:8px;flex-wrap:wrap;">
+      <div><div style="font-size:.68rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ເງິນຕົ້ນຄ້າງ</div>
+           <div style="font-weight:800;color:#1b5e20;font-size:.95rem;">${formatMoney(remaining)} ກີບ</div></div>
+      <div><div style="font-size:.68rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ດອກຄ້າງ</div>
+           <div style="font-weight:800;color:#e65100;font-size:.95rem;">${formatMoney(interestDue)} ກີບ</div></div>
+    </div>${alreadyBadge}`;
+
+  const sel = document.getElementById('vip-prod-sel2');
+  sel.innerHTML = vipProds.map(p =>
+    `<option value="${p.id}">${p.name} (${p.interestRate}% ${p.interestType==='daily'?'ລາຍວັນ':'flat'})</option>`
+  ).join('');
+
+  document.querySelector('input[name="vip-mode"][value="instant"]').checked = true;
+  document.getElementById('vip-note2').value = '';
+  const btn = document.getElementById('vip-confirm-btn');
+  if (btn) { btn.textContent = '✅ ຢືນຢັນຍ້າຍ VIP'; btn.disabled = false; }
+  onVipModeChange();
+  document.getElementById('vipModal').classList.add('open');
+}
+
+function closeVipModal() {
+  document.getElementById('vipModal').classList.remove('open');
+  _vipLoanId = null;
+}
+
+function onVipProdChange() { onVipModeChange(); }
+
+function onVipModeChange() {
+  const loan = _vipLoanId ? DB.loans.find(l => l.id === _vipLoanId) : null;
+  if (!loan) return;
+  const prodId = document.getElementById('vip-prod-sel2')?.value;
+  const prod   = DB.products.find(p => p.id === prodId);
+  if (!prod) return;
+  const mode = document.querySelector('input[name="vip-mode"]:checked')?.value || 'instant';
+
+  const remaining = loan.remainingPrincipal ?? loan.amount;
+  const dur = mode === 'instant'
+    ? (loan.duration || prod.duration || 30)
+    : (prod.duration || loan.duration || 30);
+  const newTotal    = calcLoanTotal(prod, remaining, dur);
+  const newInterest = newTotal - remaining;
+  const isDaily     = prod.paymentType === 'daily_installment';
+  const dailyAmt    = isDaily && dur > 0 ? Math.round(newTotal / dur) : 0;
+
+  // Update mode label styles
+  ['instant','new'].forEach(m => {
+    const lbl = document.getElementById('vip-mode-lbl-' + m);
+    if (!lbl) return;
+    lbl.style.borderColor = mode === m ? '#f9a825' : '#e0e0e0';
+    lbl.style.background  = mode === m ? '#fff8e1' : 'white';
   });
+
+  const modeDesc = mode === 'instant'
+    ? 'ປ່ຽນ product ໃນ loan ນີ້ ແລ້ວ recalculate ດອກ'
+    : 'ປິດ loan ນີ້ ແລ້ວ ສ້າງ loan VIP ໃໝ່';
+
+  document.getElementById('vip-preview').innerHTML = `
+    <div style="background:#f1f8e9;border:1px solid #c8e6c9;border-radius:9px;padding:11px 14px;font-size:.83rem;color:#1b5e20;line-height:1.9;">
+      <strong>${prod.name}</strong><br>
+      ເງິນຕົ້ນ: <strong>${formatMoney(remaining)} ກີບ</strong> &nbsp;|&nbsp;
+      ດອກ VIP ໃໝ່: <strong style="color:#e65100;">${formatMoney(newInterest)} ກີບ</strong> &nbsp;|&nbsp;
+      ຍອດລວມ: <strong>${formatMoney(newTotal)} ກີບ</strong>
+      ${isDaily ? `<br>ຜ່ອນ/ວັນ: <strong>${formatMoney(dailyAmt)} ກີບ</strong>` : ''}
+      <br><span style="font-size:.73rem;color:#9e9e9e;">${modeDesc}</span>
+    </div>`;
+}
+
+async function confirmVipUpgrade() {
+  const loan = _vipLoanId ? DB.loans.find(l => l.id === _vipLoanId) : null;
+  if (!loan) return;
+  const prodId = document.getElementById('vip-prod-sel2')?.value;
+  const prod   = DB.products.find(p => p.id === prodId);
+  if (!prod) { showToast('ເລືອກຜະລິດຕະພັນ', 'error'); return; }
+  const mode = document.querySelector('input[name="vip-mode"]:checked')?.value || 'instant';
+  const note = document.getElementById('vip-note2')?.value.trim() || '';
+
+  const remaining = loan.remainingPrincipal ?? loan.amount;
+  const btn = document.getElementById('vip-confirm-btn');
+  if (btn) { btn.textContent = 'ກຳລັງດຳເນີນ...'; btn.disabled = true; }
+
+  try {
+    if (mode === 'instant') {
+      const dur        = loan.duration || prod.duration || 30;
+      const newTotalDue = calcLoanTotal(prod, remaining, dur);
+      const dateStr    = new Date().toLocaleDateString('lo-LA', {year:'numeric',month:'short',day:'numeric'});
+      const appendNote = `ຍ້າຍໄປ VIP: ${prod.name} ວັນທີ ${dateStr}${note ? ' · ' + note : ''}`;
+      const newNote    = [loan.note, appendNote].filter(Boolean).join('\n');
+
+      const { error } = await sb.from('loans').update({
+        product_id:   prod.id,
+        product_name: prod.name,
+        total_due:    newTotalDue,
+        note:         newNote,
+      }).eq('id', loan.id);
+      if (error) throw error;
+
+      loan.productId   = prod.id;
+      loan.productName = prod.name;
+      loan.totalDue    = newTotalDue;
+      loan.note        = newNote;
+
+      await DB.addVipInvitation(loan.id, prod.id, loan.phone, note);
+      closeVipModal();
+      openLoanModal(loan.id);
+      renderLoans(); renderRequests(); renderProducts();
+      showToast('✅ ຍ້າຍ VIP ສຳເລັດ');
+
+    } else {
+      const dur        = prod.duration || loan.duration || 30;
+      const newTotalDue = calcLoanTotal(prod, remaining, dur);
+      const isDaily    = prod.paymentType === 'daily_installment';
+      const dailyPay   = isDaily && dur > 0 ? Math.round(newTotalDue / dur) : null;
+      const newId      = 'LAO' + Date.now().toString().slice(-6);
+
+      await DB.updateLoanStatus(loan.id, 'completed');
+
+      const { data: r, error } = await sb.from('loans').insert({
+        id: newId,
+        product_id: prod.id, product_name: prod.name,
+        name: loan.name, phone: loan.phone,
+        id_card: loan.idCard || null, doc_type: loan.docType, doc_image: loan.docImage || null,
+        occupation: loan.workplace || null, income: loan.income || null,
+        address: loan.address || null, note: note || '',
+        amount: remaining, duration: dur, total_due: newTotalDue,
+        status: 'active', paid_amount: 0,
+        created_at: new Date().toISOString(),
+        original_principal: remaining, remaining_principal: remaining,
+        interest_paid: 0, daily_payment: dailyPay,
+      }).select().single();
+      if (error) throw error;
+      DB.loans.push(mapLoan(r));
+
+      await DB.addVipInvitation(newId, prod.id, loan.phone, note);
+      closeVipModal(); closeLoanModal();
+      updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans(); renderProducts();
+      showToast('✅ ສ້າງ VIP ລາຍການໃໝ່ສຳເລັດ');
+    }
+  } catch(err) {
+    showToast('Error: ' + err.message, 'error');
+    if (btn) { btn.textContent = '✅ ຢືນຢັນຍ້າຍ VIP'; btn.disabled = false; }
+  }
 }
 
 // ====== TAB: CREDIT SCORE ======
@@ -3258,12 +3387,13 @@ async function saveManualLoan() {
 }
 
 // Backdrop close
-['loanModal','confirmModal','debtPayModal','manualLoanModal'].forEach(id => {
+['loanModal','confirmModal','debtPayModal','manualLoanModal','vipModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e){
     if (e.target === this) {
       if (id==='loanModal') closeLoanModal();
       else if (id==='debtPayModal') closeDebtPayModal();
       else if (id==='manualLoanModal') closeManualLoanModal();
+      else if (id==='vipModal') closeVipModal();
       else closeConfirm();
     }
   });
@@ -3273,6 +3403,58 @@ async function saveManualLoan() {
   });
 });
 </script>
+
+<!-- ====== VIP UPGRADE MODAL ====== -->
+<div class="modal-overlay" id="vipModal">
+  <div class="modal" style="max-width:500px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#e65100,#f9a825);color:white;padding:18px 20px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:.65rem;opacity:.8;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">VIP Upgrade</div>
+        <div style="font-size:1.1rem;font-weight:800;">👑 ຍ້າຍລູກຄ້າໄປ VIP</div>
+      </div>
+      <button onclick="closeVipModal()" style="background:rgba(255,255,255,.2);border:none;color:white;font-size:1.1rem;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;max-height:calc(90vh - 110px);overflow-y:auto;">
+      <!-- Customer info -->
+      <div id="vip-cust-info" style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:12px 16px;margin-bottom:14px;"></div>
+      <!-- VIP product -->
+      <div class="fi" style="margin-bottom:12px;">
+        <label>👑 ຜະລິດຕະພັນ VIP *</label>
+        <select id="vip-prod-sel2" onchange="onVipProdChange()" style="border:2px solid #ffe082 !important;"></select>
+      </div>
+      <!-- Mode toggle -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:.8rem;font-weight:600;color:#1b5e20;display:block;margin-bottom:6px;">ປະເພດການຍ້າຍ *</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label id="vip-mode-lbl-instant" style="border:2px solid #f9a825;background:#fff8e1;border-radius:9px;padding:10px 12px;cursor:pointer;transition:.15s;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <input type="radio" name="vip-mode" value="instant" checked onchange="onVipModeChange()" style="accent-color:#f9a825;" />
+              <span style="font-weight:700;font-size:.85rem;">⚡ ຍ້າຍທັນທີ</span>
+            </div>
+            <div style="font-size:.72rem;color:#9e9e9e;padding-left:20px;">ປ່ຽນ product ໃນ loan ນີ້</div>
+          </label>
+          <label id="vip-mode-lbl-new" style="border:2px solid #e0e0e0;background:white;border-radius:9px;padding:10px 12px;cursor:pointer;transition:.15s;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <input type="radio" name="vip-mode" value="new" onchange="onVipModeChange()" style="accent-color:#f9a825;" />
+              <span style="font-weight:700;font-size:.85rem;">🔄 ຮອບໃໝ່</span>
+            </div>
+            <div style="font-size:.72rem;color:#9e9e9e;padding-left:20px;">ປິດ loan ເກົ່າ, ສ້າງໃໝ່</div>
+          </label>
+        </div>
+      </div>
+      <!-- Preview -->
+      <div id="vip-preview" style="margin-bottom:12px;"></div>
+      <!-- Note -->
+      <div class="fi" style="margin-bottom:16px;">
+        <label>ໝາຍເຫດ</label>
+        <input type="text" id="vip-note2" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" />
+      </div>
+      <button id="vip-confirm-btn" class="btn btn-full" style="padding:12px;background:linear-gradient(135deg,#e65100,#f9a825);color:white;border:none;font-weight:700;font-size:.92rem;cursor:pointer;" onclick="confirmVipUpgrade()">
+        ✅ ຢືນຢັນຍ້າຍ VIP
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ====== MANUAL LOAN MODAL ====== -->
 <div class="modal-overlay" id="manualLoanModal">
