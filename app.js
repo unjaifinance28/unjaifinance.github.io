@@ -476,7 +476,6 @@ const DB = {
     const { data: r, error } = await sb.from('vip_invitations').insert({
       id, loan_id: loanId, product_id: productId,
       phone: cleanPhone, note: note || '',
-      created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     this.vipInvitations.push(mapVipInvitation(r));
