@@ -738,11 +738,18 @@ function doStatusSearch() {
     const principal    = l.remainingPrincipal ?? l.amount ?? 0;
     const interestRate = product?.interestRate ?? 0;
     const interestType = product?.interestType ?? 'flat';
+    const isDailyLoan  = product?.paymentType === 'daily_installment';
 
-    // Full interest for one cycle, calculated from rate (never reads from totalDue)
-    const cycleInterest = interestType === 'daily'
-      ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
-      : Math.round(principal * (interestRate / 100));
+    // Daily installment: flat rate on ORIGINAL amount only — remainingPrincipal is unreliable
+    // (for completed loans it may be 0 or leftover balance, not the original 30M)
+    // Lump-sum daily-type: rate × duration days
+    const origAmount    = l.amount ?? 0;
+    const cycleInterest = isDailyLoan
+      ? Math.round(origAmount * (interestRate / 100))
+      : interestType === 'daily'
+        ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
+        : Math.round(principal * (interestRate / 100));
+    const dailyTotal = isDailyLoan ? origAmount + cycleInterest : 0;
 
     // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
     const interestPaidCycle = l.interestPaid || 0;
@@ -775,11 +782,16 @@ function doStatusSearch() {
     const cardBorder = isVipLoan ? '1.5px solid #fdd835' : '1.5px solid #e0e0e0';
     const cardBg     = isVipLoan ? 'linear-gradient(135deg,#fffde7,white)' : 'white';
 
-    const isDailyLoan = product?.paymentType === 'daily_installment';
-    const dailyAmt    = l.dailyPayment || (l.duration > 0 ? Math.round((l.totalDue || 0) / l.duration) : 0);
-    const totalPaid   = l.paidAmount || 0;
-    const totalRem    = Math.max(0, (l.totalDue || 0) - totalPaid);
-    const paidDays    = dailyAmt > 0 ? Math.floor(totalPaid / dailyAmt) : 0;
+    const dailyAmt  = l.dailyPayment || (isDailyLoan && l.duration > 0 ? Math.round(dailyTotal / l.duration) : 0);
+    const totalPaid = l.paidAmount || 0;
+    const totalRem  = isDailyLoan ? Math.max(0, dailyTotal - totalPaid) : Math.max(0, (l.totalDue || 0) - totalPaid);
+    const paidDays  = dailyAmt > 0 ? Math.floor(totalPaid / dailyAmt) : 0;
+    if (isDailyLoan) console.log('daily loan debug:', {
+      amount: l.amount, originalPrincipal: l.originalPrincipal, remainingPrincipal: l.remainingPrincipal,
+      totalDue: l.totalDue, duration: l.duration, paidAmount: l.paidAmount,
+      dailyPayment: l.dailyPayment, productPaymentType: product?.paymentType,
+      computed: { origAmount, cycleInterest, dailyTotal, dailyAmt, paidDays },
+    });
 
     // ---- Payment details card (active loans only) ----
     const paymentCard = (() => {
@@ -895,11 +907,11 @@ function doStatusSearch() {
     // Active lump_sum: 4-line interest breakdown; other statuses: simple summary
     const gridRows = isDailyLoan ? (l.status === 'active' ? `
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
-      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(origAmount)}</span>
       <span style="color:#616161;">ດອກ</span>
       <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterest)}</span>
       <span style="color:#616161;">ລວມ</span>
-      <span style="font-weight:800;color:#212121;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
+      <span style="font-weight:800;color:#212121;text-align:right;">${formatMoney(dailyTotal)}</span>
       <span style="color:#616161;">ຜ່ອນວັນລະ</span>
       <span style="font-weight:700;color:#1565c0;text-align:right;">${formatMoney(dailyAmt)} ກີບ/ວັນ</span>
       <span style="color:#616161;">ຊຳລະແລ້ວ</span>
@@ -910,9 +922,9 @@ function doStatusSearch() {
       <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
     ` : `
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
-      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(origAmount)}</span>
       <span style="color:#616161;">ລວມ</span>
-      <span style="font-weight:700;color:#212121;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
+      <span style="font-weight:700;color:#212121;text-align:right;">${formatMoney(dailyTotal)}</span>
       <span style="color:#616161;">ຊຳລະແລ້ວ</span>
       <span style="font-weight:700;color:#2e7d32;text-align:right;">${formatMoney(totalPaid)}</span>
       <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ສະຖານະ</span>
@@ -952,6 +964,29 @@ function doStatusSearch() {
       </div>
       ${paymentCard}
       ${compoundWarning}
+      ${(() => {
+        if (l.status !== 'completed' || !isDailyLoan || !dailyAmt) return '';
+        const pd = Math.round(totalPaid / dailyAmt);
+        const sd = (l.duration || 0) - pd;
+        if (sd <= 0) return '';
+        const disc     = sd * dailyAmt;
+        const loanTotal = dailyTotal || l.totalDue || origAmount;
+        return `<div style="margin-top:10px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:1.5px solid #66bb6a;border-radius:11px;padding:13px 14px;">
+          <div style="font-size:.88rem;font-weight:800;color:#1b5e20;margin-bottom:4px;">🎉 ສຳເລັດກ່ອນກຳນົດ!</div>
+          <div style="font-size:.79rem;color:#2e7d32;margin-bottom:10px;">ຈ່າຍຄົບພາຍໃນ ${pd} ວັນ (ໄວກວ່າ ${sd} ວັນ)</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:.82rem;align-items:center;">
+            <span style="color:#616161;">ຈ່າຍຈິງ</span>
+            <span style="font-weight:700;text-align:right;">${formatMoney(totalPaid)} ກີບ</span>
+            <span style="color:#2e7d32;font-weight:600;">ສ່ວນຫຼຸດ</span>
+            <span style="font-weight:700;color:#2e7d32;text-align:right;">− ${formatMoney(disc)} ກີບ</span>
+            <span style="color:#616161;border-top:1px solid #c8e6c9;padding-top:5px;">ລວມທັງໝົດ</span>
+            <span style="font-weight:800;color:#1b5e20;border-top:1px solid #c8e6c9;padding-top:5px;text-align:right;">${formatMoney(loanTotal)} ກີບ</span>
+          </div>
+          <div style="margin-top:9px;text-align:center;background:#fff;border-radius:8px;padding:7px 10px;font-size:.84rem;font-weight:700;color:#1b5e20;border:1px solid #a5d6a7;">
+            ໄດ້ຮັບສ່ວນຫຼຸດ: ${formatMoney(disc)} ກີບ 🎁
+          </div>
+        </div>`;
+      })()}
       ${(() => {
         const hist = DB.getCompoundHistory(l.id);
         if (!hist.length) return '';
