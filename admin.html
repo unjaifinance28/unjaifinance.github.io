@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin | Unjai Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -269,6 +272,7 @@
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
       <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
+      <button class="atab" onclick="showTab('remit',this)">📤 ການສົ່ງເງິນ <span id="badge-remit" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
     </div>
 
     <!-- ====== TAB: REQUESTS ====== -->
@@ -484,7 +488,7 @@
       </div>
 
       <!-- Password change -->
-      <div class="settings-card">
+      <div class="settings-card" style="margin-bottom:16px;">
         <h3>🔑 ປ່ຽນລະຫັດຜ່ານ</h3>
         <div style="display:flex;flex-direction:column;gap:10px;max-width:360px;">
           <div class="fi"><label>ລະຫັດໃໝ່</label><input type="password" id="np1" placeholder="ໃໝ່" /></div>
@@ -492,6 +496,21 @@
           <button class="btn btn-primary" style="padding:10px;" onclick="changePwd()">ປ່ຽນ</button>
         </div>
         <span class="error-msg" id="pwdMsg" style="display:block;margin-top:8px;"></span>
+      </div>
+
+      <!-- Workplace options management -->
+      <div class="settings-card" style="margin-top:16px;">
+        <h3>🏢 ຈັດການຕົວເລືອກ "ບ່ອນເຮັດວຽກ"</h3>
+        <p style="font-size:.82rem;color:#9e9e9e;margin-bottom:14px;">ຕົວເລືອກທີ່ຈະສະແດງໃນຟອມສະໝັກກູ້ຂອງລູກຄ້າ</p>
+        <div id="workOptList" style="margin-bottom:10px;min-height:40px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="workNewOption" placeholder="ຊື່ຕົວເລືອກໃໝ່..."
+            style="flex:1;padding:9px 13px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;"
+            onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'"
+            onkeydown="if(event.key==='Enter')addWorkOption()" />
+          <button class="btn btn-primary" style="padding:9px 16px;white-space:nowrap;" onclick="addWorkOption()">+ ເພີ່ມ</button>
+        </div>
+        <span id="workMsg" style="font-size:.8rem;display:block;margin-top:8px;min-height:18px;"></span>
       </div>
     </div>
 
@@ -582,10 +601,27 @@
       <!-- Agent List -->
       <div class="sec-title">👥 ລາຍຊື່ Agent</div>
       <div class="prod-list-card" id="agentList"></div>
+    </div>
 
-      <!-- Pending Remittances -->
-      <div class="sec-title" style="margin-top:18px;color:#e65100;">⏳ ລໍຖ້າຢືນຢັນ Remittance</div>
-      <div id="remitList"></div>
+    <!-- ====== TAB: REMITTANCES ====== -->
+    <div id="tab-remit" class="tab-pane">
+
+      <!-- Summary KPIs -->
+      <div class="kpi-row" id="remitKpi"></div>
+
+      <!-- Section A: Pending -->
+      <div class="sec-title" style="color:#e65100;">⏳ ລໍຖ້າຢືນຢັນ</div>
+      <div id="remitPendingList"></div>
+
+      <!-- Section B: History -->
+      <div class="sec-title" style="margin-top:18px;">📋 ປະຫວັດການສົ່ງເງິນ</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+        <input class="sbox" id="remitSearch" placeholder="🔍 ຊື່ Agent..." oninput="filterRemitHistory()" style="max-width:220px;" />
+        <select id="remitMonthFilter" style="padding:7px 12px;border:2px solid #e0e0e0;border-radius:50px;font-family:inherit;font-size:.83rem;outline:none;" onchange="filterRemitHistory()">
+          <option value="">ທັງໝົດ</option>
+        </select>
+      </div>
+      <div id="remitHistoryList"></div>
 
       <!-- Agent Performance -->
       <div class="sec-title" style="margin-top:18px;">📊 ຜົນງານ Agent (ເດືອນນີ້)</div>
@@ -766,33 +802,59 @@ function removeLogo() {
 }
 
 // ====== AUTH ======
-const DEFAULT_PWD = 'admin1234';
-const getAdminPwd = () => localStorage.getItem('admin_pwd') || DEFAULT_PWD;
+async function getAdminPwd() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','admin_password').single();
+    return data?.value || 'admin1234';
+  } catch { return 'admin1234'; }
+}
+async function saveAdminPwd(newPwd) {
+  await sb.from('app_settings').upsert({ key:'admin_password', value:newPwd, updated_at:new Date().toISOString() });
+}
 
-function doLogin() {
+async function doLogin() {
   const v = document.getElementById('pwdInput').value;
-  if (!v) { document.getElementById('pwdErr').textContent = 'ໃສ່ລະຫັດ'; return; }
-  if (v !== getAdminPwd()) {
-    document.getElementById('pwdErr').textContent = '❌ ລະຫັດຜ່ານຜິດ';
-    document.getElementById('pwdInput').value = '';
-    return;
+  const errEl = document.getElementById('pwdErr');
+  const btn = document.querySelector('#loginScreen .btn-primary');
+  if (!v) { errEl.textContent = 'ໃສ່ລະຫັດ'; return; }
+  errEl.textContent = '';
+  btn.textContent = 'ກຳລັງກວດສອບ...';
+  btn.disabled = true;
+  try {
+    const correctPwd = await getAdminPwd();
+    if (v !== correctPwd) {
+      errEl.textContent = '❌ ລະຫັດຜ່ານຜິດ';
+      document.getElementById('pwdInput').value = '';
+      btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
+      btn.disabled = false;
+      return;
+    }
+    sessionStorage.setItem('admin_auth','1');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminBody').style.display = 'block';
+    initAdmin();
+  } catch(err) {
+    errEl.textContent = '❌ ເກີດຂໍ້ຜິດພາດ ກະລຸນາລອງໃໝ່';
+    btn.textContent = '🔓 ເຂົ້າສູ່ລະບົບ';
+    btn.disabled = false;
   }
-  sessionStorage.setItem('admin_auth','1');
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('adminBody').style.display = 'block';
-  initAdmin();
 }
 function doLogout() { sessionStorage.removeItem('admin_auth'); location.reload(); }
 document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
-function changePwd() {
+async function changePwd() {
   const p1=document.getElementById('np1').value, p2=document.getElementById('np2').value;
   const msg=document.getElementById('pwdMsg');
   if (p1.length < 4) { msg.style.color='#c62828'; msg.textContent='ຢ່າງໜ້ອຍ 4 ຕົວ'; return; }
   if (p1 !== p2) { msg.style.color='#c62828'; msg.textContent='ລະຫັດບໍ່ກົງກັນ'; return; }
-  localStorage.setItem('admin_pwd', p1);
-  msg.style.color='#1b5e20'; msg.textContent='✅ ປ່ຽນສຳເລັດ';
-  document.getElementById('np1').value = document.getElementById('np2').value = '';
-  setTimeout(()=>msg.textContent='', 3000);
+  msg.style.color='#9e9e9e'; msg.textContent='ກຳລັງບັນທຶກ...';
+  try {
+    await saveAdminPwd(p1);
+    msg.style.color='#1b5e20'; msg.textContent='✅ ປ່ຽນສຳເລັດ';
+    document.getElementById('np1').value = document.getElementById('np2').value = '';
+    setTimeout(()=>msg.textContent='', 3000);
+  } catch(err) {
+    msg.style.color='#c62828'; msg.textContent='❌ ບໍ່ສາມາດບັນທຶກໄດ້';
+  }
 }
 if (sessionStorage.getItem('admin_auth')==='1') {
   document.getElementById('loginScreen').style.display='none';
@@ -830,6 +892,8 @@ function showTab(name, btn) {
   if (name==='charts')   renderCharts();
   if (name==='credits')  renderCreditScore();
   if (name==='agents')   renderAgents();
+  if (name==='remit')    renderRemittances();
+  if (name==='settings') loadWorkOptionsAdmin();
 }
 
 // ====== INIT ======
@@ -840,6 +904,8 @@ async function initAdmin() {
     await DB.loadAll();
     updatePendingBadge();
     updateAlertsBadge();
+    updateRemitBadge();
+    setInterval(updateRemitBadge, 60000);
     renderRequests();
   } catch(err) {
     showToast('ໂຫລດຂໍ້ມູນລົ້ມເຫລວ', 'error');
@@ -1023,7 +1089,7 @@ function openLoanModal(id, focus) {
   document.getElementById('md-grid').innerHTML = [
     {l:'ຊື່',v:loan.name},{l:'ເບີ',v:loan.phone},
     {l:'ປະເພດເອກ',v:DOC_TYPE_NAMES[loan.docType]||loan.docType||'-'},{l:'ເລກເອກ',v:loan.idCard||'-'},
-    {l:'ອາຊີບ',v:loan.occupation||'-'},{l:'ລາຍໄດ້',v:loan.income?formatMoney(loan.income):'-'},
+    {l:'ບ່ອນເຮັດວຽກ',v:loan.workplace||'-'},{l:'ລາຍໄດ້',v:loan.income?formatMoney(loan.income):'-'},
     {l:'ຜະລິດຕະພັນ',v:loan.productName||'-'},{l:'ໄລຍະ',v:(loan.duration||'-')+' ວັນ'},
     {l:'ວັນສ້າງ',v:formatDate(loan.createdAt)},{l:'ວັນຄົບກຳໜົດ',v:dueTxt},
     {l:'ກູ້',v:formatMoney(loan.amount)},{l:'ຍອດລວມ',v:formatMoney(total)},
@@ -1251,7 +1317,7 @@ function doCompound(loanId) {
         productId: loan.productId, productName: loan.productName,
         name: loan.name, phone: loan.phone, idCard: loan.idCard,
         docType: loan.docType, docImage: loan.docImage,
-        occupation: loan.occupation, income: loan.income,
+        occupation: loan.workplace, income: loan.income,
         address: loan.address, note: loan.note,
         amount: rem, duration: product.duration, totalDue: newTotal,
       });
@@ -2195,13 +2261,68 @@ async function approveDiscount(scoreId, loanId, year) {
   } catch(err) { showToast('Error: ' + err.message, 'error'); }
 }
 
+// ====== WORKPLACE OPTIONS MANAGEMENT ======
+const _workDefaults = ["ພະນັກງານລັດ","ພະນັກງານເອກະຊົນ","ເຈົ້າຂອງທຸລະກິດ","ຄ້າຂາຍ","ອາວະກາດສຶກສາ","ອື່ນໆ"];
+let _workOptions = [..._workDefaults];
+
+async function loadWorkOptionsAdmin() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','workplace_options').single();
+    if (data?.value) {
+      const parsed = JSON.parse(data.value);
+      if (Array.isArray(parsed) && parsed.length) _workOptions = parsed;
+    }
+  } catch(e) {}
+  renderWorkOptions();
+}
+
+function renderWorkOptions() {
+  const el = document.getElementById('workOptList');
+  if (!el) return;
+  if (!_workOptions.length) {
+    el.innerHTML = '<p style="color:#9e9e9e;font-size:.82rem;padding:4px 0;">ຍັງບໍ່ມີທາງເລືອກ</p>';
+    return;
+  }
+  el.innerHTML = _workOptions.map((o, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f9fbe7;border:1px solid #dcedc8;border-radius:8px;margin-bottom:6px;font-size:.83rem;">
+      <span style="font-weight:500;">🏢 ${o}</span>
+      <button onclick="removeWorkOption(${i})" style="background:#ffebee;color:#c62828;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-family:inherit;font-weight:600;">🗑 ລຶບ</button>
+    </div>`).join('');
+}
+
+async function _saveWorkOptions() {
+  const { error } = await sb.from('app_settings').upsert({
+    key: 'workplace_options',
+    value: JSON.stringify(_workOptions),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  const m = document.getElementById('workMsg');
+  if (m) { m.style.color='#1b5e20'; m.textContent = '✅ ບັນທຶກສຳເລັດ'; setTimeout(() => m.textContent = '', 2500); }
+}
+
+function addWorkOption() {
+  const inp = document.getElementById('workNewOption');
+  const val = (inp?.value || '').trim();
+  if (!val) { showToast('ໃສ່ຊື່ທາງເລືອກ', 'error'); return; }
+  if (_workOptions.includes(val)) { showToast('ມີແລ້ວໃນລາຍຊື່', 'error'); return; }
+  _workOptions.push(val);
+  inp.value = '';
+  renderWorkOptions();
+  _saveWorkOptions().catch(err => showToast('Error: ' + err.message, 'error'));
+}
+
+function removeWorkOption(idx) {
+  _workOptions.splice(idx, 1);
+  renderWorkOptions();
+  _saveWorkOptions().catch(err => showToast('Error: ' + err.message, 'error'));
+}
+
 // ====== AGENTS TAB ======
 async function renderAgents() {
-  // Load agents
   const { data: agents } = await sb.from('agents').select('*').order('created_at', { ascending: false });
   const agList = agents || [];
 
-  // Render agent list
   const listEl = document.getElementById('agentList');
   if (!agList.length) {
     listEl.innerHTML = '<p style="padding:24px;text-align:center;color:#9e9e9e;">ຍັງບໍ່ມີ Agent</p>';
@@ -2223,84 +2344,95 @@ async function renderAgents() {
         </div>
       </div>`).join('');
   }
+}
 
-  // Load pending remittances
+// ====== REMITTANCE CARD CACHE (for print) ======
+const _remitCache = {};
+let _confirmedRemits = [];
+let _confirmedCols = {};
+
+// ====== REMITTANCES TAB ======
+async function renderRemittances() {
+  const { data: agents } = await sb.from('agents').select('*').order('created_at', { ascending: false });
+  const agList = agents || [];
+
+  // === Section A: Pending ===
   const { data: remits } = await sb.from('agent_remittances')
-    .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
+    .select('*').eq('status', 'pending').order('created_at', { ascending: false });
   const pendingRemits = remits || [];
 
-  const remitEl = document.getElementById('remitList');
-  if (!pendingRemits.length) {
-    remitEl.innerHTML = '<div style="background:white;border-radius:12px;padding:20px;text-align:center;color:#9e9e9e;">✅ ບໍ່ມີ remittance ລໍຖ້າ</div>';
-  } else {
-    remitEl.innerHTML = pendingRemits.map(r => `
-      <div style="background:white;border-radius:13px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
-          <div>
-            <div style="font-weight:800;font-size:.95rem;">👤 ${r.agent_name||'Agent'}</div>
-            <div style="font-size:.75rem;color:#9e9e9e;">${new Date(r.created_at).toLocaleDateString('lo-LA',{year:'numeric',month:'short',day:'numeric'})}</div>
-            <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;">
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ຮັບທັງໝົດ</div><div style="font-weight:700;">${formatMoney(r.total_amount)}</div></div>
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ຄ່າຈ້າງ</div><div style="font-weight:700;color:#1565c0;">${formatMoney(r.commission)}</div></div>
-              <div><div style="font-size:.65rem;color:#9e9e9e;">ສົ່ງ</div><div style="font-weight:900;color:#1b5e20;font-size:.95rem;">${formatMoney(r.net_amount)}</div></div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-direction:column;align-items:flex-end;">
-            ${r.slip_image
-              ? `<img src="${r.slip_image}" style="max-width:200px;border-radius:8px;border:1px solid #e0e0e0;cursor:zoom-in;display:block;margin-bottom:4px;"
-                      onclick="window.open(this.src)" />`
-              : '<div style="font-size:.78rem;color:#9e9e9e;margin-bottom:4px;">ບໍ່ມີຮູບສະລິບ</div>'
-            }
-            <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem;" onclick="confirmRemittance('${r.id}')">
-              ✅ ຢືນຢັນໄດ້ຮັບເງິນ
-            </button>
-          </div>
-        </div>
-      </div>`).join('');
+  let collByRemit = {};
+  if (pendingRemits.length) {
+    const remitIds = pendingRemits.map(r => r.id);
+    const { data: allCols } = await sb.from('agent_collections')
+      .select('*').in('remittance_id', remitIds).order('created_at', { ascending: true });
+    (allCols || []).forEach(c => {
+      if (!collByRemit[c.remittance_id]) collByRemit[c.remittance_id] = [];
+      collByRemit[c.remittance_id].push(c);
+    });
+  }
+  pendingRemits.forEach(r => { _remitCache[r.id] = { remit: r, cols: collByRemit[r.id] || [] }; });
+
+  document.getElementById('remitPendingList').innerHTML = pendingRemits.length
+    ? pendingRemits.map(r => buildRemittanceCard(r, collByRemit[r.id] || [])).join('')
+    : '<div style="background:white;border-radius:12px;padding:20px;text-align:center;color:#9e9e9e;">✅ ບໍ່ມີ remittance ລໍຖ້າ</div>';
+
+  // === Section B: ALL confirmed ===
+  const { data: confirmedData } = await sb.from('agent_remittances')
+    .select('*').eq('status', 'confirmed').order('confirmed_at', { ascending: false });
+  _confirmedRemits = confirmedData || [];
+
+  if (_confirmedRemits.length) {
+    const allIds = _confirmedRemits.map(r => r.id);
+    const { data: allCols } = await sb.from('agent_collections')
+      .select('*').in('remittance_id', allIds).order('created_at', { ascending: true });
+    _confirmedCols = {};
+    (allCols || []).forEach(c => {
+      if (!_confirmedCols[c.remittance_id]) _confirmedCols[c.remittance_id] = [];
+      _confirmedCols[c.remittance_id].push(c);
+    });
+    _confirmedRemits.forEach(r => { _remitCache[r.id] = { remit: r, cols: _confirmedCols[r.id] || [] }; });
   }
 
-  // Recently confirmed remittances (last 30 days)
-  const since30 = new Date(Date.now() - 30*86400000).toISOString();
-  const { data: confirmedRemits } = await sb.from('agent_remittances')
-    .select('*').eq('status','confirmed').gte('confirmed_at', since30)
-    .order('confirmed_at', { ascending: false });
-  const confirmedList = confirmedRemits || [];
-  const confirmedHtml = confirmedList.length ? confirmedList.map(r => `
-    <div style="background:#f1f8e9;border:1px solid #c8e6c9;border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:.83rem;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-        <div>
-          <div style="font-weight:700;color:#1b5e20;">✅ ${r.agent_name||'Agent'}</div>
-          <div style="font-size:.72rem;color:#9e9e9e;margin-top:2px;">
-            ຢືນຢັນ: ${new Date(r.confirmed_at).toLocaleString('lo-LA',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
-          </div>
-          <div style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;">
-            <div><div style="font-size:.62rem;color:#9e9e9e;">ຮັບທັງໝົດ</div><div style="font-weight:700;">${formatMoney(r.total_amount)}</div></div>
-            <div><div style="font-size:.62rem;color:#9e9e9e;">ຄ່າຈ້າງ</div><div style="font-weight:700;color:#1565c0;">${formatMoney(r.commission)}</div></div>
-            <div><div style="font-size:.62rem;color:#9e9e9e;">ສົ່ງ</div><div style="font-weight:900;color:#1b5e20;">${formatMoney(r.net_amount)}</div></div>
-          </div>
-        </div>
-        ${r.slip_image ? `<img src="${r.slip_image}" style="max-width:80px;border-radius:6px;border:1px solid #c8e6c9;cursor:zoom-in;" onclick="window.open(this.src)" />` : ''}
-      </div>
-    </div>`).join('')
-    : '<div style="text-align:center;padding:12px;color:#9e9e9e;font-size:.83rem;">ຍັງບໍ່ມີ (30 ວັນ)</div>';
+  // Build month filter
+  const monthSel = document.getElementById('remitMonthFilter');
+  if (monthSel) {
+    const months = [...new Set(_confirmedRemits.map(r => r.confirmed_at?.slice(0,7)))].filter(Boolean).sort().reverse();
+    monthSel.innerHTML = '<option value="">ທັງໝົດ</option>' + months.map(m => {
+      const label = new Date(m + '-01').toLocaleDateString('lo-LA', { year:'numeric', month:'long' });
+      return `<option value="${m}">${label}</option>`;
+    }).join('');
+  }
 
-  const remitListEl = document.getElementById('remitList');
-  remitListEl.innerHTML = (remitEl.innerHTML || '') +
-    `<div style="margin-top:16px;padding-top:14px;border-top:1px dashed #e0e0e0;">
-      <div style="font-size:.72rem;font-weight:800;color:#616161;letter-spacing:.4px;margin-bottom:8px;">📋 ຢືນຢັນແລ້ວ (30 ວັນ)</div>
-      ${confirmedHtml}
-    </div>`;
+  // Summary KPIs
+  const totalAllTime = _confirmedRemits.reduce((s, r) => s + (r.total_amount || 0), 0);
+  const nowM = new Date().toISOString().slice(0, 7);
+  const totalThisMonth = _confirmedRemits.filter(r => r.confirmed_at?.slice(0,7) === nowM)
+    .reduce((s, r) => s + (r.total_amount || 0), 0);
+  const agentTotals = {};
+  _confirmedRemits.forEach(r => {
+    const n = r.agent_name || 'Agent';
+    agentTotals[n] = (agentTotals[n] || 0) + (r.total_amount || 0);
+  });
+  const topAgent = Object.entries(agentTotals).sort((a,b) => b[1]-a[1])[0]?.[0] || '-';
+
+  document.getElementById('remitKpi').innerHTML = [
+    { icon:'💰', label:'ລວມຮັບທັງໝົດ',      val:formatMoney(totalAllTime),  color:'#1b5e20' },
+    { icon:'📅', label:'ເດືອນນີ້',            val:formatMoney(totalThisMonth),color:'#1565c0' },
+    { icon:'🏆', label:'Agent ທີ່ສົ່ງຫຼາຍສຸດ', val:topAgent,                  color:'#f57f17' },
+  ].map(k=>`<div class="kcard" style="border-left-color:${k.color};">
+    <div class="ki">${k.icon}</div>
+    <div class="kv" style="color:${k.color};font-size:${k.val.length>10?'.85rem':'1rem'};">${k.val}</div>
+    <div class="kl">${k.label}</div>
+  </div>`).join('');
+
+  filterRemitHistory();
 
   // Agent performance (this month)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const { data: cols } = await sb.from('agent_collections')
-    .select('*')
-    .gte('created_at', monthStart);
+  const { data: cols } = await sb.from('agent_collections').select('*').gte('created_at', monthStart);
   const collData = cols || [];
-
   const perfByAgent = {};
   collData.forEach(c => {
     if (!perfByAgent[c.agent_id]) perfByAgent[c.agent_id] = { cols: 0, total: 0, remitted: 0 };
@@ -2325,6 +2457,313 @@ async function renderAgents() {
       </tr>`;
     }).join('');
   }
+
+  updateRemitBadge(pendingRemits.length);
+}
+
+function filterRemitHistory() {
+  const q     = (document.getElementById('remitSearch')?.value || '').toLowerCase().trim();
+  const month = document.getElementById('remitMonthFilter')?.value || '';
+  let list = _confirmedRemits;
+  if (q)     list = list.filter(r => (r.agent_name || '').toLowerCase().includes(q));
+  if (month) list = list.filter(r => r.confirmed_at?.slice(0,7) === month);
+
+  const el = document.getElementById('remitHistoryList');
+  if (!el) return;
+  el.innerHTML = list.length
+    ? list.map(r => buildConfirmedCard(r, _confirmedCols[r.id] || [])).join('')
+    : '<div style="background:white;border-radius:12px;padding:20px;text-align:center;color:#9e9e9e;">ຍັງບໍ່ມີ</div>';
+}
+
+function buildConfirmedCard(r, cols) {
+  const fmtD  = iso => new Date(iso).toLocaleDateString('lo-LA', { year:'numeric', month:'short', day:'numeric' });
+  const mIcon = m => m==='cash'?'💵 ສົດ':m==='bcel'?'🏦 BCEL':m==='ldb'?'🏛 LDB':'💳 '+m;
+  const uid   = r.id.replace(/[^a-zA-Z0-9]/g,'_');
+  const detailId = 'rd-' + uid;
+
+  const tableRows = cols.map((c, i) => `
+    <tr style="border-bottom:1px solid #f0f0f0;">
+      <td style="padding:8px 10px;color:#bdbdbd;font-size:.72rem;">${i+1}</td>
+      <td style="padding:8px 10px;white-space:nowrap;font-size:.75rem;color:#616161;">${fmtD(c.created_at)}</td>
+      <td style="padding:8px 10px;font-weight:600;color:#212121;">${c.loan_name||'-'}</td>
+      <td style="padding:8px 10px;font-size:.72rem;"><span style="background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:4px;">${c.loan_id}</span></td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:#1b5e20;">${formatMoney(c.amount)}</td>
+      <td style="padding:8px 10px;font-size:.75rem;color:#616161;">${mIcon(c.method)}</td>
+    </tr>`).join('');
+
+  return `
+    <div style="background:white;border:1px solid #c8e6c9;border-radius:13px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+
+      <!-- Header row -->
+      <div style="background:#e8f5e9;border-bottom:1px solid #c8e6c9;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer;"
+           onclick="toggleRemitDetail('${detailId}')">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="width:36px;height:36px;background:#1b5e20;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">✅</div>
+          <div>
+            <div style="font-weight:700;color:#1b5e20;font-size:.95rem;">${r.agent_name||'Agent'}</div>
+            <div style="font-size:.72rem;color:#757575;margin-top:1px;">
+              ສ່ົງ: ${fmtD(r.created_at)} &nbsp;·&nbsp; ຢືນຢັນ: ${fmtD(r.confirmed_at)} &nbsp;·&nbsp; <strong>${cols.length} ລາຍການ</strong>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;">
+            <div style="font-size:.65rem;color:#9e9e9e;">ສຸດທິໂອນ</div>
+            <div style="font-weight:800;color:#1b5e20;font-size:1rem;">${formatMoney(r.net_amount)}</div>
+          </div>
+          ${r.slip_image ? `<img src="${r.slip_image}" style="width:38px;height:38px;object-fit:cover;border-radius:6px;border:1px solid #c8e6c9;cursor:zoom-in;flex-shrink:0;" onclick="event.stopPropagation();viewSlip(this.src)" />` : ''}
+          <span id="${detailId}-arrow" style="color:#9e9e9e;font-size:.85rem;padding:4px;">▼</span>
+        </div>
+      </div>
+
+      <!-- Collapsible detail -->
+      <div id="${detailId}" style="display:none;">
+
+        <!-- Money summary strip -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:#f9fbe7;border-bottom:1px solid #e8f5e9;">
+          <div style="padding:10px 14px;border-right:1px solid #e8f5e9;">
+            <div style="font-size:.65rem;color:#9e9e9e;margin-bottom:2px;">ຮັບທັງໝົດ</div>
+            <div style="font-weight:700;font-size:.9rem;">${formatMoney(r.total_amount)}</div>
+          </div>
+          <div style="padding:10px 14px;border-right:1px solid #e8f5e9;">
+            <div style="font-size:.65rem;color:#9e9e9e;margin-bottom:2px;">ຄ່າຈ້າງ Agent</div>
+            <div style="font-weight:700;font-size:.9rem;color:#c62828;">-${formatMoney(r.commission||0)}</div>
+          </div>
+          <div style="padding:10px 14px;background:#e8f5e9;">
+            <div style="font-size:.65rem;color:#1b5e20;margin-bottom:2px;font-weight:600;">ສຸດທິໂອນ</div>
+            <div style="font-weight:800;font-size:.95rem;color:#1b5e20;">${formatMoney(r.net_amount)}</div>
+          </div>
+        </div>
+
+        <!-- Collection table -->
+        <div style="padding:12px 16px 8px;">
+          <div style="font-size:.78rem;font-weight:700;color:#616161;margin-bottom:8px;">📋 ລາຍລະອຽດ</div>
+          <div style="overflow-x:auto;border-radius:8px;border:1px solid #e8f5e9;">
+            <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+              <thead>
+                <tr style="background:#f1f8e9;">
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#757575;width:32px;">#</th>
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#757575;white-space:nowrap;">ວັນທີ</th>
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#757575;">ຊື່ລູກຄ້າ</th>
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#757575;">ລະຫັດ</th>
+                  <th style="padding:8px 10px;text-align:right;font-weight:600;color:#757575;white-space:nowrap;">ຮັບ (ກີບ)</th>
+                  <th style="padding:8px 10px;text-align:left;font-weight:600;color:#757575;">ວິທີ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#9e9e9e;">ບໍ່ພົບລາຍການ</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Action bar -->
+        <div style="padding:10px 16px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+          ${r.slip_image ? `<button onclick="viewSlip('${r.slip_image}')" style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;padding:7px 14px;cursor:pointer;font-family:inherit;font-size:.78rem;color:#424242;font-weight:600;">🖼️ ເບິ່ງສະລິບ</button>` : ''}
+          <button onclick="printRemittance('${r.id}')" style="background:white;border:1.5px solid #a5d6a7;border-radius:8px;padding:7px 16px;cursor:pointer;font-family:inherit;font-size:.78rem;color:#1b5e20;font-weight:600;">📄 PDF / ພິມ</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleRemitDetail(id) {
+  const el    = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
+async function updateRemitBadge(count) {
+  if (count === undefined) {
+    const { data } = await sb.from('agent_remittances').select('id').eq('status', 'pending');
+    count = (data || []).length;
+  }
+  const b = document.getElementById('badge-remit');
+  if (!b) return;
+  b.textContent = count;
+  b.style.display = count > 0 ? 'inline' : 'none';
+}
+
+function buildRemittanceCard(r, cols) {
+  const fmtD = iso => new Date(iso).toLocaleDateString('lo-LA', { year:'numeric', month:'short', day:'numeric' });
+  const mIcon = m => m==='cash'?'💵 ສົດ':m==='bcel'?'🏦 BCEL':'💳 '+m;
+
+  const tableRows = cols.map((c, i) => `
+    <tr style="border-bottom:1px solid #f5f5f5;">
+      <td style="padding:7px 8px;color:#9e9e9e;">${i+1}</td>
+      <td style="padding:7px 8px;white-space:nowrap;font-size:.75rem;">${fmtD(c.created_at)}</td>
+      <td style="padding:7px 8px;font-weight:600;">${c.loan_name||'-'}</td>
+      <td style="padding:7px 8px;font-size:.72rem;color:#1b5e20;">${c.loan_id}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;">${formatMoney(c.amount)}</td>
+      <td style="padding:7px 8px;font-size:.75rem;">${mIcon(c.method)}</td>
+    </tr>`).join('');
+
+  const totalRow = `
+    <tr style="background:#e8f5e9;font-weight:800;border-top:2px solid #c8e6c9;">
+      <td colspan="4" style="padding:8px 8px;text-align:right;color:#1b5e20;">ລວມທັງໝົດ</td>
+      <td style="padding:8px 8px;text-align:right;color:#1b5e20;font-size:.95rem;">${formatMoney(r.total_amount)}</td>
+      <td></td>
+    </tr>`;
+
+  return `
+    <div style="background:white;border-radius:13px;box-shadow:0 2px 10px rgba(0,0,0,.1);margin-bottom:18px;overflow:hidden;border:1.5px solid #ffe082;">
+      <!-- Card header -->
+      <div style="background:#fff8e1;border-bottom:1.5px solid #ffe082;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-weight:800;font-size:1rem;">👤 ${r.agent_name||'Agent'}</div>
+          <div style="font-size:.75rem;color:#9e9e9e;">ສ່ົງ: ${fmtD(r.created_at)}</div>
+        </div>
+        <span style="background:#e65100;color:white;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;">⏳ ລໍຖ້າຢືນຢັນ</span>
+      </div>
+
+      <div style="padding:16px 18px;">
+        <!-- Collection breakdown table -->
+        <div style="font-size:.8rem;font-weight:800;color:#1b5e20;margin-bottom:8px;">📋 ລາຍລະອຽດການຮັບ (${cols.length} ລາຍການ)</div>
+        <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0;">
+          <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+            <thead>
+              <tr style="background:#f5f5f5;">
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">#</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;white-space:nowrap;">ວັນທີ</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ຊື່ລູກຄ້າ</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ລະຫັດ</th>
+                <th style="padding:8px 8px;text-align:right;font-weight:700;color:#616161;white-space:nowrap;">ຮັບ (ກີບ)</th>
+                <th style="padding:8px 8px;text-align:left;font-weight:700;color:#616161;">ວິທີ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows || '<tr><td colspan="6" style="text-align:center;padding:14px;color:#9e9e9e;">ບໍ່ພົບລາຍການ</td></tr>'}
+              ${totalRow}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary -->
+        <div style="margin-top:12px;background:#fafafa;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px;">
+            <span style="color:#616161;">├─ ລວມຮັບທັງໝົດ</span>
+            <span style="font-weight:700;">${formatMoney(r.total_amount)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:8px;">
+            <span style="color:#616161;">├─ ຄ່າຈ້າງ Agent (ຄົງທີ)</span>
+            <span style="font-weight:700;color:#c62828;">-${formatMoney(r.commission||0)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;border-top:1.5px solid #1b5e20;padding-top:8px;">
+            <span style="font-weight:800;color:#1b5e20;">└─ ສຸດທິຕ້ອງໂອນ</span>
+            <span style="font-weight:900;color:#1b5e20;font-size:1.05rem;">${formatMoney(r.net_amount)}</span>
+          </div>
+        </div>
+
+        <!-- Slip image -->
+        <div style="margin-top:12px;">
+          ${r.slip_image
+            ? `<img src="${r.slip_image}" style="max-width:100%;border-radius:10px;border:1px solid #e0e0e0;cursor:zoom-in;display:block;" onclick="viewSlip(this.src)" />`
+            : '<div style="background:#fff3e0;border:1.5px dashed #ffb74d;border-radius:10px;padding:14px;text-align:center;color:#e65100;font-size:.85rem;font-weight:700;">⚠️ ບໍ່ມີຮູບສະລິບ</div>'
+          }
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+          <button class="btn" style="padding:9px 16px;font-size:.83rem;background:#f5f5f5;color:#424242;border:1px solid #e0e0e0;" onclick="printRemittance('${r.id}')">
+            🖨️ ພິມ / PDF
+          </button>
+          <button class="btn btn-primary" style="padding:9px 16px;font-size:.83rem;flex:1;min-width:160px;" onclick="confirmRemittance('${r.id}')">
+            ✅ ຢືນຢັນໄດ້ຮັບເງິນ
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function printRemittance(remitId) {
+  const cached = _remitCache[remitId];
+  if (!cached) { showToast('ກະລຸນາໂຫລດໜ້ານີ້ໃໝ່', 'error'); return; }
+  const { remit: r, cols } = cached;
+
+  const fmtD  = iso => new Date(iso).toLocaleDateString('lo-LA', { year:'numeric', month:'short', day:'numeric' });
+  const fmtM  = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0)) + ' ກີບ';
+  const mName = m => m==='cash'?'ສົດ':m==='bcel'?'BCEL':m;
+  const printDate = new Date().toLocaleDateString('lo-LA', { year:'numeric', month:'long', day:'numeric' });
+
+  const tableRows = cols.map((c, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${fmtD(c.created_at)}</td>
+      <td>${c.loan_name||'-'}</td>
+      <td style="font-size:.8em;color:#1b5e20;">${c.loan_id}</td>
+      <td style="text-align:right;font-weight:700;">${fmtM(c.amount)}</td>
+      <td>${mName(c.method)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="lo"><head>
+    <meta charset="UTF-8"/>
+    <title>Remittance — ${r.agent_name}</title>
+    <style>
+      body { font-family:'Phetsarath OT','Noto Sans Lao',sans-serif; margin:28px 32px; color:#212121; font-size:14px; }
+      .hdr { text-align:center; border-bottom:3px solid #1b5e20; padding-bottom:14px; margin-bottom:20px; }
+      .hdr .logo { font-size:2.4rem; }
+      .hdr h1 { color:#1b5e20; margin:4px 0 0; font-size:1.5rem; }
+      .hdr h2 { margin:4px 0 0; font-size:1rem; color:#424242; font-weight:600; }
+      .meta { display:flex; gap:28px; flex-wrap:wrap; margin-bottom:18px; font-size:.88rem; }
+      .meta span { color:#616161; }
+      .meta strong { color:#212121; }
+      table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:.85rem; }
+      thead th { background:#1b5e20; color:white; padding:9px 10px; text-align:left; white-space:nowrap; }
+      tbody td { padding:8px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+      .total-row td { background:#e8f5e9; font-weight:800; border-top:2px solid #c8e6c9; border-bottom:none; }
+      .summary { background:#f9f9f9; border:1px solid #ddd; border-radius:8px; padding:14px 18px; margin-bottom:24px; }
+      .s-row { display:flex; justify-content:space-between; margin-bottom:7px; font-size:.9rem; }
+      .s-total { display:flex; justify-content:space-between; border-top:2px solid #1b5e20; padding-top:9px; font-weight:900; font-size:1.05rem; color:#1b5e20; }
+      .slip-img { max-width:280px; border:1px solid #ddd; border-radius:6px; margin-bottom:24px; }
+      .sig { display:flex; gap:80px; margin-top:56px; }
+      .sig-box { flex:1; text-align:center; }
+      .sig-line { border-top:1px solid #424242; margin:56px 0 8px; }
+      .sig-label { font-size:.85rem; color:#424242; }
+      @media print { @page { margin:18mm; } }
+    </style>
+  </head><body>
+    <div class="hdr">
+      <div class="logo">🏦</div>
+      <h1>Unjai Finance</h1>
+      <h2>ລາຍງານການສົ່ງເງິນ</h2>
+    </div>
+    <div class="meta">
+      <span>Agent: <strong>${r.agent_name||'-'}</strong></span>
+      <span>ວັນທີສົ່ງ: <strong>${fmtD(r.created_at)}</strong></span>
+      <span>ວັນທີພິມ: <strong>${printDate}</strong></span>
+      <span>ລະຫັດ: <strong>${r.id}</strong></span>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th><th>ວັນທີ</th><th>ຊື່ລູກຄ້າ</th><th>ລະຫັດ</th><th>ຮັບ (ກີບ)</th><th>ວິທີ</th>
+      </tr></thead>
+      <tbody>
+        ${tableRows || '<tr><td colspan="6" style="text-align:center;padding:16px;color:#9e9e9e;">ບໍ່ພົບລາຍການ</td></tr>'}
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right;padding:9px 10px;">ລວມທັງໝົດ</td>
+          <td style="padding:9px 10px;">${fmtM(r.total_amount)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="summary">
+      <div class="s-row"><span>ລວມຮັບທັງໝົດ</span><span>${fmtM(r.total_amount)}</span></div>
+      <div class="s-row"><span>ຄ່າຈ້າງ Agent (ຄົງທີ)</span><span style="color:#c62828;">-${fmtM(r.commission||0)}</span></div>
+      <div class="s-total"><span>ສຸດທິຕ້ອງໂອນ</span><span>${fmtM(r.net_amount)}</span></div>
+    </div>
+    ${r.slip_image ? `<div><div style="font-weight:700;margin-bottom:8px;">ຮູບ Slip ໂອນເງິນ:</div><img src="${r.slip_image}" class="slip-img"/></div>` : ''}
+    <div class="sig">
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ລາຍເຊັນ Admin</div></div>
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ລາຍເຊັນ Agent (${r.agent_name||''})</div></div>
+    </div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 async function saveAgent(e) {
@@ -2433,7 +2872,7 @@ async function confirmRemittance(remitId) {
 
       closeConfirm();
       showToast('ຢືນຢັນ ✅ ຄ່າຈ້າງຖືກຫັກເດືອນ ' + currentMonth);
-      renderAgents();
+      renderRemittances();
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
@@ -2447,7 +2886,23 @@ async function confirmRemittance(remitId) {
       else closeConfirm();
     }
   });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape')
+      document.getElementById('slipModal').style.display = 'none';
+  });
 });
+</script>
+
+<div id="slipModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:zoom-out; align-items:center; justify-content:center;" onclick="document.getElementById('slipModal').style.display='none'">
+  <img id="slipModalImg" style="max-width:90%; max-height:90vh; border-radius:12px; box-shadow:0 4px 32px rgba(0,0,0,0.5);" />
+  <div style="position:absolute; top:16px; right:24px; color:white; font-size:2rem; cursor:pointer;">✕</div>
+</div>
+
+<script>
+function viewSlip(src) {
+  document.getElementById('slipModalImg').src = src;
+  document.getElementById('slipModal').style.display = 'flex';
+}
 </script>
 </body>
 </html>

@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ສະໝັກກູ້ເງິນ | Unjai Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
   <style>
   /* ====== BRAND LOGO ====== */
@@ -224,15 +227,9 @@
             <span class="error-msg" id="e-idcard"></span>
           </div>
           <div class="form-group">
-            <label>ອາຊີບ *</label>
+            <label>ບ່ອນເຮັດວຽກ *</label>
             <select id="f-occ">
               <option value="">-- ເລືອກ --</option>
-              <option>ພະນັກງານລັດ</option>
-              <option>ພະນັກງານເອກະຊົນ</option>
-              <option>ເຈົ້າຂອງທຸລະກິດ</option>
-              <option>ຄ້າຂາຍ</option>
-              <option>ຊາວກະສິກອນ</option>
-              <option>ອື່ນໆ</option>
             </select>
             <span class="error-msg" id="e-occ"></span>
           </div>
@@ -556,7 +553,7 @@ function validate() {
     ['f-name','e-name','ກະລຸນາໃສ່ຊື່-ນາມສະກຸນ'],
     ['f-phone','e-phone','ກະລຸນາໃສ່ເບີໂທ'],
     ['f-idcard','e-idcard','ກະລຸນາໃສ່ເລກເອກະສານ'],
-    ['f-occ','e-occ','ກະລຸນາເລືອກອາຊີບ'],
+    ['f-occ','e-occ','ກະລຸນາເລືອກບ່ອນເຮັດວຽກ'],
     ['f-income','e-income','ກະລຸນາໃສ່ລາຍໄດ້'],
     ['f-address','e-address','ກະລຸນາໃສ່ທີ່ຢູ່'],
   ];
@@ -940,6 +937,13 @@ function printBarcode(loanId) {
   try {
     await DB.loadAll();
     renderProducts();
+    // Load workplace options from Supabase
+    const workOpts = await loadWorkplaceOptions().catch(() => null);
+    if (workOpts && workOpts.length) {
+      const sel = document.getElementById('f-occ');
+      if (sel) sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
+        workOpts.map(o => `<option>${o}</option>`).join('');
+    }
   } catch(err) {
     console.error(err);
     grid.innerHTML = '<p style="text-align:center;color:#c62828;padding:30px;grid-column:1/-1;">ໂຫລດຂໍ້ມູນລົ້ມເຫລວ</p>';
