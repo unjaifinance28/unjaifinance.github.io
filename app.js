@@ -614,6 +614,19 @@ function getMoneyValue(input) {
   return parseFloat((input.value || '').replace(/,/g, '')) || 0;
 }
 
+// ===== OCCUPATION OPTIONS =====
+async function loadOccupationOptions() {
+  const DEFAULTS = ["ພະນັກງານລັດ","ພະນັກງານເອກະຊົນ","ເຈົ້າຂອງທຸລະກິດ","ຄ້າຂາຍ","ອາວະກາສສຶກສາ","ອື່ນໆ"];
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','occupation_options').single();
+    if (data?.value) {
+      const opts = JSON.parse(data.value);
+      if (Array.isArray(opts) && opts.length) return opts;
+    }
+  } catch(e) {}
+  return DEFAULTS;
+}
+
 // ===== ARROW KEY NAVIGATION between form fields =====
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
