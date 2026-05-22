@@ -3044,6 +3044,16 @@ async function confirmRemittance(remitId) {
           .in('id', remit.collection_ids);
       }
 
+      // 5. Auto-record commission as expense
+      if (remit.commission > 0) {
+        const agentName = remit.agent_name || remit.agent_id || '-';
+        await DB.addExpense({
+          category: 'ຄ່າຈ້າງ Agent',
+          amount:   remit.commission,
+          note:     'ຄ່າຈ້າງ Agent: ' + agentName + ' | Remittance: ' + remitId,
+        });
+      }
+
       closeConfirm();
       showToast('ຢືນຢັນ ✅ ຄ່າຈ້າງຖືກຫັກເດືອນ ' + currentMonth);
       renderRemittances();
