@@ -467,7 +467,7 @@
           <div class="exp-form" style="gap:7px;">
             <input type="text"   id="dbt-creditor"   placeholder="ຊື່ເຈົ້າໜີ້ *" />
             <input type="text" inputmode="numeric" id="dbt-amount" placeholder="ຈຳນວນກູ້ (ກີບ) *" class="money-input" oninput="formatMoneyInput(this)" />
-            <input type="number" id="dbt-rate"        placeholder="ອັດຕາດອກ (%/ເດືອນ) *" min="0" step="0.1" />
+            <input type="number" id="dbt-rate"        placeholder="ອັດຕາດອກ (%/ເດືອນ) — 0 = ບໍ່ມີດອກ" min="0" step="0.1" />
             <div id="dbt-dates-row" style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
               <div><label style="font-size:.75rem;color:#616161;">ວັນທີກູ້</label>
                    <input type="date" id="dbt-borrow" style="width:100%;padding:7px 9px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;" /></div>
@@ -1812,14 +1812,15 @@ function debtDaysUntilDue(d) {
 function addDebt() {
   const creditor   = document.getElementById('dbt-creditor').value.trim();
   const amount     = getMoneyValue(document.getElementById('dbt-amount'));
-  const rate       = parseFloat(document.getElementById('dbt-rate').value);
+  const rateRaw    = document.getElementById('dbt-rate').value.trim();
+  const rate       = rateRaw === '' ? 0 : parseFloat(rateRaw);
   const borrowDate = document.getElementById('dbt-borrow').value;
   const dueDate    = document.getElementById('dbt-due').value;
   const note       = document.getElementById('dbt-note').value.trim();
-  if (!creditor)         { showToast('ໃສ່ຊື່ເຈົ້າໜີ້','error'); return; }
+  if (!creditor)            { showToast('ໃສ່ຊື່ເຈົ້າໜີ້','error'); return; }
   if (!amount || amount<=0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
-  if (!rate   || rate<0)    { showToast('ໃສ່ອັດຕາດອກ','error'); return; }
-  if (!borrowDate)       { showToast('ເລືອກວັນທີກູ້','error'); return; }
+  if (isNaN(rate) || rate<0){ showToast('ອັດຕາດອກຕ້ອງ >= 0','error'); return; }
+  if (!borrowDate)          { showToast('ເລືອກວັນທີກູ້','error'); return; }
   (async () => {
     try {
       await DB.addDebt({ creditor, amount, rate, borrowDate, dueDate, note });
