@@ -231,6 +231,9 @@
             <select id="f-occ">
               <option value="">-- ເລືອກ --</option>
             </select>
+            <input type="text" id="workplaceOther"
+              placeholder="ກະລຸນາລະບຸບ່ອນເຮັດວຽກຂອງທ່ານ"
+              style="display:none;margin-top:8px;" />
             <span class="error-msg" id="e-occ"></span>
           </div>
 
@@ -554,6 +557,10 @@ function validate() {
     ['f-phone','e-phone','ກະລຸນາໃສ່ເບີໂທ'],
     ['f-idcard','e-idcard','ກະລຸນາໃສ່ເລກເອກະສານ'],
     ['f-occ','e-occ','ກະລຸນາເລືອກບ່ອນເຮັດວຽກ'],
+    // 'ອື່ນໆ' requires the free-text field to be filled
+    ...(document.getElementById('f-occ')?.value === 'ອື່ນໆ'
+      ? [['workplaceOther','e-occ','ກະລຸນາລະບຸບ່ອນເຮັດວຽກ']]
+      : []),
     ['f-income','e-income','ກະລຸນາໃສ່ລາຍໄດ້'],
     ['f-address','e-address','ກະລຸນາໃສ່ທີ່ຢູ່'],
   ];
@@ -644,13 +651,18 @@ document.getElementById('applyForm').addEventListener('submit', async e => {
       idCard:   document.getElementById('f-idcard').value.trim(),
       docType:  docTypeRadio ? docTypeRadio.value : 'id',
       docImage: docImageData || null,
-      occupation: document.getElementById('f-occ').value,
+      workplace: document.getElementById('f-occ').value === 'ອື່ນໆ'
+        ? (document.getElementById('workplaceOther').value.trim() || 'ອື່ນໆ')
+        : document.getElementById('f-occ').value,
       income:   getMoneyValue(document.getElementById('f-income')),
       address:  document.getElementById('f-address').value.trim(),
       note:     document.getElementById('f-note').value.trim(),
       amount:   amt,
       duration: dur,
       totalDue: total,
+      dailyPayment: selectedProduct.paymentType === 'daily_installment' && dur > 0
+        ? Math.round(total / dur)
+        : null,
       originalRate, discountedRate, discountApplied,
     });
 
@@ -746,9 +758,9 @@ function doStatusSearch() {
     const cycleInterestDisplay = cycleInterest;
     const interestPaidDisplay  = interestPaidCycle;
 
-    // ---- Compound warning (uses interestOwed, not old interestDue) ----
+    // ---- Compound warning (only for products with compound=true) ----
     let compoundWarning = '';
-    if (l.status === 'active' && l.duration > 0 && interestOwed > 0) {
+    if (l.status === 'active' && product?.compound === true && l.duration > 0 && interestOwed > 0) {
       const cDays        = product ? (product.compoundDays || 0) : 0;
       const compoundDate = new Date(dueDate.getTime() + cDays * 86400000);
       const compStart    = new Date(compoundDate); compStart.setHours(0, 0, 0, 0);
@@ -763,9 +775,52 @@ function doStatusSearch() {
     const cardBorder = isVipLoan ? '1.5px solid #fdd835' : '1.5px solid #e0e0e0';
     const cardBg     = isVipLoan ? 'linear-gradient(135deg,#fffde7,white)' : 'white';
 
+    const isDailyLoan = product?.paymentType === 'daily_installment';
+    const dailyAmt    = l.dailyPayment || (l.duration > 0 ? Math.round((l.totalDue || 0) / l.duration) : 0);
+    const totalPaid   = l.paidAmount || 0;
+    const totalRem    = Math.max(0, (l.totalDue || 0) - totalPaid);
+    const paidDays    = dailyAmt > 0 ? Math.floor(totalPaid / dailyAmt) : 0;
+
     // ---- Payment details card (active loans only) ----
     const paymentCard = (() => {
       if (l.status !== 'active') return '';
+      if (isDailyLoan) {
+        const fmtDMY = iso => {
+          if (!iso) return '-';
+          const d = new Date(iso);
+          return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        };
+        let countdownBg, countdownColor, countdownIcon, countdownText;
+        if (daysLeft > 7) {
+          countdownBg = '#e8f5e9'; countdownColor = '#2e7d32'; countdownIcon = '🟢';
+          countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+        } else if (daysLeft >= 1) {
+          countdownBg = '#fff3e0'; countdownColor = '#e65100'; countdownIcon = '🟡';
+          countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+        } else {
+          countdownBg = '#ffebee'; countdownColor = '#c62828'; countdownIcon = '🔴';
+          countdownText = `ເກີນກຳນົດ ${Math.abs(daysLeft)} ວັນແລ້ວ`;
+        }
+        return `<div style="margin-top:10px;background:linear-gradient(135deg,#e3f2fd,#e8f5e9);border:1px solid #90caf9;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:.72rem;font-weight:800;color:#1565c0;margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase;">📅 ຜ່ອນລາຍວັນ</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-bottom:4px;">
+            <span style="color:#616161;">ຜ່ອນວັນລະ</span>
+            <span style="font-weight:800;color:#1565c0;">${formatMoney(dailyAmt)} ກີບ/ວັນ</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-bottom:4px;">
+            <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+            <span style="font-weight:700;color:#2e7d32;">${formatMoney(totalPaid)} (${paidDays} ວັນ)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;padding-top:6px;border-top:1px dashed #90caf9;margin-bottom:8px;">
+            <span style="color:#616161;">ຄ້າງຊຳລະ</span>
+            <span style="font-weight:800;color:${totalRem > 0 ? '#c62828' : '#1b5e20'};">${totalRem > 0 ? formatMoney(totalRem) : '✅ ຊຳລະຄົບ'}</span>
+          </div>
+          <div style="font-size:.77rem;color:#1565c0;font-style:italic;margin-bottom:8px;padding:5px 8px;background:rgba(21,101,192,.07);border-radius:6px;">💡 ຈ່າຍວັນລະ ${formatMoney(dailyAmt)} ກີບ ຫຼື ສະສົມຈ່າຍໄດ້ · ຄົບ ${fmtDMY(dueDate)}</div>
+          <div style="margin-top:4px;padding:7px 10px;background:${countdownBg};border-radius:8px;font-size:.83rem;font-weight:700;color:${countdownColor};text-align:center;">
+            ${countdownIcon} ${countdownText}
+          </div>
+        </div>`;
+      }
       const fmtDMY = iso => {
         if (!iso) return '-';
         const d = new Date(iso);
@@ -836,8 +891,33 @@ function doStatusSearch() {
     })();
 
     // ---- Main info grid ----
-    // Active loans: 4-line interest breakdown; other statuses: simple summary
-    const gridRows = l.status === 'active' ? `
+    // Daily installment: show principal/total/daily/paid/remaining
+    // Active lump_sum: 4-line interest breakdown; other statuses: simple summary
+    const gridRows = isDailyLoan ? (l.status === 'active' ? `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="color:#616161;">ດອກ</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterest)}</span>
+      <span style="color:#616161;">ລວມ</span>
+      <span style="font-weight:800;color:#212121;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
+      <span style="color:#616161;">ຜ່ອນວັນລະ</span>
+      <span style="font-weight:700;color:#1565c0;text-align:right;">${formatMoney(dailyAmt)} ກີບ/ວັນ</span>
+      <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">${formatMoney(totalPaid)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຄ້າງ</span>
+      <span style="font-weight:900;color:${totalRem > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${totalRem > 0 ? formatMoney(totalRem) : '✅ ຊຳລະຄົບ'}</span>
+      <span style="color:#616161;">ສະຖານະ</span>
+      <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    ` : `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      <span style="color:#616161;">ລວມ</span>
+      <span style="font-weight:700;color:#212121;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
+      <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">${formatMoney(totalPaid)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ສະຖານະ</span>
+      <span style="text-align:right;border-top:1px solid #f0f0f0;padding-top:5px;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    `) : l.status === 'active' ? `
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
       <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
       <span style="color:#616161;">ດອກເບ້ຍງວດນີ້</span>
@@ -852,7 +932,7 @@ function doStatusSearch() {
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
       <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
       <span style="color:#616161;">ດອກເບ້ຍ</span>
-      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(interestInDb)}</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterest)}</span>
       <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ລວມທັງໝົດ</span>
       <span style="font-weight:900;color:#1b5e20;border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
       <span style="color:#616161;">ສະຖານະ</span>
@@ -941,8 +1021,22 @@ function printBarcode(loanId) {
     const workOpts = await loadWorkplaceOptions().catch(() => null);
     if (workOpts && workOpts.length) {
       const sel = document.getElementById('f-occ');
-      if (sel) sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
-        workOpts.map(o => `<option>${o}</option>`).join('');
+      if (sel) {
+        sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
+          workOpts.map(o => `<option>${o}</option>`).join('');
+        sel.addEventListener('change', function() {
+          const otherInput = document.getElementById('workplaceOther');
+          if (this.value === 'ອື່ນໆ') {
+            otherInput.style.display = 'block';
+            otherInput.required = true;
+            otherInput.focus();
+          } else {
+            otherInput.style.display = 'none';
+            otherInput.required = false;
+            otherInput.value = '';
+          }
+        });
+      }
     }
   } catch(err) {
     console.error(err);
