@@ -322,6 +322,7 @@
         <button class="fbtn"    data-f="rejected"  onclick="setLoanFilter(this,'rejected')">❌ ປະຕິເສດ</button>
         <input class="sbox" id="loanSearch" placeholder="🔍 ຊື່ / ເບີ / ລະຫັດ..." oninput="renderLoans()" />
         <button class="fbtn" onclick="exportLoansCSV()" style="background:#e3f2fd;border-color:#1565c0;color:#1565c0;white-space:nowrap;">⬇️ Export CSV</button>
+        <button class="fbtn" onclick="openManualLoanModal()" style="background:#e8f5e9;border-color:#2e7d32;color:#1b5e20;font-weight:700;white-space:nowrap;">➕ ສ້າງລາຍການໃໝ່</button>
       </div>
       <div id="overdueAlert" style="display:none;background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:10px 16px;margin-bottom:10px;font-size:.84rem;color:#e65100;"></div>
       <div class="tbl-card">
@@ -1185,13 +1186,28 @@ function renderLoans() {
 function doStatus(id, newStatus) {
   const labels = { active:'ອະນຸມັດ & ໂອນເງິນ', completed:'ປິດສຳເລັດ', rejected:'ປະຕິເສດ' };
   const icons  = { active:'✅', completed:'🎉', rejected:'❌' };
-  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', `ຢືນຢັນ: ${labels[newStatus]}`, async () => {
+  const today  = new Date().toISOString().slice(0, 10);
+  const msgHtml = newStatus === 'active'
+    ? `ຢືນຢັນ: ${labels[newStatus]}<div style="margin-top:12px;">
+       <label style="font-size:.82rem;font-weight:600;color:#1b5e20;display:block;margin-bottom:5px;">📅 ວັນທີກູ້ຢືມ</label>
+       <input type="date" id="approvalDateInput" value="${today}"
+         style="width:100%;padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;"
+         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'" /></div>`
+    : `ຢືນຢັນ: ${labels[newStatus]}`;
+  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', msgHtml, async () => {
     try {
       await DB.updateLoanStatus(id, newStatus);
+      if (newStatus === 'active') {
+        const di = document.getElementById('approvalDateInput');
+        if (di?.value) {
+          const iso = new Date(di.value + 'T00:00:00').toISOString();
+          await sb.from('loans').update({ created_at: iso }).eq('id', id);
+          const loan = DB.loans.find(l => l.id === id);
+          if (loan) loan.createdAt = iso;
+        }
+      }
       closeConfirm();
-      updatePendingBadge();
-      updateAlertsBadge();
-      renderRequests();
+      updatePendingBadge(); updateAlertsBadge(); renderRequests();
       if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
       if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
       if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
@@ -3142,12 +3158,112 @@ async function confirmRemittance(remitId) {
   });
 }
 
+// ====== MANUAL LOAN MODAL ======
+function openManualLoanModal() {
+  const sel = document.getElementById('ml-product');
+  sel.innerHTML = '<option value="">-- ເລືອກຜະລິດຕະພັນ --</option>' +
+    DB.products.filter(p => p.status === 'active').map(p =>
+      `<option value="${p.id}">${p.name} (${p.interestRate}% ${p.interestType==='daily'?'ລາຍວັນ':'flat'} · ${p.duration||'?'} ວັນ)</option>`
+    ).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('ml-date').value = today;
+  ['ml-name','ml-phone','ml-idcard','ml-workplace','ml-address','ml-amount','ml-note','ml-paid'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('ml-duration').value = '';
+  document.getElementById('ml-product').value  = '';
+  document.getElementById('ml-status').value   = 'active';
+  document.getElementById('ml-doctype').value  = 'id';
+  document.getElementById('ml-paid-group').style.display = 'flex';
+  document.getElementById('ml-preview').style.display    = 'none';
+  document.getElementById('manualLoanModal').classList.add('open');
+}
+function closeManualLoanModal() {
+  document.getElementById('manualLoanModal').classList.remove('open');
+}
+function onManualStatusChange() {
+  const s = document.getElementById('ml-status').value;
+  document.getElementById('ml-paid-group').style.display = ['active','completed'].includes(s) ? 'flex' : 'none';
+}
+function onManualProdChange() {
+  const prodId = document.getElementById('ml-product').value;
+  const amt    = getMoneyValue(document.getElementById('ml-amount'));
+  const durIn  = document.getElementById('ml-duration');
+  const prev   = document.getElementById('ml-preview');
+  if (!prodId) { prev.style.display = 'none'; return; }
+  const prod = DB.products.find(p => p.id === prodId);
+  if (!prod) { prev.style.display = 'none'; return; }
+  if (prod.duration > 0 && !durIn.value) durIn.value = prod.duration;
+  const dur = parseInt(durIn.value) || prod.duration || 30;
+  if (!amt) { prev.style.display = 'none'; return; }
+  const total    = calcLoanTotal(prod, amt, dur);
+  const interest = total - amt;
+  const isDaily  = prod.paymentType === 'daily_installment';
+  const dailyAmt = isDaily && dur > 0 ? Math.round(total / dur) : 0;
+  prev.style.display = 'block';
+  prev.innerHTML = `<strong>ສະຫຼຸບ:</strong><br>
+    ເງິນຕົ້ນ: <strong>${formatMoney(amt)} ກີບ</strong> &nbsp;|&nbsp;
+    ດອກ: <strong>${formatMoney(interest)} ກີບ</strong> &nbsp;|&nbsp;
+    ຍອດລວມ: <strong>${formatMoney(total)} ກີບ</strong>
+    ${isDaily ? `<br>ຜ່ອນ/ວັນ: <strong>${formatMoney(dailyAmt)} ກີບ</strong>` : ''}`;
+}
+async function saveManualLoan() {
+  const name      = document.getElementById('ml-name').value.trim();
+  const phone     = document.getElementById('ml-phone').value.trim();
+  const prodId    = document.getElementById('ml-product').value;
+  const amount    = getMoneyValue(document.getElementById('ml-amount'));
+  const dur       = parseInt(document.getElementById('ml-duration').value) || 0;
+  const dateVal   = document.getElementById('ml-date').value;
+  const status    = document.getElementById('ml-status').value;
+  const paidAmt   = getMoneyValue(document.getElementById('ml-paid')) || 0;
+  const docType   = document.getElementById('ml-doctype').value;
+  const idCard    = document.getElementById('ml-idcard').value.trim();
+  const workplace = document.getElementById('ml-workplace').value.trim();
+  const address   = document.getElementById('ml-address').value.trim();
+  const note      = document.getElementById('ml-note').value.trim();
+  if (!name)              { showToast('ໃສ່ຊື່ລູກຄ້າ','error'); return; }
+  if (!phone)             { showToast('ໃສ່ເບີໂທ','error'); return; }
+  if (!prodId)            { showToast('ເລືອກຜະລິດຕະພັນ','error'); return; }
+  if (!amount || amount <= 0) { showToast('ໃສ່ຈຳນວນກູ້','error'); return; }
+  if (!dur || dur <= 0)   { showToast('ໃສ່ໄລຍະ','error'); return; }
+  if (!dateVal)           { showToast('ເລືອກວັນທີ','error'); return; }
+  const prod = DB.products.find(p => p.id === prodId);
+  if (!prod) { showToast('ບໍ່ພົບຜະລິດຕະພັນ','error'); return; }
+  const totalDue  = calcLoanTotal(prod, amount, dur);
+  const isDaily   = prod.paymentType === 'daily_installment';
+  const dailyPay  = isDaily && dur > 0 ? Math.round(totalDue / dur) : null;
+  const createdAt = new Date(dateVal + 'T00:00:00').toISOString();
+  const id        = 'LAO' + Date.now().toString().slice(-6);
+  const row = {
+    id,
+    product_id: prodId, product_name: prod.name,
+    name, phone,
+    id_card: idCard || null, doc_type: docType, doc_image: null,
+    occupation: workplace || null, income: null,
+    address: address || null, note: note || '',
+    amount, duration: dur, total_due: totalDue,
+    status, paid_amount: paidAmt,
+    created_at: createdAt,
+    original_principal: amount, remaining_principal: amount,
+    interest_paid: 0, daily_payment: dailyPay,
+  };
+  try {
+    const { data: r, error } = await sb.from('loans').insert(row).select().single();
+    if (error) throw error;
+    DB.loans.push(mapLoan(r));
+    closeManualLoanModal();
+    updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
+    showToast('ສ້າງສັນຍາ ✅');
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
 // Backdrop close
-['loanModal','confirmModal','debtPayModal'].forEach(id => {
+['loanModal','confirmModal','debtPayModal','manualLoanModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e){
     if (e.target === this) {
       if (id==='loanModal') closeLoanModal();
       else if (id==='debtPayModal') closeDebtPayModal();
+      else if (id==='manualLoanModal') closeManualLoanModal();
       else closeConfirm();
     }
   });
@@ -3157,6 +3273,81 @@ async function confirmRemittance(remitId) {
   });
 });
 </script>
+
+<!-- ====== MANUAL LOAN MODAL ====== -->
+<div class="modal-overlay" id="manualLoanModal">
+  <div class="modal" style="max-width:600px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;padding:18px 20px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:.65rem;opacity:.7;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">Admin</div>
+        <div style="font-size:1.1rem;font-weight:800;">➕ ສ້າງສັນຍາກູ້ໃໝ່</div>
+      </div>
+      <button onclick="closeManualLoanModal()" style="background:rgba(255,255,255,.2);border:none;color:white;font-size:1.1rem;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;max-height:calc(90vh - 110px);overflow-y:auto;">
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi"><label>ຊື່ລູກຄ້າ *</label><input type="text" id="ml-name" placeholder="ຊື່-ນາມສະກຸນ" /></div>
+        <div class="fi"><label>ເບີໂທ *</label><input type="text" id="ml-phone" placeholder="020XXXXXXXX" inputmode="tel" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ປະເພດເອກະສານ</label>
+          <select id="ml-doctype">
+            <option value="id">🪪 ບັດປະຈຳໂຕ</option>
+            <option value="family">📖 ສຳມະໂນຄົວ</option>
+            <option value="passport">✈️ ພາດສະປອດ</option>
+          </select>
+        </div>
+        <div class="fi"><label>ເລກເອກະສານ</label><input type="text" id="ml-idcard" placeholder="ເລກບັດ / ສຳໂນ" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi"><label>ບ່ອນເຮັດວຽກ</label><input type="text" id="ml-workplace" placeholder="ຊື່ບ່ອນເຮັດວຽກ" /></div>
+        <div class="fi"><label>ທີ່ຢູ່</label><input type="text" id="ml-address" placeholder="ທີ່ຢູ່" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ຜະລິດຕະພັນ *</label>
+          <select id="ml-product" onchange="onManualProdChange()"><option value="">-- ເລືອກ --</option></select>
+        </div>
+        <div class="fi">
+          <label>ຈຳນວນກູ້ (ກີບ) *</label>
+          <input type="text" inputmode="numeric" id="ml-amount" placeholder="ຈຳນວນ" class="money-input" oninput="formatMoneyInput(this);onManualProdChange()" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ໄລຍະ (ວັນ) *</label>
+          <input type="number" id="ml-duration" placeholder="30" min="1" oninput="onManualProdChange()" />
+        </div>
+        <div class="fi"><label>📅 ວັນທີກູ້ຢືມ *</label><input type="date" id="ml-date" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ສະຖານະ *</label>
+          <select id="ml-status" onchange="onManualStatusChange()">
+            <option value="pending">⏳ ລໍຖ້າ</option>
+            <option value="active" selected>💰 ດຳເນີນ</option>
+            <option value="completed">🎉 ສຳເລັດ</option>
+            <option value="rejected">❌ ປະຕິເສດ</option>
+          </select>
+        </div>
+        <div class="fi" id="ml-paid-group">
+          <label>ຊຳລະແລ້ວ (ກີບ)</label>
+          <input type="text" inputmode="numeric" id="ml-paid" placeholder="0" class="money-input" oninput="formatMoneyInput(this)" />
+        </div>
+      </div>
+      <div class="fi" style="margin-bottom:12px;">
+        <label>ໝາຍເຫດ</label>
+        <textarea id="ml-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" style="min-height:50px;"></textarea>
+      </div>
+      <div id="ml-preview" style="display:none;background:#e8f5e9;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.85rem;color:#1b5e20;line-height:1.8;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary btn-full" style="padding:12px;" onclick="saveManualLoan()">💾 ສ້າງສັນຍາ</button>
+        <button class="btn btn-outline" style="padding:12px 18px;" onclick="closeManualLoanModal()">ຍົກເລີກ</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="slipModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:zoom-out; align-items:center; justify-content:center;" onclick="document.getElementById('slipModal').style.display='none'">
   <img id="slipModalImg" style="max-width:90%; max-height:90vh; border-radius:12px; box-shadow:0 4px 32px rgba(0,0,0,0.5);" />
