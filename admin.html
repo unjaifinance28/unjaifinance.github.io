@@ -795,10 +795,18 @@
 <script src="app.js"></script>
 <script>
 // ====== LOGO ======
-(function() {
-  const saved = localStorage.getItem('uf_logo');
-  if (saved) applyLogo(saved);
-})();
+async function loadLogo() {
+  const cached = localStorage.getItem('uf_logo');
+  if (cached) applyLogo(cached);
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','company_logo').single();
+    if (data?.value) {
+      applyLogo(data.value);
+      localStorage.setItem('uf_logo', data.value);
+    }
+  } catch {}
+}
+loadLogo();
 
 function applyLogo(dataUrl) {
   const pb = document.getElementById('logoPreviewBox');
@@ -820,7 +828,7 @@ function uploadLogo(input) {
   reader.onload = function(e) {
     // Compress to 200px
     const img = new Image();
-    img.onload = function() {
+    img.onload = async function() {
       let w = img.width, h = img.height, maxW = 200;
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       const canvas = document.createElement('canvas');
@@ -829,7 +837,13 @@ function uploadLogo(input) {
       const compressed = canvas.toDataURL('image/jpeg', 0.85);
       localStorage.setItem('uf_logo', compressed);
       applyLogo(compressed);
-      document.getElementById('logoMsg').textContent = '✅ ບັນທຶກໂລໂກ້ສຳເລັດ';
+      try {
+        await sb.from('app_settings').upsert({ key: 'company_logo', value: compressed, updated_at: new Date().toISOString() });
+        document.getElementById('logoMsg').textContent = '✅ ບັນທຶກໂລໂກ້ສຳເລັດ (ທຸກອຸປະກອນ)';
+      } catch(err) {
+        document.getElementById('logoMsg').textContent = '⚠️ ບັນທຶກສຳເລັດສະເພາະອຸປະກອນນີ້';
+        console.warn('Logo Supabase save failed:', err);
+      }
       showToast('ອັບໂຫລດໂລໂກ້ ✅');
       setTimeout(() => { document.getElementById('logoMsg').textContent = ''; }, 3000);
     };
@@ -838,8 +852,11 @@ function uploadLogo(input) {
   reader.readAsDataURL(file);
 }
 
-function removeLogo() {
+async function removeLogo() {
   localStorage.removeItem('uf_logo');
+  try {
+    await sb.from('app_settings').delete().eq('key', 'company_logo');
+  } catch(err) { console.warn('Logo Supabase delete failed:', err); }
   const pb = document.getElementById('logoPreviewBox');
   if (pb) pb.innerHTML = '🏦';
   const rb = document.getElementById('logoRemoveBtn');
