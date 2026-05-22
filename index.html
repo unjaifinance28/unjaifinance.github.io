@@ -937,12 +937,12 @@ function printBarcode(loanId) {
   try {
     await DB.loadAll();
     renderProducts();
-    // Load occupation options from Supabase
-    const occOpts = await loadOccupationOptions().catch(() => null);
-    if (occOpts && occOpts.length) {
+    // Load workplace options from Supabase
+    const workOpts = await loadWorkplaceOptions().catch(() => null);
+    if (workOpts && workOpts.length) {
       const sel = document.getElementById('f-occ');
       if (sel) sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
-        occOpts.map(o => `<option>${o}</option>`).join('');
+        workOpts.map(o => `<option>${o}</option>`).join('');
     }
   } catch(err) {
     console.error(err);

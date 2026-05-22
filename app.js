@@ -19,7 +19,7 @@ const mapProduct = r => ({
 const mapLoan = r => ({
   id: r.id, productId: r.product_id, productName: r.product_name,
   name: r.name, phone: r.phone, idCard: r.id_card, docType: r.doc_type, docImage: r.doc_image,
-  occupation: r.occupation, income: r.income, address: r.address, note: r.note || '',
+  workplace: r.occupation, income: r.income, address: r.address, note: r.note || '',
   amount: r.amount, duration: r.duration, totalDue: r.total_due,
   status: r.status, paidAmount: r.paid_amount || 0, createdAt: r.created_at,
   originalPrincipal: r.original_principal ?? r.amount,
@@ -234,7 +234,7 @@ const DB = {
       id, product_id: data.productId, product_name: data.productName,
       name: data.name, phone: data.phone, id_card: data.idCard,
       doc_type: data.docType, doc_image: data.docImage,
-      occupation: data.occupation, income: data.income,
+      occupation: data.workplace, income: data.income,
       address: data.address, note: data.note || '',
       amount: data.amount, duration: data.duration, total_due: data.totalDue,
       status: 'pending', paid_amount: 0,
@@ -614,11 +614,11 @@ function getMoneyValue(input) {
   return parseFloat((input.value || '').replace(/,/g, '')) || 0;
 }
 
-// ===== OCCUPATION OPTIONS =====
-async function loadOccupationOptions() {
-  const DEFAULTS = ["ພະນັກງານລັດ","ພະນັກງານເອກະຊົນ","ເຈົ້າຂອງທຸລະກິດ","ຄ້າຂາຍ","ອາວະກາສສຶກສາ","ອື່ນໆ"];
+// ===== WORKPLACE OPTIONS =====
+async function loadWorkplaceOptions() {
+  const DEFAULTS = ["ພະນັກງານລັດ","ພະນັກງານເອກະຊົນ","ເຈົ້າຂອງທຸລະກິດ","ຄ້າຂາຍ","ອາວະກາດສຶກສາ","ອື່ນໆ"];
   try {
-    const { data } = await sb.from('app_settings').select('value').eq('key','occupation_options').single();
+    const { data } = await sb.from('app_settings').select('value').eq('key','workplace_options').single();
     if (data?.value) {
       const opts = JSON.parse(data.value);
       if (Array.isArray(opts) && opts.length) return opts;
