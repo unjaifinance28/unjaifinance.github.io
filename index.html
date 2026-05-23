@@ -887,7 +887,12 @@ function doStatusSearch() {
         warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`;
       }
 
-      const interestNextHtml = interestOwed > 0
+      const interestNextHtml = interestRate === 0
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຕົ້ນທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:${principal > 0 ? '#c62828' : '#2e7d32'};">${principal > 0 ? formatMoney(principal) : '✅ ຊຳລະຄົບ'}</span>
+           </div>`
+        : interestOwed > 0
         ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
              <span style="color:#616161;">ດອກທີ່ຕ້ອງຊຳລະ</span>
              <span style="font-weight:700;color:#e65100;">${formatMoney(interestOwed)}</span>
@@ -950,6 +955,8 @@ function doStatusSearch() {
       ${interestRate === 0 ? `
       <span style="color:#616161;">ດອກເບ້ຍ</span>
       <span style="font-weight:700;color:#2e7d32;text-align:right;">🎁 ບໍ່ມີ (0%)</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຍັງຕ້ອງຊຳລະ</span>
+      <span style="font-weight:900;color:${principal > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${principal > 0 ? formatMoney(principal) : '✅ ຊຳລະຄົບ'}</span>
       ` : `
       <span style="color:#616161;">ດອກເບ້ຍງວດນີ້</span>
       <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterestDisplay)}</span>

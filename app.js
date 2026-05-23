@@ -376,9 +376,14 @@ const DB = {
 
     const curPrincipal = loan.remainingPrincipal ?? loan.amount;
     const interestDue  = Math.max(0, loan.totalDue - curPrincipal);
+    const isZeroInterest = (loan.totalDue || 0) <= (loan.amount || 0);
 
     let interestCollected, principalReduced;
-    if (amount >= interestDue) {
+    if (isZeroInterest || interestDue === 0) {
+      // 0% interest loan — entire payment reduces principal directly
+      interestCollected = 0;
+      principalReduced  = amount;
+    } else if (amount >= interestDue) {
       interestCollected = interestDue;
       principalReduced  = amount - interestDue;
     } else {

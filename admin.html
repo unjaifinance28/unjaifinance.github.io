@@ -438,16 +438,19 @@
           💵 ຍອດເງິນໃນບັນຊີປັດຈຸບັນ
         </div>
         <div style="margin-bottom:14px;padding:12px;background:#f9fbe7;border-radius:10px;border:1px solid #dce775;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <label for="opening-balance-input" style="font-size:.78rem;font-weight:700;color:#558b2f;">💰 ຍອດຍົກມາ / ທຶນເລີ່ມຕົ້ນ</label>
-            <span id="ob-saved" style="font-size:.72rem;font-weight:600;color:#2e7d32;opacity:0;transition:opacity .4s;"></span>
+          <label style="font-size:.78rem;font-weight:700;color:#558b2f;display:block;margin-bottom:6px;">💰 ຍອດຍົກມາ / ທຶນເລີ່ມຕົ້ນ</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" inputmode="numeric" id="opening-balance-input"
+              placeholder="0"
+              class="money-input"
+              oninput="formatMoneyInput(this)"
+              style="flex:1;padding:8px 12px;border:2px solid #c5e1a5;border-radius:8px;font-family:inherit;font-size:.9rem;outline:none;box-sizing:border-box;" />
+            <button onclick="saveOpeningBalanceNow()"
+              style="background:#1b5e20;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:700;white-space:nowrap;">
+              💾 ບັນທຶກ
+            </button>
           </div>
-          <input type="text" inputmode="numeric" id="opening-balance-input"
-            placeholder="ໃສ່ຍອດເງິນກ່ອນເລີ່ມໃຊ້ລະບົບ"
-            class="money-input"
-            oninput="formatMoneyInput(this)"
-            onblur="saveOpeningBalanceInput()"
-            style="width:100%;padding:8px 12px;border:1px solid #c5e1a5;border-radius:8px;font-family:inherit;font-size:.88rem;box-sizing:border-box;outline:none;" />
+          <span id="ob-save-msg" style="font-size:.75rem;margin-top:5px;display:block;min-height:1.2em;"></span>
         </div>
         <div id="balBreakdown"></div>
       </div>
@@ -942,29 +945,33 @@ async function saveAdminPwd(newPwd) {
 
 let _openingBalance = 0;
 async function getOpeningBalance() {
-  try {
-    const { data } = await sb.from('app_settings').select('value').eq('key','opening_balance').single();
-    return data ? parseFloat(data.value) || 0 : 0;
-  } catch { return 0; }
+  const { data, error } = await sb.from('app_settings').select('value').eq('key','opening_balance').single();
+  console.log('[opening_balance] load:', data?.value, error?.message);
+  if (error) return 0;
+  const val = parseFloat(data?.value) || 0;
+  console.log('[opening_balance] loaded value:', val);
+  return val;
 }
-async function saveOpeningBalance(val) {
-  await sb.from('app_settings').upsert({ key:'opening_balance', value: String(val), updated_at: new Date().toISOString() });
-}
-async function saveOpeningBalanceInput() {
+async function saveOpeningBalanceNow() {
   const inp = document.getElementById('opening-balance-input');
-  const val = getMoneyValue(inp);
-  if (val === _openingBalance) return;
-  _openingBalance = val;
-  renderCurrentBalance();
-  try {
-    await saveOpeningBalance(val);
-    const lbl = document.getElementById('ob-saved');
-    if (lbl) {
-      lbl.textContent = 'ບັນທຶກແລ້ວ ✓';
-      lbl.style.opacity = '1';
-      setTimeout(() => { lbl.style.opacity = '0'; }, 2000);
-    }
-  } catch(err) { showToast('ບັນທຶກລົ້ມເຫລວ: ' + err.message, 'error'); }
+  const msg = document.getElementById('ob-save-msg');
+  const amount = getMoneyValue(inp);
+  console.log('[opening_balance] saving:', amount);
+  msg.style.color = '#9e9e9e';
+  msg.textContent = 'ກຳລັງບັນທຶກ...';
+  const { data, error } = await sb.from('app_settings')
+    .upsert({ key: 'opening_balance', value: String(amount) }, { onConflict: 'key' });
+  console.log('[opening_balance] save result — data:', data, '| error:', error);
+  if (error) {
+    msg.style.color = '#c62828';
+    msg.textContent = '❌ Error: ' + error.message;
+  } else {
+    _openingBalance = amount;
+    renderCurrentBalance();
+    msg.style.color = '#2e7d32';
+    msg.textContent = '✅ ບັນທຶກສຳເລັດ';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  }
 }
 
 async function doLogin() {
@@ -1128,6 +1135,7 @@ async function initAdmin() {
   if (overlay) overlay.style.display = 'flex';
   try {
     await DB.loadAll();
+    _openingBalance = await getOpeningBalance().catch(() => 0);
     updatePendingBadge();
     updateAlertsBadge();
     updateRemitBadge();
@@ -2027,7 +2035,12 @@ function deleteExpense(id) {
   })();
 }
 
-function renderPerf() {
+async function renderPerf() {
+  // ── Opening balance — load first so balance calc is correct ────────
+  _openingBalance = await getOpeningBalance().catch(() => _openingBalance);
+  const inp = document.getElementById('opening-balance-input');
+  if (inp) inp.value = _openingBalance > 0 ? _openingBalance.toLocaleString('en-US') : '';
+
   // ── Core loan metrics ──────────────────────────────────────────────
   const activeLns  = DB.loans.filter(l=>l.status==='active');
   const totalLoans = DB.loans.length;
@@ -2209,15 +2222,9 @@ function renderPerf() {
     </tr></thead>
     <tbody>${prodRows.join('')}</tbody>`;
 
-  // ── Current balance (sync with cached value) + async refresh ──────
+  // ── Balance + other income ─────────────────────────────────────────
   renderCurrentBalance();
-  Promise.all([getOpeningBalance(), loadOtherIncome()]).then(([ob]) => {
-    _openingBalance = ob;
-    const inp = document.getElementById('opening-balance-input');
-    if (inp && ob > 0) inp.value = ob.toLocaleString('en-US');
-    renderCurrentBalance();
-    renderOtherIncome();
-  });
+  loadOtherIncome().then(() => renderOtherIncome());
 }
 
 // ====== OVERDUE HELPERS ======
@@ -3622,7 +3629,7 @@ function renderCurrentBalance() {
     const color = plus ? '#2e7d32' : '#c62828';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.85rem;">
       <span style="color:#616161;">${sign} ${label}</span>
-      <span style="font-weight:700;color:${color};">${formatMoney(Math.round(value))} ກີບ</span>
+      <span style="font-weight:700;color:${color};">${formatMoney(Math.round(value))}</span>
     </div>`;
   };
 
