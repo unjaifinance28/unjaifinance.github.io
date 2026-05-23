@@ -1554,6 +1554,7 @@ function openLoanModal(id, focus) {
       acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
     }
   }
+  acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
 
   // Barcode
@@ -1573,6 +1574,92 @@ function openLoanModal(id, focus) {
   }
 
   document.getElementById('loanModal').classList.add('open');
+}
+
+function printCustomerCard(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+
+  const logo    = localStorage.getItem('uf_logo') || '';
+  const logoHtml = logo
+    ? `<img src="${logo}" style="height:28px;border-radius:4px;vertical-align:middle;">`
+    : `<span style="font-weight:900;font-size:1.1rem;">UF</span>`;
+
+  const product  = DB.products.find(p => p.id === loan.productId);
+  const prodDesc = product
+    ? `${product.duration || '-'}ວັນ ${product.interestRate}%`
+    : (loan.productName || '-');
+
+  const win = window.open('', '_blank', 'width=420,height=320,menubar=no,toolbar=no,location=no');
+  if (!win) { showToast('ກະລຸນາອະນຸຍາດ popup', 'error'); return; }
+
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#e0e0e0; display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:'Noto Sans Lao','Noto Sans',sans-serif; }
+  .card {
+    width:320px; height:200px; border-radius:12px;
+    box-shadow:0 4px 20px rgba(0,0,0,.25); overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .card-header {
+    background:linear-gradient(135deg,#1b5e20,#2e7d32);
+    color:white; padding:10px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .card-header .brand { display:flex; align-items:center; gap:8px; }
+  .card-header .co-name { font-size:.82rem; font-weight:800; letter-spacing:.5px; }
+  .card-header .loan-id { font-size:.68rem; opacity:.8; letter-spacing:1px; }
+  .card-body { background:white; flex:1; padding:8px 14px 4px; display:flex; flex-direction:column; justify-content:space-between; }
+  .info-grid { display:grid; grid-template-columns:auto 1fr; gap:1px 8px; font-size:.72rem; }
+  .info-lbl { color:#9e9e9e; white-space:nowrap; }
+  .info-val { color:#212121; font-weight:700; }
+  .barcode-wrap { text-align:center; margin-top:2px; }
+  @media print {
+    body { background:white; }
+    .card { box-shadow:none; width:85mm; height:54mm; }
+    .no-print { display:none; }
+  }
+</style>
+</head><body>
+<div>
+  <div class="card">
+    <div class="card-header">
+      <div class="brand">
+        ${logoHtml}
+        <span class="co-name">Unjai Finance</span>
+      </div>
+      <span class="loan-id">${loan.id}</span>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <span class="info-lbl">ຊື່</span>
+        <span class="info-val">${loan.name || '-'}</span>
+        <span class="info-lbl">ເບີ</span>
+        <span class="info-val">${loan.phone || '-'}</span>
+        <span class="info-lbl">ຜະລິດຕະພັນ</span>
+        <span class="info-val">${prodDesc}</span>
+      </div>
+      <div class="barcode-wrap">
+        <svg id="bc"></svg>
+      </div>
+    </div>
+  </div>
+  <div class="no-print" style="text-align:center;margin-top:14px;">
+    <button onclick="window.print()" style="padding:8px 24px;background:#1b5e20;color:white;border:none;border-radius:8px;font-size:.88rem;cursor:pointer;font-family:inherit;">🖨 ພິມ</button>
+    <button onclick="window.close()" style="padding:8px 16px;margin-left:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;font-size:.88rem;cursor:pointer;font-family:inherit;">ປິດ</button>
+  </div>
+</div>
+<script>
+  JsBarcode('#bc', '${loan.id}', {
+    format:'CODE128', width:1.6, height:45,
+    displayValue:true, fontSize:10, margin:2,
+    lineColor:'#1b5e20',
+  });
+<\/script>
+</body></html>`);
+  win.document.close();
 }
 
 function printBarcodeCard() {
