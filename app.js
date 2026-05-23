@@ -584,6 +584,7 @@ const DB = {
 
 // ===== UTILS =====
 function calcLoanTotal(product, amount, customDays) {
+  if (product.interestRate === 0) return amount;
   const days = customDays || product.duration || 30;
   if (product.interestType === 'flat')
     return Math.round(amount * (1 + product.interestRate / 100));
