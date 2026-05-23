@@ -39,9 +39,9 @@ const mapExpense = r => ({
   id: r.id, category: r.category, amount: r.amount, note: r.note || '', date: r.date,
 });
 const mapDebt = r => ({
-  id: r.id, creditor: r.creditor, amount: r.amount, rate: r.rate,
+  id: r.id, creditor: r.creditor, amount: r.amount, rate: r.interest_rate,
   borrowDate: r.borrow_date, dueDate: r.due_date, note: r.note || '',
-  status: r.status, settledDate: r.settled_date, createdAt: r.created_at,
+  status: r.status, createdAt: r.created_at,
 });
 const mapDebtPayment = r => ({
   id: r.id, debtId: r.debt_id, amount: r.amount, method: r.method,
@@ -440,10 +440,10 @@ const DB = {
   async addDebt(data) {
     const id = 'DBT' + Date.now();
     const { data: r, error } = await sb.from('debts').insert({
-      id, creditor: data.creditor, amount: data.amount, rate: data.rate,
+      id, creditor: data.creditor, amount: data.amount, interest_rate: data.rate,
       borrow_date: data.borrowDate || null, due_date: data.dueDate || null,
       note: data.note || '', status: 'active',
-      settled_date: null, created_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     const d = mapDebt(r);
@@ -453,8 +453,7 @@ const DB = {
 
   async updateDebt(id, data) {
     const row = {};
-    if (data.status      !== undefined) row.status       = data.status;
-    if (data.settledDate !== undefined) row.settled_date = data.settledDate;
+    if (data.status !== undefined) row.status = data.status;
     const { error } = await sb.from('debts').update(row).eq('id', id);
     if (error) throw error;
     const i = this.debts.findIndex(d => d.id === id);
@@ -577,7 +576,7 @@ const DB = {
     this.debtPayments.push(p);
     const totalRepaid = this.debtPayments.filter(x => x.debtId === debtId).reduce((s, x) => s + x.amount, 0);
     if (totalRepaid >= debt.amount && debt.status !== 'settled') {
-      await this.updateDebt(debtId, { status: 'settled', settledDate: new Date().toISOString() });
+      await this.updateDebt(debtId, { status: 'settled' });
     }
     return p;
   },

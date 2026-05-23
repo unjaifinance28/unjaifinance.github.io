@@ -213,6 +213,9 @@
     /* Debt form date row */
     #dbt-dates-row { grid-template-columns:1fr !important; }
   }
+  /* ====== CURRENT BALANCE CARD ====== */
+  .bal-card { background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border-radius:16px; padding:22px 24px; box-shadow:0 2px 12px rgba(27,94,32,.12); margin-bottom:16px; border:1.5px solid #c8e6c9; }
+
   /* ====== MONEY INPUT ====== */
   .money-input { text-align:right; letter-spacing:.5px; }
 
@@ -287,12 +290,12 @@
       <button class="atab" onclick="showTab('loans',this)">💰 ລາຍການກູ້</button>
       <button class="atab" onclick="showTab('products',this)">📦 ຜະລິດຕະພັນ</button>
       <button class="atab" onclick="showTab('perf',this)">📊 ຜົນດຳເນີນງານ</button>
-      <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
       <button class="atab" onclick="showTab('alerts',this)">🔔 ແຈ້ງເຕືອນ <span id="badge-alerts" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
       <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
       <button class="atab" onclick="showTab('remit',this)">📤 ການສົ່ງເງິນ <span id="badge-remit" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
+      <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
     </div>
 
     <!-- ====== TAB: REQUESTS ====== -->
@@ -427,6 +430,15 @@
 
     <!-- ====== TAB: PERFORMANCE ====== -->
     <div id="tab-perf" class="tab-pane">
+
+      <!-- Current Balance Card -->
+      <div class="bal-card">
+        <div style="font-size:.88rem;font-weight:800;color:#1b5e20;margin-bottom:12px;">
+          💵 ຍອດເງິນໃນບັນຊີປັດຈຸບັນ
+        </div>
+        <div id="balBreakdown"></div>
+      </div>
+
       <div class="kpi-row" id="perfKpi"></div>
 
       <!-- P&L Summary -->
@@ -455,6 +467,30 @@
             <button class="btn btn-primary" style="padding:8px;" onclick="addExpense()">+ ບັນທຶກ</button>
           </div>
           <div id="expList"></div>
+        </div>
+      </div>
+
+      <!-- ====== OTHER INCOME ====== -->
+      <div class="sec-title" style="margin-top:6px;">💚 ລາຍໄດ້ອື່ນໆ</div>
+      <div class="perf-grid">
+        <div class="perf-card">
+          <h3>➕ ບັນທຶກລາຍໄດ້</h3>
+          <div class="exp-form">
+            <select id="incCat">
+              <option value="">-- ໝວດ --</option>
+              <option>ຄ່າບໍລິການ</option>
+              <option>ຄ່າທຳນຽມ</option>
+              <option>ລາຍໄດ້ອື່ນໆ</option>
+            </select>
+            <input type="text" inputmode="numeric" id="incAmt" placeholder="ຈຳນວນ (ກີບ)" class="money-input" oninput="formatMoneyInput(this)" />
+            <input type="text" id="incNote" placeholder="ໝາຍເຫດ" />
+            <input type="date" id="incDate" />
+            <button class="btn btn-primary" style="padding:8px;" onclick="addOtherIncome()">+ ບັນທຶກລາຍໄດ້</button>
+          </div>
+        </div>
+        <div class="perf-card">
+          <h3>📋 ລາຍໄດ້ທີ່ບັນທຶກ</h3>
+          <div id="otherIncomeList"></div>
         </div>
       </div>
 
@@ -493,6 +529,7 @@
           <table id="perfProdTable"></table>
         </div>
       </div>
+
     </div>
 
     <!-- ====== TAB: SETTINGS ====== -->
@@ -1799,9 +1836,9 @@ function debtRemaining(d) {
 }
 function debtAccruedInterest(d) {
   const start = new Date(d.borrowDate || d.createdAt);
-  const end   = d.status === 'settled' ? new Date(d.settledDate) : new Date();
+  const end   = (d.status === 'settled' && d.dueDate) ? new Date(d.dueDate) : new Date();
   const days  = Math.max(0, Math.floor((end - start) / 86400000));
-  return Math.round(d.amount * (d.rate / 100 / 30) * days);
+  return Math.round(d.amount * ((d.rate || 0) / 100 / 30) * days);
 }
 function debtDaysUntilDue(d) {
   if (!d.dueDate) return null;
@@ -2059,6 +2096,9 @@ function renderPerf() {
       <th style="padding:10px 13px;">ດອກຮັບ</th>
     </tr></thead>
     <tbody>${prodRows.join('')}</tbody>`;
+
+  // ── Other income + current balance ────────────────────────────────
+  loadOtherIncome().then(() => { renderOtherIncome(); renderCurrentBalance(); });
 }
 
 // ====== OVERDUE HELPERS ======
@@ -3403,6 +3443,120 @@ async function saveManualLoan() {
       document.getElementById('slipModal').style.display = 'none';
   });
 });
+
+function renderCurrentBalance() {
+  const activeLns     = DB.loans.filter(l => l.status === 'active');
+  const completedLns  = DB.loans.filter(l => l.status === 'completed');
+  const nonPendRejLns = DB.loans.filter(l => !['pending','rejected'].includes(l.status));
+
+  const totalDebtsBorrowed     = DB.debts.reduce((s,d) => s + (d.amount || 0), 0);
+  const totalInterestReceived  = nonPendRejLns.reduce((s,l) => s + (l.interestPaid || 0), 0);
+  const totalPrincipalReturned = completedLns.reduce((s,l) => s + (l.amount || 0), 0);
+  const totalActiveLoans       = activeLns.reduce((s,l) => s + (l.amount || 0), 0);
+  const totalExpenses          = DB.expenses.reduce((s,e) => s + (e.amount || 0), 0);
+  const totalDebtRepayments    = (DB.debtPayments || []).reduce((s,p) => s + (p.amount || 0), 0);
+  const totalOtherIncome       = _otherIncome.reduce((s,r) => s + (r.amount || 0), 0);
+
+  const balance = totalDebtsBorrowed + totalInterestReceived + totalPrincipalReturned
+                + totalOtherIncome - totalActiveLoans - totalExpenses - totalDebtRepayments;
+
+  const totalCapital = totalDebtsBorrowed || 1;
+  const balColor = balance < 0 ? '#c62828'
+    : balance < totalCapital * 0.1 ? '#e65100'
+    : '#1b5e20';
+
+  const row = (plus, label, value) => {
+    const sign  = plus ? '+' : '−';
+    const color = plus ? '#1565c0' : '#c62828';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.84rem;">
+      <span style="color:#616161;">${sign} ${label}</span>
+      <span style="font-weight:700;color:${color};">${sign}${formatMoney(value)} ກີບ</span>
+    </div>`;
+  };
+
+  const totalSign = balance < 0 ? '−' : '';
+
+  const bdEl = document.getElementById('balBreakdown');
+  if (!bdEl) return;
+  bdEl.innerHTML =
+    row(true,  'ທຶນກູ້ຢືມ',    totalDebtsBorrowed) +
+    row(true,  'ດອກຮັບໄດ້',    totalInterestReceived) +
+    row(true,  'ຕົ້ນຄືນ',      totalPrincipalReturned) +
+    row(true,  'ລາຍໄດ້ອື່ນໆ',  totalOtherIncome) +
+    row(false, 'ຢູ່ນຳລູກຄ້າ', totalActiveLoans) +
+    row(false, 'ລາຍຈ່າຍ',      totalExpenses) +
+    row(false, 'ຈ່າຍໜີ້',      totalDebtRepayments) +
+    `<div style="border-top:2px solid rgba(27,94,32,.25);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline;">
+       <span style="font-size:.88rem;font-weight:800;color:#424242;">ຍອດລວມ</span>
+       <span style="font-size:1.6rem;font-weight:900;color:${balColor};">${totalSign}${formatMoney(Math.abs(balance))}&thinsp;<span style="font-size:.9rem;font-weight:500;color:#9e9e9e;">ກີບ</span></span>
+     </div>`;
+}
+
+// ====== OTHER INCOME ======
+let _otherIncome = [];
+
+async function loadOtherIncome() {
+  try {
+    const { data } = await sb.from('other_income').select('*').order('date', { ascending: false });
+    _otherIncome = (data || []).map(r => ({
+      id: r.id,
+      category: r.category,
+      amount: r.amount,
+      note: r.note || '',
+      date: r.date
+    }));
+  } catch { _otherIncome = []; }
+}
+
+function renderOtherIncome() {
+  const el = document.getElementById('otherIncomeList');
+  if (!el) return;
+  if (!_otherIncome.length) {
+    el.innerHTML = '<p style="text-align:center;color:#9e9e9e;font-size:.82rem;padding:12px;">ຍັງບໍ່ມີ</p>';
+    return;
+  }
+  el.innerHTML = _otherIncome.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;gap:8px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:700;color:#1b5e20;">${r.category}</div>
+        <div style="font-size:.75rem;color:#9e9e9e;">${r.date}${r.note ? ' · ' + r.note : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:800;color:#2e7d32;white-space:nowrap;">+${formatMoney(r.amount)} ກີບ</span>
+        <button class="act-btn a-del" onclick="deleteOtherIncome('${r.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function addOtherIncome() {
+  const cat  = document.getElementById('incCat').value;
+  const amt  = getMoneyValue(document.getElementById('incAmt'));
+  const note = document.getElementById('incNote').value.trim();
+  const date = document.getElementById('incDate').value || new Date().toISOString().slice(0,10);
+  if (!cat)  { showToast('ເລືອກໝວດ','error'); return; }
+  if (!amt)  { showToast('ໃສ່ຈຳນວນ','error'); return; }
+  try {
+    await sb.from('other_income').insert({ category: cat, amount: amt, note, date });
+    document.getElementById('incCat').value  = '';
+    document.getElementById('incAmt').value  = '';
+    document.getElementById('incNote').value = '';
+    document.getElementById('incDate').value = '';
+    showToast('ບັນທຶກລາຍໄດ້ ✅');
+    await loadOtherIncome();
+    renderOtherIncome();
+    renderCurrentBalance();
+  } catch { showToast('ບັນທຶກບໍ່ໄດ້','error'); }
+}
+
+async function deleteOtherIncome(id) {
+  try {
+    await sb.from('other_income').delete().eq('id', id);
+    showToast('ລຶບສຳເລັດ');
+    await loadOtherIncome();
+    renderOtherIncome();
+    renderCurrentBalance();
+  } catch { showToast('ລຶບບໍ່ໄດ້','error'); }
+}
 </script>
 
 <!-- ====== VIP UPGRADE MODAL ====== -->
