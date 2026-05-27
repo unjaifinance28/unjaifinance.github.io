@@ -29,6 +29,7 @@ const mapLoan = r => ({
   originalRate: r.original_rate || null,
   discountedRate: r.discounted_rate || null,
   discountApplied: r.discount_applied || 0,
+  discountAmount: r.discount_amount || 0,
   dailyPayment: r.daily_payment || null,
 });
 const mapPayment = r => ({

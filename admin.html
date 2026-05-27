@@ -214,8 +214,15 @@
     /* Debt form date row */
     #dbt-dates-row { grid-template-columns:1fr !important; }
   }
-  /* ====== CURRENT BALANCE CARD ====== */
+  /* ====== STATEMENT / BALANCE CARD ====== */
   .bal-card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px; border:2px solid #e8f5e9; }
+  .stmt-card { padding:0 !important; overflow:hidden; }
+  .stmt-tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .stmt-tbl thead th { background:#1b5e20; color:white; padding:9px 13px; white-space:nowrap; font-weight:600; position:sticky; top:0; z-index:2; }
+  .stmt-tbl tbody td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.04); vertical-align:middle; }
+  .stmt-tbl .dr-row { background:#fff5f5; }
+  .stmt-tbl .cr-row { background:#f5fff5; }
+  .stmt-tbl .ob-row { background:#fffde7; }
 
   /* ====== MONEY INPUT ====== */
   .money-input { text-align:right; letter-spacing:.5px; }
@@ -250,6 +257,12 @@
     .login-box { padding:28px 20px; }
     .perf-grid { grid-template-columns:1fr; }
   }
+
+  /* ====== REPORT CHECKBOX FILTER ====== */
+  .wp-check-label { display:flex; align-items:center; gap:6px; padding:6px 12px; background:#f1f8e9; border:1.5px solid #c8e6c9; border-radius:8px; cursor:pointer; font-size:.83rem; white-space:nowrap; user-select:none; transition:.15s; }
+  .wp-check-label:hover { background:#e8f5e9; border-color:#4caf50; }
+  .wp-check-label input[type=checkbox] { accent-color:#2e7d32; width:15px; height:15px; cursor:pointer; }
+  .wp-check-label.all-chk { font-weight:700; background:#e8f5e9; border-color:#2e7d32; }
   </style>
 </head>
 <body>
@@ -296,6 +309,7 @@
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
       <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
       <button class="atab" onclick="showTab('remit',this)">📤 ການສົ່ງເງິນ <span id="badge-remit" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
+      <button class="atab" onclick="showTab('report',this)">📋 ລາຍງານ</button>
       <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
     </div>
 
@@ -432,27 +446,62 @@
     <!-- ====== TAB: PERFORMANCE ====== -->
     <div id="tab-perf" class="tab-pane">
 
-      <!-- Current Balance Card -->
-      <div class="bal-card">
-        <div style="font-size:.88rem;font-weight:800;color:#1b5e20;margin-bottom:12px;">
-          💵 ຍອດເງິນໃນບັນຊີປັດຈຸບັນ
-        </div>
-        <div style="margin-bottom:14px;padding:12px;background:#f9fbe7;border-radius:10px;border:1px solid #dce775;">
-          <label style="font-size:.78rem;font-weight:700;color:#558b2f;display:block;margin-bottom:6px;">💰 ຍອດຍົກມາ / ທຶນເລີ່ມຕົ້ນ</label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="text" inputmode="numeric" id="opening-balance-input"
-              placeholder="0"
-              class="money-input"
-              oninput="formatMoneyInput(this)"
-              style="flex:1;padding:8px 12px;border:2px solid #c5e1a5;border-radius:8px;font-family:inherit;font-size:.9rem;outline:none;box-sizing:border-box;" />
-            <button onclick="saveOpeningBalanceNow()"
-              style="background:#1b5e20;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:700;white-space:nowrap;">
-              💾 ບັນທຶກ
-            </button>
+      <!-- Bank Statement Card -->
+      <div class="bal-card stmt-card">
+        <!-- Header: title + opening balance + filters -->
+        <div style="padding:16px 18px 14px;border-bottom:1px solid #e8f5e9;">
+          <div style="font-size:.9rem;font-weight:800;color:#1b5e20;margin-bottom:12px;">📋 Statement ການເຄື່ອນໄຫວເງິນ</div>
+
+          <!-- Opening balance input -->
+          <div style="padding:10px 12px;background:#f9fbe7;border-radius:8px;border:1px solid #dce775;margin-bottom:12px;">
+            <label style="font-size:.75rem;font-weight:700;color:#558b2f;display:block;margin-bottom:5px;">💰 ຍອດຍົກມາ / ທຶນເລີ່ມຕົ້ນ</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" inputmode="numeric" id="opening-balance-input" placeholder="0" class="money-input"
+                oninput="formatMoneyInput(this)"
+                style="flex:1;padding:7px 11px;border:2px solid #c5e1a5;border-radius:7px;font-family:inherit;font-size:.88rem;outline:none;box-sizing:border-box;" />
+              <button onclick="saveOpeningBalanceNow()"
+                style="background:#1b5e20;color:white;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:700;white-space:nowrap;">💾 ບັນທຶກ</button>
+            </div>
+            <span id="ob-save-msg" style="font-size:.72rem;margin-top:4px;display:block;min-height:1.1em;"></span>
           </div>
-          <span id="ob-save-msg" style="font-size:.75rem;margin-top:5px;display:block;min-height:1.2em;"></span>
+
+          <!-- Filters -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <div style="display:flex;gap:4px;align-items:center;">
+              <label style="font-size:.74rem;color:#757575;white-space:nowrap;">ຈາກ:</label>
+              <input type="date" id="stmt-from" onchange="renderStatement()"
+                style="padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;font-size:.78rem;outline:none;" />
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <label style="font-size:.74rem;color:#757575;white-space:nowrap;">ຫາ:</label>
+              <input type="date" id="stmt-to" onchange="renderStatement()"
+                style="padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;font-size:.78rem;outline:none;" />
+            </div>
+            <button class="fbtn stmt-ftype on" onclick="setStmtFilter('all',this)">ທັງໝົດ</button>
+            <button class="fbtn stmt-ftype" onclick="setStmtFilter('dr',this)" style="color:#c62828;border-color:#ffcdd2;">📤 Dr ເງິນອອກ</button>
+            <button class="fbtn stmt-ftype" onclick="setStmtFilter('cr',this)" style="color:#2e7d32;border-color:#c8e6c9;">📥 Cr ເງິນເຂົ້າ</button>
+            <button class="fbtn" onclick="exportStatementExcel()" style="background:#e3f2fd;border-color:#1565c0;color:#1565c0;white-space:nowrap;">⬇️ Excel</button>
+          </div>
         </div>
-        <div id="balBreakdown"></div>
+
+        <!-- Statement table -->
+        <div style="overflow-x:auto;max-height:520px;overflow-y:auto;">
+          <table class="stmt-tbl">
+            <thead>
+              <tr>
+                <th>ວັນທີ</th>
+                <th>ລາຍການ</th>
+                <th style="text-align:right;">Dr (ເງິນອອກ)</th>
+                <th style="text-align:right;">Cr (ເງິນເຂົ້າ)</th>
+                <th style="text-align:right;">ຍອດຄົງເຫຼືອ</th>
+              </tr>
+            </thead>
+            <tbody id="stmtBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Footer: final balance -->
+        <div id="stmtFooter"></div>
       </div>
 
       <div class="kpi-row" id="perfKpi"></div>
@@ -732,6 +781,39 @@
       </div>
     </div>
 
+    <!-- ====== TAB: REPORT ====== -->
+    <div id="tab-report" class="tab-pane">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <div class="sec-title" style="margin:0;">📋 ລາຍງານສຳລັບ Agent</div>
+        <button onclick="exportReportExcel()" class="fbtn" style="background:#1b5e20;border-color:#1b5e20;color:white;font-weight:700;white-space:nowrap;">⬇️ Export Excel</button>
+      </div>
+
+      <!-- Workplace checkbox filter -->
+      <div style="background:white;border-radius:13px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-bottom:14px;">
+        <div style="font-size:.85rem;font-weight:700;color:#1b5e20;margin-bottom:10px;">🏢 ກອງຕາມ ບ່ອນເຮັດວຽກ</div>
+        <div id="reportWpChecks" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
+      <!-- Table -->
+      <div class="tbl-card">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>ລຳດັບ</th><th>ຊື່</th><th>ລະຫັດ</th><th>ເບີໂທ</th>
+              <th>ບ່ອນເຮັດວຽກ</th><th>ຜະລິດຕະພັນ</th>
+              <th style="text-align:right;">ເງິນຕົ້ນ</th>
+              <th style="text-align:right;">ດອກເບ້ຍ</th>
+              <th style="text-align:right;">ລວມ</th>
+            </tr></thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div id="reportSummary" style="background:white;border-radius:13px;padding:14px 20px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-top:12px;font-size:.88rem;"></div>
+    </div>
+
   </div><!-- /admin-wrap -->
 </div><!-- /admin-body -->
 
@@ -855,6 +937,7 @@
 </div>
 <style>@keyframes ld-spin{to{transform:rotate(360deg);}}</style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 <script>
@@ -944,6 +1027,8 @@ async function saveAdminPwd(newPwd) {
 }
 
 let _openingBalance = 0;
+let _otherIncome = [];
+
 async function getOpeningBalance() {
   const { data, error } = await sb.from('app_settings').select('value').eq('key','opening_balance').single();
   console.log('[opening_balance] load:', data?.value, error?.message);
@@ -1126,6 +1211,7 @@ function showTab(name, btn) {
   if (name==='credits')  renderCreditScore();
   if (name==='agents')   renderAgents();
   if (name==='remit')    renderRemittances();
+  if (name==='report')   initReport();
   if (name==='settings') { loadWorkOptionsAdmin(); loadLoginHistory(); }
 }
 
@@ -1141,6 +1227,7 @@ async function initAdmin() {
     updateRemitBadge();
     setInterval(updateRemitBadge, 60000);
     renderRequests();
+    debugBalance().catch(console.error);
   } catch(err) {
     showToast('ໂຫລດຂໍ້ມູນລົ້ມເຫລວ', 'error');
     console.error(err);
@@ -1234,9 +1321,10 @@ function renderLoans() {
   const tbody = document.getElementById('loanTableBody');
   if (!loans.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="9">ບໍ່ພົບ</td></tr>'; return; }
   tbody.innerHTML = loans.map(l => {
-    const origTotal  = (l.paidAmount || 0) + (l.totalDue || 0);
-    const pct        = origTotal > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / origTotal) * 100)) : 0;
-    const rem        = l.totalDue || 0;
+    const _prod      = DB.products.find(p => p.id === l.productId);
+    const _total     = _prod ? calcLoanTotal(_prod, l.amount, l.duration) : Math.max((l.paidAmount||0) + (l.totalDue||0), l.amount);
+    const pct        = _total > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / _total) * 100)) : 0;
+    const rem        = Math.max(0, _total - (l.paidAmount || 0));
     const due        = calcDueDate(l);
     const overdue    = isLoanOverdue(l);
     const topupCount = DB.getLoanTopups(l.id).length;
@@ -1247,7 +1335,7 @@ function renderLoans() {
       <td>${l.name}<div style="font-size:.7rem;color:#9e9e9e;">${l.phone}</div></td>
       <td style="font-size:.78rem;">${l.productName}</td>
       <td>${formatMoney(l.amount)}</td>
-      <td>${formatMoney(l.totalDue)}</td>
+      <td>${formatMoney(_total)}</td>
       <td>
         <div style="font-size:.8rem;">${formatMoney(l.paidAmount)}</div>
         <div class="mini-prog"><div class="mini-prog-fill" style="width:${pct}%;"></div></div>
@@ -1272,15 +1360,60 @@ function doStatus(id, newStatus) {
   const labels = { active:'ອະນຸມັດ & ໂອນເງິນ', completed:'ປິດສຳເລັດ', rejected:'ປະຕິເສດ' };
   const icons  = { active:'✅', completed:'🎉', rejected:'❌' };
   const today  = new Date().toISOString().slice(0, 10);
-  const msgHtml = newStatus === 'active'
-    ? `ຢືນຢັນ: ${labels[newStatus]}<div style="margin-top:12px;">
+  const loan   = DB.loans.find(l => l.id === id);
+  const _lProd = loan ? DB.products.find(p => p.id === loan.productId) : null;
+  const correctTotal = _lProd ? calcLoanTotal(_lProd, loan.amount, loan.duration) : (loan?.totalDue || 0);
+  const remaining = loan ? Math.max(0, correctTotal - (loan.paidAmount || 0)) : 0;
+
+  let msgHtml;
+  if (newStatus === 'active') {
+    msgHtml = `ຢືນຢັນ: ${labels[newStatus]}<div style="margin-top:12px;">
        <label style="font-size:.82rem;font-weight:600;color:#1b5e20;display:block;margin-bottom:5px;">📅 ວັນທີກູ້ຢືມ</label>
        <input type="date" id="approvalDateInput" value="${today}"
          style="width:100%;padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;"
-         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'" /></div>`
-    : `ຢືນຢັນ: ${labels[newStatus]}`;
+         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'" /></div>`;
+  } else if (newStatus === 'completed' && remaining > 0) {
+    msgHtml = `ປິດສຳເລັດ — ຍອດທີ່ຮັບຈິງ: <strong style="color:#1b5e20;">${formatMoney(loan.paidAmount || 0)}</strong><br>
+      <div style="margin-top:8px;background:#fff3e0;border-radius:8px;padding:8px 12px;font-size:.85rem;">
+        ✂️ ສ່ວນຫຼຸດ (Write-off): <strong style="color:#e65100;">${formatMoney(remaining)}</strong><br>
+        <span style="font-size:.78rem;color:#9e9e9e;">ຍອດຄ້າງ ${formatMoney(remaining)} ຈະຖືກໝາຍ Write-off ໃນ ຍອດດຸ່ນດ່ຽງ</span>
+      </div>`;
+  } else {
+    msgHtml = `ຢືນຢັນ: ${labels[newStatus]}`;
+  }
   openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', msgHtml, async () => {
     try {
+      // Special handling for 'completed' status with discount
+      if (newStatus === 'completed' && loan) {
+        const discountAmount = Math.max(0, correctTotal - (loan.paidAmount || 0));
+        if (discountAmount > 0) {
+          // Mark as fully paid and record discount
+          const { error } = await sb.from('loans').update({
+            status: 'completed',
+            paid_amount: correctTotal,
+            total_due: correctTotal,
+            remaining_principal: 0,
+            discount_amount: discountAmount
+          }).eq('id', id);
+          if (error) throw error;
+          // Update local state
+          loan.status = 'completed';
+          loan.paidAmount = correctTotal;
+          loan.totalDue = correctTotal;
+          loan.remainingPrincipal = 0;
+          loan.discountAmount = discountAmount;
+          closeConfirm();
+          updatePendingBadge(); updateAlertsBadge(); renderRequests();
+          if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+          if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+          if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
+          if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
+          showToast(`✅ ສຳເລັດ | ສ່ວນຫຼຸດ: ${formatMoney(discountAmount)} ກີບ`);
+          return;
+        }
+      }
+
+      // Normal status update
       await DB.updateLoanStatus(id, newStatus);
       if (newStatus === 'active') {
         const di = document.getElementById('approvalDateInput');
@@ -2230,8 +2363,9 @@ async function renderPerf() {
     <tbody>${prodRows.join('')}</tbody>`;
 
   // ── Balance + other income ─────────────────────────────────────────
+  await loadOtherIncome();
+  renderOtherIncome();
   renderCurrentBalance();
-  loadOtherIncome().then(() => renderOtherIncome());
 }
 
 // ====== OVERDUE HELPERS ======
@@ -3554,6 +3688,19 @@ async function saveManualLoan() {
     const { data: r, error } = await sb.from('loans').insert(row).select().single();
     if (error) throw error;
     DB.loans.push(mapLoan(r));
+
+    // If an initial paid amount was set, write a payment record so the
+    // payments table stays in sync with loans.paid_amount.
+    if (paidAmt > 0) {
+      const payRef = 'BF-' + id;
+      await sb.from('payments').insert({
+        id: payRef, loan_id: id, amount: paidAmt, method: 'cash',
+        note: 'ຊຳລະຕ້ອງການ (manual entry)', date: createdAt, ref: payRef,
+      });
+      DB.payments.push({ id: payRef, loanId: id, amount: paidAmt, method: 'cash',
+        note: 'ຊຳລະຕ້ອງການ (manual entry)', date: createdAt, ref: payRef });
+    }
+
     closeManualLoanModal();
     updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
     showToast('ສ້າງສັນຍາ ✅');
@@ -3562,103 +3709,242 @@ async function saveManualLoan() {
 
 // Backdrop close
 ['loanModal','confirmModal','debtPayModal','manualLoanModal','vipModal'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e){
-    if (e.target === this) {
-      if (id==='loanModal') closeLoanModal();
-      else if (id==='debtPayModal') closeDebtPayModal();
-      else if (id==='manualLoanModal') closeManualLoanModal();
-      else if (id==='vipModal') closeVipModal();
-      else closeConfirm();
-    }
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape')
-      document.getElementById('slipModal').style.display = 'none';
-  });
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', function(e){
+      if (e.target === this) {
+        if (id==='loanModal') closeLoanModal();
+        else if (id==='debtPayModal') closeDebtPayModal();
+        else if (id==='manualLoanModal') closeManualLoanModal();
+        else if (id==='vipModal') closeVipModal();
+        else closeConfirm();
+      }
+    });
+  }
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const slipModal = document.getElementById('slipModal');
+    if (slipModal) slipModal.style.display = 'none';
+  }
 });
 
+// ====== BANK STATEMENT ======
+let _stmtFilter = 'all';
+
+function setStmtFilter(f, btn) {
+  _stmtFilter = f;
+  document.querySelectorAll('.stmt-ftype').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  renderStatement();
+}
+
+function fmtD(dateStr) {
+  if (!dateStr) return '—';
+  const s = String(dateStr).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
+  return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+}
+
+function buildStmtEntries() {
+  const entries = [];
+
+  if (_openingBalance > 0) {
+    entries.push({ sortKey: '', dateStr: '—', label: 'ຍອດຍົກມາ', dr: 0, cr: _openingBalance, rowClass: 'ob-row' });
+  }
+
+  DB.debts.forEach(d => {
+    const sk = d.borrowDate ? String(d.borrowDate).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(d.borrowDate), label: 'ກູ້ທຶນ: ' + (d.creditor || ''), dr: 0, cr: d.amount || 0, rowClass: 'cr-row' });
+  });
+
+  DB.loans.filter(l => !['pending', 'rejected'].includes(l.status)).forEach(l => {
+    const sk = l.createdAt ? String(l.createdAt).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: l.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  DB.payments.forEach(p => {
+    const loan = DB.loans.find(l => l.id === p.loanId);
+    const sk = p.date ? String(p.date).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(p.date), label: 'ຮັບຊຳລະ: ' + (loan?.name || ''), dr: 0, cr: p.amount || 0, rowClass: 'cr-row' });
+  });
+
+  DB.expenses.forEach(e => {
+    const sk = e.date ? String(e.date).slice(0, 10) : '';
+    const note = e.note ? ' · ' + e.note : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(e.date), label: 'ລາຍຈ່າຍ: ' + (e.category || '') + note, dr: e.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  (DB.debtPayments || []).forEach(p => {
+    const debt = DB.debts.find(d => d.id === p.debtId);
+    const sk = p.date ? String(p.date).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(p.date), label: 'ຈ່າຍໜີ້: ' + (debt?.creditor || ''), dr: p.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  (_otherIncome || []).forEach(r => {
+    const sk = r.date ? String(r.date).slice(0, 10) : '';
+    const note = r.note ? ' · ' + r.note : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(r.date), label: 'ລາຍໄດ້: ' + (r.category || '') + note, dr: 0, cr: r.amount || 0, rowClass: 'cr-row' });
+  });
+
+  // Sort: empty sortKey (opening balance) first, then ascending by date
+  entries.sort((a, b) => {
+    if (a.sortKey === b.sortKey) return 0;
+    if (a.sortKey === '') return -1;
+    if (b.sortKey === '') return 1;
+    return a.sortKey < b.sortKey ? -1 : 1;
+  });
+
+  // Compute running balance across all entries
+  let running = 0;
+  entries.forEach(e => { running += e.cr - e.dr; e.balance = running; });
+
+  return entries;
+}
+
+function renderStatement() {
+  const fromVal = (document.getElementById('stmt-from')?.value || '').slice(0, 10);
+  const toVal   = (document.getElementById('stmt-to')?.value   || '').slice(0, 10);
+
+  const entries = buildStmtEntries();
+  const finalBalance = entries.length ? entries[entries.length - 1].balance : 0;
+
+  // Date filter: opening balance row only shown when no date range active
+  const dateFiltered = entries.filter(e => {
+    if (e.rowClass === 'ob-row') return !fromVal && !toVal;
+    if (fromVal && e.sortKey < fromVal) return false;
+    if (toVal   && e.sortKey > toVal)   return false;
+    return true;
+  });
+
+  // Type filter
+  const visible = _stmtFilter === 'dr' ? dateFiltered.filter(e => e.dr > 0)
+                : _stmtFilter === 'cr' ? dateFiltered.filter(e => e.cr > 0)
+                : dateFiltered;
+
+  let dispDr = 0, dispCr = 0;
+  visible.forEach(e => { dispDr += e.dr; dispCr += e.cr; });
+
+  const fmtAmt = n => n > 0 ? formatMoney(Math.round(n)) : '';
+
+  const tbody = document.getElementById('stmtBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = visible.length
+    ? visible.map(e => {
+        const balColor = e.balance >= 0 ? '#1b5e20' : '#c62828';
+        return `<tr class="${e.rowClass}">
+          <td style="white-space:nowrap;font-size:.76rem;color:#757575;">${e.dateStr}</td>
+          <td style="max-width:240px;">${e.label}</td>
+          <td style="text-align:right;color:#c62828;white-space:nowrap;font-weight:600;">${fmtAmt(e.dr)}</td>
+          <td style="text-align:right;color:#2e7d32;white-space:nowrap;font-weight:600;">${fmtAmt(e.cr)}</td>
+          <td style="text-align:right;font-weight:700;color:${balColor};white-space:nowrap;">${formatMoney(Math.round(e.balance))}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:28px;color:#9e9e9e;">ບໍ່ມີລາຍການ</td></tr>';
+
+  // Totals summary row
+  tbody.innerHTML += `<tr style="background:#f5f5f5;border-top:2px solid #bdbdbd;">
+    <td colspan="2" style="font-weight:700;font-size:.82rem;color:#424242;padding:9px 12px;">ລວມ Dr / Cr</td>
+    <td style="text-align:right;font-weight:800;color:#c62828;white-space:nowrap;">${fmtAmt(dispDr)}</td>
+    <td style="text-align:right;font-weight:800;color:#2e7d32;white-space:nowrap;">${fmtAmt(dispCr)}</td>
+    <td></td>
+  </tr>`;
+
+  // Footer: authoritative balance from renderCurrentBalance()
+  renderCurrentBalance();
+}
+
+function exportStatementExcel() {
+  const fromVal = (document.getElementById('stmt-from')?.value || '').slice(0, 10);
+  const toVal   = (document.getElementById('stmt-to')?.value   || '').slice(0, 10);
+
+  const entries = buildStmtEntries();
+
+  const filtered = entries.filter(e => {
+    if (e.rowClass === 'ob-row') return !fromVal && !toVal;
+    if (fromVal && e.sortKey < fromVal) return false;
+    if (toVal   && e.sortKey > toVal)   return false;
+    return true;
+  });
+
+  // Same formula as renderCurrentBalance()
+  const _d = DB.loans.filter(l => !['pending','rejected'].includes(l.status));
+  const finalBalance = (_openingBalance || 0)
+    + DB.payments.reduce((s,p) => s+(p.amount||0), 0)                                                       // totalPaymentsReceived
+    + DB.debts.reduce((s,d) => s+(d.amount||0), 0)                                                          // ourDebts
+    - _d.reduce((s,l) => s+(l.amount||0), 0)                                                                // moneyLentOut
+    - DB.expenses.reduce((s,e) => s+(e.amount||0), 0)                                                       // expenses
+    - _d.reduce((s,l) => s+(l.discountApplied||0), 0);                                                      // discountsGiven
+
+  const aoa = [['ວັນທີ', 'ລາຍການ', 'Dr (ເງິນອອກ)', 'Cr (ເງິນເຂົ້າ)', 'ຍອດຄົງເຫຼືອ']];
+  filtered.forEach(e => aoa.push([e.dateStr, e.label, e.dr || '', e.cr || '', Math.round(e.balance)]));
+  aoa.push(['', 'ຍອດຄົງເຫຼືອປັດຈຸບັນ', '', '', Math.round(finalBalance)]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 10 }, { wch: 38 }, { wch: 16 }, { wch: 16 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Statement');
+  XLSX.writeFile(wb, 'statement.xlsx');
+}
+
 function renderCurrentBalance() {
-  const activeLns     = DB.loans.filter(l => l.status === 'active');
-  const completedLns  = DB.loans.filter(l => l.status === 'completed');
-  const nonPendRejLns = DB.loans.filter(l => !['pending','rejected'].includes(l.status));
+  const openingBalance = _openingBalance || 0;
 
-  const totalDebtsBorrowed = DB.debts.reduce((s,d) => s + (d.amount || 0), 0);
+  // Same source as Dr/Cr ledger: sum every payment transaction
+  const totalPaymentsReceived = DB.payments.reduce((s, p) => s + (p.amount || 0), 0);
 
-  // Split each loan's paidAmount into interest vs principal using totalDue ratio
-  // Uses l.paidAmount (always populated) instead of DB.payments (may be empty)
-  let totalInterestReceived = 0;
-  let totalActivePrincipalPaid = 0;
+  // Money we borrowed (cash IN from debts table, same as Dr/Cr ledger)
+  const ourDebts = DB.debts.reduce((s, d) => s + (d.amount || 0), 0);
 
-  nonPendRejLns.forEach(l => {
-    const paid      = l.paidAmount || 0;
-    const principal = l.amount     || 0;
-    const due       = l.totalDue   || principal || 1;
-    const intRatio  = due > principal ? (due - principal) / due : 0;
-    const intPart   = Math.round(paid * intRatio);
-    const prinPart  = paid - intPart;
-    totalInterestReceived += intPart;
-    if (l.status === 'active') totalActivePrincipalPaid += Math.max(0, prinPart);
-  });
+  // Money we sent out to customers (disbursed loans only)
+  const disbursed = DB.loans.filter(l => !['pending', 'rejected'].includes(l.status));
+  const moneyLentOut = disbursed.reduce((s, l) => s + (l.amount || 0), 0);
 
-  // Principal returned:
-  //   Completed loans: full original principal (loan.amount)
-  //   Active loans: principal portion of payments made so far
-  const totalPrincipalReturned =
-    completedLns.reduce((s,l) => s + (l.amount || 0), 0) + totalActivePrincipalPaid;
+  // Operating expenses
+  const expenses = DB.expenses.reduce((s, e) => s + (e.amount || 0), 0);
 
-  // Active loans: remaining principal still with customers (not original amount)
-  const totalActiveLoans = activeLns.reduce((s,l) =>
-    s + (l.remainingPrincipal !== undefined ? l.remainingPrincipal : (l.amount || 0)), 0);
+  // Discounts / write-offs
+  const discountsGiven = disbursed.reduce((s, l) => s + (l.discountApplied || 0), 0);
 
-  const totalExpenses       = DB.expenses.reduce((s,e) => s + (e.amount || 0), 0);
-  const totalDebtRepayments = (DB.debtPayments || []).reduce((s,p) => s + (p.amount || 0), 0);
+  const balance = openingBalance
+               + totalPaymentsReceived
+               + ourDebts
+               - moneyLentOut
+               - expenses
+               - discountsGiven;
 
-  const balance = _openingBalance + totalDebtsBorrowed + totalInterestReceived + totalPrincipalReturned
-                - totalActiveLoans - totalExpenses - totalDebtRepayments;
-
-  console.log('Balance calc:', {
-    openingBalance: _openingBalance,
-    totalDebtsBorrowed,
-    totalInterestReceived: Math.round(totalInterestReceived),
-    totalPrincipalReturned: Math.round(totalPrincipalReturned),
-    totalActiveLoans: Math.round(totalActiveLoans),
-    totalExpenses,
-    totalDebtRepayments,
-    balance: Math.round(balance),
-  });
-
-  const balColor = balance < 0 ? '#c62828'
-    : balance < (totalDebtsBorrowed || 1) * 0.1 ? '#e65100'
-    : '#2e7d32';
+  const balColor = balance < 0 ? '#c62828' : '#2e7d32';
 
   const row = (plus, label, value) => {
     const sign  = plus ? '+' : '−';
     const color = plus ? '#2e7d32' : '#c62828';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.85rem;">
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.83rem;">
       <span style="color:#616161;">${sign} ${label}</span>
       <span style="font-weight:700;color:${color};">${formatMoney(Math.round(value))}</span>
     </div>`;
   };
 
-  const bdEl = document.getElementById('balBreakdown');
-  if (!bdEl) return;
-  bdEl.innerHTML =
-    (_openingBalance > 0 ? row(true, 'ຍອດຍົກມາ', _openingBalance) : '') +
-    row(true,  'ທຶນກູ້ຢືມ',    totalDebtsBorrowed) +
-    row(true,  'ດອກຮັບໄດ້',    totalInterestReceived) +
-    row(true,  'ຕົ້ນຄືນ',      totalPrincipalReturned) +
-    row(false, 'ຢູ່ນຳລູກຄ້າ', totalActiveLoans) +
-    row(false, 'ລາຍຈ່າຍ',      totalExpenses) +
-    row(false, 'ຈ່າຍໜີ້',      totalDebtRepayments) +
-    `<div style="border-top:2px solid #e0e0e0;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;">
-       <span style="font-size:.95rem;font-weight:800;color:#424242;">ຍອດລວມ</span>
-       <span style="font-size:1.7rem;font-weight:900;color:${balColor};">${formatMoney(Math.round(balance))}&thinsp;<span style="font-size:.85rem;font-weight:500;color:#9e9e9e;">ກີບ</span></span>
-     </div>`;
+  const footer = document.getElementById('stmtFooter');
+  if (!footer) return;
+
+  footer.innerHTML = `
+    <div style="padding:12px 18px 10px;border-top:2px solid #c8e6c9;background:#fafafa;">
+      ${openingBalance > 0 ? row(true,  'ຍອດຍົກມາ',        openingBalance)        : ''}
+      ${row(true,  'ຮັບຊຳລະ (ລວມ)',         totalPaymentsReceived)}
+      ${ourDebts > 0 ? row(true, 'ເງິນກູ້ທຶນ', ourDebts) : ''}
+      ${row(false, 'ປ່ອຍກູ້ (ທັງໝົດ)',     moneyLentOut)}
+      ${row(false, 'ລາຍຈ່າຍ',             expenses)}
+      ${discountsGiven > 0 ? row(false, 'ສ່ວນຫຼຸດ / Write-off', discountsGiven) : ''}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;background:white;border-top:1px solid #e0e0e0;">
+      <span style="font-size:.95rem;font-weight:800;color:#424242;">ຍອດຄົງເຫຼືອປັດຈຸບັນ</span>
+      <span style="font-size:1.7rem;font-weight:900;color:${balColor};">${formatMoney(Math.round(balance))}&thinsp;<span style="font-size:.85rem;font-weight:500;color:#9e9e9e;">ກີບ</span></span>
+    </div>`;
 }
 
 // ====== OTHER INCOME ======
-let _otherIncome = [];
-
 async function loadOtherIncome() {
   try {
     const { data } = await sb.from('other_income').select('*').order('date', { ascending: false });
@@ -3720,6 +4006,169 @@ async function deleteOtherIncome(id) {
     renderOtherIncome();
     renderCurrentBalance();
   } catch { showToast('ລຶບບໍ່ໄດ້','error'); }
+}
+
+// ====== TAB: REPORT ======
+function initReport() {
+  const active = DB.loans.filter(l => l.status === 'active');
+  const wpSet  = new Set(active.map(l => l.workplace || '').filter(Boolean));
+  const wps    = Array.from(wpSet).sort();
+
+  const container = document.getElementById('reportWpChecks');
+  if (!container) return;
+  container.innerHTML = ['ທັງໝົດ', ...wps].map(wp => `
+    <label class="wp-check-label${wp === 'ທັງໝົດ' ? ' all-chk' : ''}">
+      <input type="checkbox" checked value="${wp.replace(/"/g,'&quot;')}" onchange="onReportWpChange(this)" />
+      ${wp}
+    </label>`).join('');
+
+  renderReport();
+}
+
+function onReportWpChange(cb) {
+  const all = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
+  if (cb.value === 'ທັງໝົດ') {
+    all.forEach(c => c.checked = cb.checked);
+  } else {
+    const nonAll = Array.from(all).filter(c => c.value !== 'ທັງໝົດ');
+    const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
+    if (allCb) allCb.checked = nonAll.every(c => c.checked);
+  }
+  renderReport();
+}
+
+function _getReportLoans() {
+  const all    = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
+  const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
+  const active = DB.loans.filter(l => l.status === 'active');
+  if (!allCb || allCb.checked) return active;
+  const checked = Array.from(all).filter(c => c.checked && c.value !== 'ທັງໝົດ').map(c => c.value);
+  if (!checked.length) return [];
+  return active.filter(l => checked.includes(l.workplace || ''));
+}
+
+function renderReport() {
+  const tbody   = document.getElementById('reportTableBody');
+  const summary = document.getElementById('reportSummary');
+  if (!tbody) return;
+
+  const loans  = _getReportLoans();
+  const fmtNum = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0));
+
+  if (!loans.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">ບໍ່ພົບລາຍການ</td></tr>';
+    if (summary) summary.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = loans.map((l, i) => {
+    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    const interest  = (l.totalDue ?? 0) - principal;
+    return `<tr>
+      <td style="text-align:center;">${i + 1}</td>
+      <td style="font-weight:600;">${l.name || '-'}</td>
+      <td style="font-size:.78rem;color:#1b5e20;">${l.id}</td>
+      <td>${l.phone || '-'}</td>
+      <td>${l.workplace || '-'}</td>
+      <td>${l.productName || '-'}</td>
+      <td style="text-align:right;">${fmtNum(principal)}</td>
+      <td style="text-align:right;">${fmtNum(interest)}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(l.totalDue ?? 0)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalDue = loans.reduce((s, l) => s + (l.totalDue ?? 0), 0);
+  if (summary) summary.innerHTML = `
+    <div style="display:flex;gap:28px;flex-wrap:wrap;">
+      <span>👥 ຈຳນວນລູກຄ້າ: <strong style="color:#1b5e20;">${loans.length} ຄົນ</strong></span>
+      <span>💰 ລວມເງິນຕ້ອງເກັບ: <strong style="color:#1b5e20;">${new Intl.NumberFormat('lo-LA').format(Math.round(totalDue))} ກີບ</strong></span>
+    </div>`;
+}
+
+function exportReportExcel() {
+  if (typeof XLSX === 'undefined') { showToast('XLSX library ບໍ່ໄດ້ໂຫລດ', 'error'); return; }
+  const loans = _getReportLoans();
+  if (!loans.length) { showToast('ບໍ່ມີຂໍ້ມູນ', 'error'); return; }
+
+  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
+  const rows = loans.map((l, i) => {
+    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, (l.totalDue ?? 0) - principal, l.totalDue ?? 0];
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, 'ລາຍງານ');
+  XLSX.writeFile(wb, 'ລາຍງານ_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+
+// ====== DEBUG: BALANCE AUDIT ======
+async function debugBalance() {
+  const [
+    { data: loans },
+    { data: expenses },
+    { data: debts },
+    { data: settings },
+  ] = await Promise.all([
+    sb.from('loans').select('id, name, amount, status, paid_amount, interest_paid, discount_applied'),
+    sb.from('expenses').select('amount, category, date'),
+    sb.from('debts').select('amount, creditor, status'),
+    sb.from('app_settings').select('key, value').in('key', ['opening_balance']),
+  ]);
+
+  const openingBalance = parseFloat(settings?.find(s => s.key === 'opening_balance')?.value || 0);
+
+  // Only disbursed loans (not pending/rejected)
+  const disbursed = (loans || []).filter(l => !['pending','rejected'].includes(l.status));
+
+  const moneyLentOut       = disbursed.reduce((s,l) => s+(l.amount||0), 0);
+  const interestReceived   = disbursed.reduce((s,l) => s+(l.interest_paid||0), 0);
+  const principalReturned  = disbursed.reduce((s,l) => {
+    const paid = l.paid_amount||0, int = l.interest_paid||0;
+    return s + Math.max(0, paid - int);
+  }, 0);
+  const totalPaidByCustomers = principalReturned + interestReceived;
+  const expensesTotal      = (expenses||[]).reduce((s,e) => s+(e.amount||0), 0);
+  const discountsGiven     = disbursed.reduce((s,l) => s+(l.discount_applied||0), 0);
+  const debtsTotal         = (debts||[]).reduce((s,d) => s+(d.amount||0), 0);
+
+  const balance = openingBalance + principalReturned + interestReceived
+                - moneyLentOut - expensesTotal - discountsGiven;
+
+  console.group('%c🏦 Balance Audit — exact formula match', 'color:#1b5e20;font-weight:bold;font-size:14px;');
+  console.table({
+    'openingBalance (+)':          { value: openingBalance,      loans: '—' },
+    'principalReturned (+)':       { value: principalReturned,   loans: disbursed.length },
+    'interestReceived (+)':        { value: interestReceived,    loans: disbursed.length },
+    'moneyLentOut (−)':            { value: moneyLentOut,        loans: disbursed.length },
+    'expenses (−)':                { value: expensesTotal,       loans: (expenses||[]).length },
+    'discountsGiven (−)':          { value: discountsGiven,      loans: disbursed.filter(l=>l.discount_applied>0).length },
+    '══ BALANCE ══':               { value: balance,             loans: '—' },
+    '── (info) ourDebts ──':       { value: debtsTotal,          loans: (debts||[]).length },
+    '── (info) totalPaidRaw ──':   { value: totalPaidByCustomers,loans: '—' },
+  });
+
+  console.log('%cDisbursed loan breakdown:', 'color:#1565c0;font-weight:bold;');
+  if (disbursed.length) {
+    console.table(disbursed.map(l => ({
+      name:             l.name,
+      status:           l.status,
+      amount:           l.amount,
+      paid_amount:      l.paid_amount,
+      interest_paid:    l.interest_paid,
+      principal_ret:    Math.max(0,(l.paid_amount||0)-(l.interest_paid||0)),
+      discount_applied: l.discount_applied,
+    })));
+  }
+
+  console.log('%cExpenses:', 'color:#c62828;font-weight:bold;');
+  if (expenses?.length) {
+    console.table(expenses.map(e => ({ date: e.date, category: e.category, amount: e.amount })));
+  }
+
+  console.groupEnd();
+  return { openingBalance, principalReturned, interestReceived, moneyLentOut, expensesTotal, discountsGiven, balance };
 }
 </script>
 
