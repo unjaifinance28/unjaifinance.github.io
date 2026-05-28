@@ -859,6 +859,20 @@
       <!-- Action buttons row -->
       <div id="md-acts" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;"></div>
 
+      <!-- Force status section (admin override) -->
+      <div id="md-force-status-section" style="display:none;background:#fff3e0;border:1.5px solid #ffcc80;border-radius:10px;padding:12px 14px;margin-top:10px;">
+        <div style="font-size:.8rem;font-weight:700;color:#e65100;margin-bottom:8px;">🔧 ແກ້ໄຂສະຖານະ (Admin Override)</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="md-force-status-sel" style="padding:7px 10px;border:2px solid #ffcc80;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;flex:1;background:white;">
+            <option value="pending">⏳ ລໍຖ້າ (pending)</option>
+            <option value="active">💰 ດຳເນີນ (active)</option>
+            <option value="completed">🎉 ສຳເລັດ (completed)</option>
+            <option value="rejected">❌ ປະຕິເສດ (rejected)</option>
+          </select>
+          <button style="background:#e65100;color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:700;white-space:nowrap;" onclick="doForceStatus()">✅ ບັນທຶກສະຖານະ</button>
+        </div>
+      </div>
+
       <!-- Barcode -->
       <div id="md-barcode-section" style="display:none;margin-top:14px;background:#f9fbe7;border:1px solid #c8e6c9;border-radius:10px;padding:14px;text-align:center;">
         <div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">🔲 Barcode ສຳລັບ Agent</div>
@@ -1451,6 +1465,9 @@ function openLoanModal(id, focus) {
   currentLoanId = id;
   const loan = DB.loans.find(l=>l.id===id);
   if (!loan) return;
+  // Reset admin tools panel on each open
+  const _fsEl = document.getElementById('md-force-status-section');
+  if (_fsEl) _fsEl.style.display = 'none';
   const payments = DB.getLoanPayments(id);
   const paid  = loan.paidAmount || 0;
   const _prod = DB.products.find(p => p.id === loan.productId);
@@ -1705,6 +1722,10 @@ function openLoanModal(id, focus) {
   }
   acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
+  if (loan.status === 'completed') {
+    acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openRenewLoan('${id}')">🔄 ສ້າງສັນຍາໃໝ່</button>`;
+  }
+  acts.innerHTML += `<button class="btn" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-weight:700;font-size:.78rem;" onclick="toggleForceStatusSection('${loan.status}')">🔧 ແກ້ໄຂສະຖານະ</button>`;
 
   // Barcode
   const barcodeSection = document.getElementById('md-barcode-section');
@@ -1815,6 +1836,64 @@ function printBarcodeCard() {
 function closeLoanModal() {
   document.getElementById('loanModal').classList.remove('open');
   currentLoanId = null;
+}
+
+// ====== ADMIN: FORCE STATUS OVERRIDE ======
+function toggleForceStatusSection(currentStatus) {
+  const el = document.getElementById('md-force-status-section');
+  if (!el) return;
+  const isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : 'block';
+  if (!isVisible && currentStatus) {
+    const sel = document.getElementById('md-force-status-sel');
+    if (sel) sel.value = currentStatus;
+  }
+}
+
+async function doForceStatus() {
+  const sel = document.getElementById('md-force-status-sel');
+  const newStatus = sel?.value;
+  if (!newStatus || !currentLoanId) return;
+  const STATUS_LBL = { pending:'ລໍຖ້າ', active:'ດຳເນີນ', completed:'ສຳເລັດ', rejected:'ປະຕິເສດ' };
+  const label = STATUS_LBL[newStatus] || newStatus;
+  openConfirm('🔧', 'ບັນທຶກສະຖານະ?',
+    `ຕ້ອງການປ່ຽນສະຖານະເປັນ: <strong style="color:#e65100;">${label}</strong><br>
+     <span style="font-size:.8rem;color:#9e9e9e;">ຈະ bypass ທຸກ validation ແລະ ອັບເດດໂດຍກົງ</span>`,
+    async () => {
+      try {
+        const { error } = await sb.from('loans').update({ status: newStatus }).eq('id', currentLoanId);
+        if (error) throw error;
+        const loan = DB.loans.find(l => l.id === currentLoanId);
+        if (loan) loan.status = newStatus;
+        closeConfirm();
+        openLoanModal(currentLoanId);
+        updatePendingBadge(); updateAlertsBadge(); renderRequests();
+        if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+        if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+        showToast(`✅ ປ່ຽນສະຖານະເປັນ "${label}" ສຳເລັດ`);
+      } catch(err) { showToast('Error: ' + err.message, 'error'); }
+    }
+  );
+}
+
+// ====== ADMIN: RENEW LOAN FROM COMPLETED ======
+function openRenewLoan(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  openManualLoanModal();
+  // Pre-fill customer info from completed loan
+  document.getElementById('ml-name').value      = loan.name      || '';
+  document.getElementById('ml-phone').value     = loan.phone     || '';
+  document.getElementById('ml-idcard').value    = loan.idCard    || '';
+  document.getElementById('ml-doctype').value   = loan.docType   || 'id';
+  document.getElementById('ml-workplace').value = loan.workplace || '';
+  document.getElementById('ml-address').value   = loan.address   || '';
+  // New loan starts as pending; admin must pick product & amount
+  document.getElementById('ml-status').value    = 'pending';
+  document.getElementById('ml-paid-group').style.display = 'none';
+  document.getElementById('ml-amount').value   = '';
+  document.getElementById('ml-duration').value = '';
+  document.getElementById('ml-preview').style.display = 'none';
 }
 
 function toggleMdSection(id) {
@@ -3703,7 +3782,7 @@ async function saveManualLoan() {
 
     closeManualLoanModal();
     updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
-    showToast('ສ້າງສັນຍາ ✅');
+    showToast(`✅ ສ້າງສັນຍາໃໝ່ສຳເລັດ | ລະຫັດ: ${id}`);
   } catch(err) { showToast('Error: ' + err.message, 'error'); }
 }
 
