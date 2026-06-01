@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
   /* ====== LOGIN ====== */
   .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1b5e20,#2e7d32); padding:20px; }
@@ -213,8 +214,38 @@
     /* Debt form date row */
     #dbt-dates-row { grid-template-columns:1fr !important; }
   }
+  /* ====== STATEMENT / BALANCE CARD ====== */
+  .bal-card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px; border:2px solid #e8f5e9; }
+  .stmt-card { padding:0 !important; overflow:hidden; }
+  .stmt-tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .stmt-tbl thead th { background:#1b5e20; color:white; padding:9px 13px; white-space:nowrap; font-weight:600; position:sticky; top:0; z-index:2; }
+  .stmt-tbl tbody td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.04); vertical-align:middle; }
+  .stmt-tbl .dr-row { background:#fff5f5; }
+  .stmt-tbl .cr-row { background:#f5fff5; }
+  .stmt-tbl .ob-row { background:#fffde7; }
+
   /* ====== MONEY INPUT ====== */
   .money-input { text-align:right; letter-spacing:.5px; }
+
+  /* ====== LOAN MODAL v2 ====== */
+  .md-card { background:white; border-radius:11px; border:1px solid #e8e8e8; padding:13px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .md-card-title { font-size:.68rem; font-weight:700; color:#1b5e20; text-transform:uppercase; letter-spacing:.6px; margin-bottom:9px; padding-bottom:7px; border-bottom:1px solid #e8f5e9; }
+  .md-row { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:4px 0; border-bottom:1px solid #f5f5f5; font-size:.82rem; }
+  .md-row:last-child { border-bottom:none; padding-bottom:0; }
+  .md-lbl { color:#9e9e9e; font-weight:500; flex-shrink:0; }
+  .md-val { font-weight:600; color:#212121; text-align:right; word-break:break-word; }
+  .md-money-card { background:#f9fbe7; border-radius:11px; border:1px solid #dcedc8; padding:13px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .md-money-item { margin-bottom:9px; }
+  .md-money-item:last-child { margin-bottom:0; }
+  .md-money-lbl { font-size:.65rem; color:#9e9e9e; margin-bottom:1px; }
+  .md-collapsible { background:white; border:1px solid #e8e8e8; border-radius:10px; overflow:hidden; margin-bottom:10px; }
+  .md-collapsible-hdr { padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-size:.83rem; font-weight:700; color:#1b5e20; }
+  .md-collapsible-hdr:hover { background:#f9fbe7; }
+  .md-collapsible-body { padding:0 14px 12px; }
+
+  @media(max-width:600px) {
+    #md-info-cards { grid-template-columns:1fr !important; }
+  }
 
   @media(max-width:480px){
     .admin-nav .logo { font-size:.75rem; }
@@ -226,6 +257,20 @@
     .login-box { padding:28px 20px; }
     .perf-grid { grid-template-columns:1fr; }
   }
+
+  /* ====== REPORT CHECKBOX FILTER ====== */
+  .wp-check-label { display:flex; align-items:center; gap:6px; padding:6px 12px; background:#f1f8e9; border:1.5px solid #c8e6c9; border-radius:8px; cursor:pointer; font-size:.83rem; white-space:nowrap; user-select:none; transition:.15s; }
+  .wp-check-label:hover { background:#e8f5e9; border-color:#4caf50; }
+  .wp-check-label input[type=checkbox] { accent-color:#2e7d32; width:15px; height:15px; cursor:pointer; }
+  .wp-check-label.all-chk { font-weight:700; background:#e8f5e9; border-color:#2e7d32; }
+
+  /* ====== DAILY COLLECTION TRACKER ====== */
+  .trk-badge { display:inline-flex; align-items:center; gap:3px; padding:3px 10px; border-radius:50px; font-size:.73rem; font-weight:700; white-space:nowrap; }
+  .trk-paid    { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
+  .trk-unpaid  { background:#fff8e1; color:#e65100; border:1px solid #ffe082; }
+  .trk-overdue { background:#ffebee; color:#c62828; border:1px solid #ef9a9a; }
+  .trk-phone   { color:#1565c0; text-decoration:none; font-weight:600; }
+  .trk-phone:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -267,12 +312,14 @@
       <button class="atab" onclick="showTab('loans',this)">💰 ລາຍການກູ້</button>
       <button class="atab" onclick="showTab('products',this)">📦 ຜະລິດຕະພັນ</button>
       <button class="atab" onclick="showTab('perf',this)">📊 ຜົນດຳເນີນງານ</button>
-      <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
       <button class="atab" onclick="showTab('alerts',this)">🔔 ແຈ້ງເຕືອນ <span id="badge-alerts" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
+      <button class="atab" onclick="showTab('tracker',this)">📋 ຕິດຕາມ</button>
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
       <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
       <button class="atab" onclick="showTab('remit',this)">📤 ການສົ່ງເງິນ <span id="badge-remit" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
+      <button class="atab" onclick="showTab('report',this)">📋 ລາຍງານ</button>
+      <button class="atab" onclick="showTab('settings',this)">⚙️ ຕັ້ງຄ່າ</button>
     </div>
 
     <!-- ====== TAB: REQUESTS ====== -->
@@ -302,6 +349,7 @@
         <button class="fbtn"    data-f="rejected"  onclick="setLoanFilter(this,'rejected')">❌ ປະຕິເສດ</button>
         <input class="sbox" id="loanSearch" placeholder="🔍 ຊື່ / ເບີ / ລະຫັດ..." oninput="renderLoans()" />
         <button class="fbtn" onclick="exportLoansCSV()" style="background:#e3f2fd;border-color:#1565c0;color:#1565c0;white-space:nowrap;">⬇️ Export CSV</button>
+        <button class="fbtn" onclick="openManualLoanModal()" style="background:#e8f5e9;border-color:#2e7d32;color:#1b5e20;font-weight:700;white-space:nowrap;">➕ ສ້າງລາຍການໃໝ່</button>
       </div>
       <div id="overdueAlert" style="display:none;background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:10px 16px;margin-bottom:10px;font-size:.84rem;color:#e65100;"></div>
       <div class="tbl-card">
@@ -331,14 +379,21 @@
               <input type="text" id="pf-name" placeholder="ເຊັ່ນ: ເງິນກູ້ 30 ວັນ" required />
             </div>
             <div class="fi">
-              <label>ອັດຕາດອກເບ້ຍ (%) *</label>
-              <input type="number" id="pf-rate" placeholder="ເຊັ່ນ: 15" step="0.01" min="0" required oninput="updateProdPreview()" />
+              <label>ອັດຕາດອກເບ້ຍ (%) <small style="font-weight:400;color:#9e9e9e;">0 = ບໍ່ມີດອກ</small></label>
+              <input type="number" id="pf-rate" placeholder="0" step="0.01" min="0" oninput="updateProdPreview()" />
             </div>
             <div class="fi">
               <label>ປະເພດດອກ *</label>
               <select id="pf-type" onchange="onProdTypeChange()">
                 <option value="flat">Flat (ລວມ%)</option>
                 <option value="daily">ລາຍວັນ (%/ວັນ)</option>
+              </select>
+            </div>
+            <div class="fi">
+              <label>ປະເພດຊຳລະ *</label>
+              <select id="pf-payment-type">
+                <option value="lump_sum">ຈ່າຍຄັ້ງດຽວຕອນຄົບກຳໜົດ</option>
+                <option value="daily_installment">ຜ່ອນລາຍວັນ</option>
               </select>
             </div>
             <div class="fi" id="pf-dur-group">
@@ -399,6 +454,65 @@
 
     <!-- ====== TAB: PERFORMANCE ====== -->
     <div id="tab-perf" class="tab-pane">
+
+      <!-- Bank Statement Card -->
+      <div class="bal-card stmt-card">
+        <!-- Header: title + opening balance + filters -->
+        <div style="padding:16px 18px 14px;border-bottom:1px solid #e8f5e9;">
+          <div style="font-size:.9rem;font-weight:800;color:#1b5e20;margin-bottom:12px;">📋 Statement ການເຄື່ອນໄຫວເງິນ</div>
+
+          <!-- Opening balance input -->
+          <div style="padding:10px 12px;background:#f9fbe7;border-radius:8px;border:1px solid #dce775;margin-bottom:12px;">
+            <label style="font-size:.75rem;font-weight:700;color:#558b2f;display:block;margin-bottom:5px;">💰 ຍອດຍົກມາ / ທຶນເລີ່ມຕົ້ນ</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" inputmode="numeric" id="opening-balance-input" placeholder="0" class="money-input"
+                oninput="formatMoneyInput(this)"
+                style="flex:1;padding:7px 11px;border:2px solid #c5e1a5;border-radius:7px;font-family:inherit;font-size:.88rem;outline:none;box-sizing:border-box;" />
+              <button onclick="saveOpeningBalanceNow()"
+                style="background:#1b5e20;color:white;border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:700;white-space:nowrap;">💾 ບັນທຶກ</button>
+            </div>
+            <span id="ob-save-msg" style="font-size:.72rem;margin-top:4px;display:block;min-height:1.1em;"></span>
+          </div>
+
+          <!-- Filters -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <div style="display:flex;gap:4px;align-items:center;">
+              <label style="font-size:.74rem;color:#757575;white-space:nowrap;">ຈາກ:</label>
+              <input type="date" id="stmt-from" onchange="renderStatement()"
+                style="padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;font-size:.78rem;outline:none;" />
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <label style="font-size:.74rem;color:#757575;white-space:nowrap;">ຫາ:</label>
+              <input type="date" id="stmt-to" onchange="renderStatement()"
+                style="padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;font-size:.78rem;outline:none;" />
+            </div>
+            <button class="fbtn stmt-ftype on" onclick="setStmtFilter('all',this)">ທັງໝົດ</button>
+            <button class="fbtn stmt-ftype" onclick="setStmtFilter('dr',this)" style="color:#c62828;border-color:#ffcdd2;">📤 Dr ເງິນອອກ</button>
+            <button class="fbtn stmt-ftype" onclick="setStmtFilter('cr',this)" style="color:#2e7d32;border-color:#c8e6c9;">📥 Cr ເງິນເຂົ້າ</button>
+            <button class="fbtn" onclick="exportStatementExcel()" style="background:#e3f2fd;border-color:#1565c0;color:#1565c0;white-space:nowrap;">⬇️ Excel</button>
+          </div>
+        </div>
+
+        <!-- Statement table -->
+        <div style="overflow-x:auto;max-height:520px;overflow-y:auto;">
+          <table class="stmt-tbl">
+            <thead>
+              <tr>
+                <th>ວັນທີ</th>
+                <th>ລາຍການ</th>
+                <th style="text-align:right;">Dr (ເງິນອອກ)</th>
+                <th style="text-align:right;">Cr (ເງິນເຂົ້າ)</th>
+                <th style="text-align:right;">ຍອດຄົງເຫຼືອ</th>
+              </tr>
+            </thead>
+            <tbody id="stmtBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Footer: final balance -->
+        <div id="stmtFooter"></div>
+      </div>
+
       <div class="kpi-row" id="perfKpi"></div>
 
       <!-- P&L Summary -->
@@ -430,6 +544,30 @@
         </div>
       </div>
 
+      <!-- ====== OTHER INCOME ====== -->
+      <div class="sec-title" style="margin-top:6px;">💚 ລາຍໄດ້ອື່ນໆ</div>
+      <div class="perf-grid">
+        <div class="perf-card">
+          <h3>➕ ບັນທຶກລາຍໄດ້</h3>
+          <div class="exp-form">
+            <select id="incCat">
+              <option value="">-- ໝວດ --</option>
+              <option>ຄ່າບໍລິການ</option>
+              <option>ຄ່າທຳນຽມ</option>
+              <option>ລາຍໄດ້ອື່ນໆ</option>
+            </select>
+            <input type="text" inputmode="numeric" id="incAmt" placeholder="ຈຳນວນ (ກີບ)" class="money-input" oninput="formatMoneyInput(this)" />
+            <input type="text" id="incNote" placeholder="ໝາຍເຫດ" />
+            <input type="date" id="incDate" />
+            <button class="btn btn-primary" style="padding:8px;" onclick="addOtherIncome()">+ ບັນທຶກລາຍໄດ້</button>
+          </div>
+        </div>
+        <div class="perf-card">
+          <h3>📋 ລາຍໄດ້ທີ່ບັນທຶກ</h3>
+          <div id="otherIncomeList"></div>
+        </div>
+      </div>
+
       <!-- ====== COMPANY DEBTS ====== -->
       <div class="sec-title" style="margin-top:6px;">🏦 ໜີ້ສິນບໍລິສັດ (ທຶນກູ້ຢືມ)</div>
       <div class="perf-grid">
@@ -439,7 +577,7 @@
           <div class="exp-form" style="gap:7px;">
             <input type="text"   id="dbt-creditor"   placeholder="ຊື່ເຈົ້າໜີ້ *" />
             <input type="text" inputmode="numeric" id="dbt-amount" placeholder="ຈຳນວນກູ້ (ກີບ) *" class="money-input" oninput="formatMoneyInput(this)" />
-            <input type="number" id="dbt-rate"        placeholder="ອັດຕາດອກ (%/ເດືອນ) *" min="0" step="0.1" />
+            <input type="number" id="dbt-rate"        placeholder="ອັດຕາດອກ (%/ເດືອນ) — 0 = ບໍ່ມີດອກ" min="0" step="0.1" />
             <div id="dbt-dates-row" style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
               <div><label style="font-size:.75rem;color:#616161;">ວັນທີກູ້</label>
                    <input type="date" id="dbt-borrow" style="width:100%;padding:7px 9px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;" /></div>
@@ -465,6 +603,7 @@
           <table id="perfProdTable"></table>
         </div>
       </div>
+
     </div>
 
     <!-- ====== TAB: SETTINGS ====== -->
@@ -512,6 +651,16 @@
         </div>
         <span id="workMsg" style="font-size:.8rem;display:block;margin-top:8px;min-height:18px;"></span>
       </div>
+
+      <!-- Login history -->
+      <div class="settings-card" style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">📋 ປະຫວັດການເຂົ້າລະບົບ</h3>
+          <button class="btn btn-outline" style="padding:6px 14px;font-size:.8rem;" onclick="clearLoginHistory()">🗑 ລ້າງປະຫວັດ</button>
+        </div>
+        <p style="font-size:.82rem;color:#9e9e9e;margin-bottom:14px;">ບັນທຶກການເຂົ້າລະບົບລ່າສຸດ 20 ຄັ້ງ</p>
+        <div id="loginHistoryList"><div style="font-size:.82rem;color:#9e9e9e;">ກຳລັງໂຫລດ...</div></div>
+      </div>
     </div>
 
     <!-- ====== TAB: ALERTS ====== -->
@@ -523,6 +672,39 @@
 
       <div class="sec-title" style="color:#e65100;margin-top:18px;">🟠 ໃກ້ຄົບກຳໜົດ (ພາຍໃນ 7 ວັນ)</div>
       <div id="alert-duesoon-list"></div>
+    </div>
+
+    <!-- ====== TAB: TRACKER ====== -->
+    <div id="tab-tracker" class="tab-pane">
+
+      <!-- Summary KPIs -->
+      <div class="kpi-row" id="trackerKpi"></div>
+
+      <!-- Filter + search bar -->
+      <div class="fbar" id="trackerFilterBar">
+        <button class="fbtn on" onclick="setTrackerFilter(this,'all')">ທັງໝົດ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'paid')" style="border-color:#a5d6a7;color:#1b5e20;">✅ ຈ່າຍແລ້ວ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'unpaid')" style="border-color:#ffe082;color:#e65100;">⏰ ຍັງບໍ່ຈ່າຍ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'overdue')" style="border-color:#ef9a9a;color:#c62828;">⚠️ ຄ້າງ</button>
+        <input class="sbox" id="trackerSearch" placeholder="🔍 ຊື່ / ລະຫັດ / ເບີ..." oninput="renderTracker()" />
+      </div>
+
+      <!-- Table -->
+      <div class="tbl-card">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>ລະຫັດ</th>
+              <th>ຊື່ລູກຄ້າ</th>
+              <th>ເບີໂທ</th>
+              <th>ຜະລິດຕະພັນ</th>
+              <th style="text-align:right;">ຈ່າຍລ່າສຸດ</th>
+              <th>ວັນທີ</th>
+            </tr></thead>
+            <tbody id="trackerTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ====== TAB: CHARTS ====== -->
@@ -641,44 +823,114 @@
       </div>
     </div>
 
+    <!-- ====== TAB: REPORT ====== -->
+    <div id="tab-report" class="tab-pane">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <div class="sec-title" style="margin:0;">📋 ລາຍງານສຳລັບ Agent</div>
+        <button onclick="exportReportExcel()" class="fbtn" style="background:#1b5e20;border-color:#1b5e20;color:white;font-weight:700;white-space:nowrap;">⬇️ Export Excel</button>
+      </div>
+
+      <!-- Workplace checkbox filter -->
+      <div style="background:white;border-radius:13px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-bottom:14px;">
+        <div style="font-size:.85rem;font-weight:700;color:#1b5e20;margin-bottom:10px;">🏢 ກອງຕາມ ບ່ອນເຮັດວຽກ</div>
+        <div id="reportWpChecks" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
+      <!-- Table -->
+      <div class="tbl-card">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>ລຳດັບ</th><th>ຊື່</th><th>ລະຫັດ</th><th>ເບີໂທ</th>
+              <th>ບ່ອນເຮັດວຽກ</th><th>ຜະລິດຕະພັນ</th>
+              <th style="text-align:right;">ເງິນຕົ້ນ</th>
+              <th style="text-align:right;">ດອກເບ້ຍ</th>
+              <th style="text-align:right;">ລວມ</th>
+            </tr></thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div id="reportSummary" style="background:white;border-radius:13px;padding:14px 20px;box-shadow:0 1px 6px rgba(0,0,0,.09);margin-top:12px;font-size:.88rem;"></div>
+    </div>
+
   </div><!-- /admin-wrap -->
 </div><!-- /admin-body -->
 
 <!-- ====== LOAN DETAIL MODAL ====== -->
 <div class="modal-overlay" id="loanModal">
-  <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
-      <div>
-        <div style="font-size:.72rem;color:#9e9e9e;">ລາຍລະອຽດ</div>
-        <div id="md-id" style="font-size:1.4rem;font-weight:900;color:#1b5e20;letter-spacing:3px;"></div>
+  <div class="modal" style="max-width:650px;padding:0;overflow:hidden;">
+
+    <!-- HEADER BAND -->
+    <div id="md-header" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;padding:18px 20px 16px;"></div>
+
+    <!-- SCROLLABLE BODY -->
+    <div style="padding:14px 16px 18px;max-height:calc(90vh - 110px);overflow-y:auto;">
+
+      <!-- 3-column info cards -->
+      <div id="md-info-cards" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;"></div>
+
+      <!-- Progress bar -->
+      <div id="md-prog-wrap" style="display:none;background:white;border-radius:10px;border:1px solid #e0e0e0;padding:12px 14px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:.75rem;font-weight:600;color:#616161;margin-bottom:6px;">
+          <span>ຄວາມຄືບໜ້າ</span><span id="md-pct" style="color:#1b5e20;"></span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="md-pfill"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#9e9e9e;margin-top:5px;">
+          <span id="md-paid-txt"></span><span id="md-rem-txt"></span>
+        </div>
       </div>
-      <div id="md-status"></div>
+
+      <!-- Document section (collapsible, built by JS) -->
+      <div id="md-doc-section" style="margin-bottom:10px;"></div>
+
+      <!-- Payment history (collapsible, built by JS) -->
+      <div id="md-hist" style="margin-bottom:0;"></div>
+
+      <!-- Compound interest history (collapsible, built by JS) -->
+      <div id="md-compound-hist"></div>
+
+      <!-- Payment form -->
+      <div id="md-pay-form"></div>
+
+      <!-- Top-up form -->
+      <div id="md-topup-form"></div>
+
+      <!-- Action buttons row -->
+      <div id="md-acts" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;"></div>
+
+      <!-- Force status section (admin override) -->
+      <div id="md-force-status-section" style="display:none;background:#fff3e0;border:1.5px solid #ffcc80;border-radius:10px;padding:12px 14px;margin-top:10px;">
+        <div style="font-size:.8rem;font-weight:700;color:#e65100;margin-bottom:8px;">🔧 ແກ້ໄຂສະຖານະ (Admin Override)</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="md-force-status-sel" style="padding:7px 10px;border:2px solid #ffcc80;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;flex:1;background:white;">
+            <option value="pending">⏳ ລໍຖ້າ (pending)</option>
+            <option value="active">💰 ດຳເນີນ (active)</option>
+            <option value="completed">🎉 ສຳເລັດ (completed)</option>
+            <option value="rejected">❌ ປະຕິເສດ (rejected)</option>
+          </select>
+          <button style="background:#e65100;color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:700;white-space:nowrap;" onclick="doForceStatus()">✅ ບັນທຶກສະຖານະ</button>
+        </div>
+      </div>
+
+      <!-- Barcode -->
+      <div id="md-barcode-section" style="display:none;margin-top:14px;background:#f9fbe7;border:1px solid #c8e6c9;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">🔲 Barcode ສຳລັບ Agent</div>
+        <svg id="md-barcode-svg" style="max-width:100%;height:70px;"></svg>
+        <div style="margin-top:8px;">
+          <button class="btn btn-outline" style="padding:6px 16px;font-size:.8rem;" onclick="printBarcodeCard()">🖨️ ພິມບັດ</button>
+        </div>
+      </div>
+
+    </div><!-- /scrollable body -->
+
+    <!-- FOOTER -->
+    <div style="padding:10px 16px;border-top:1px solid #e8e8e8;background:#fafafa;">
+      <button class="btn btn-outline btn-full" onclick="closeLoanModal()">ປິດ</button>
     </div>
-    <div class="dg" id="md-grid"></div>
-    <div id="md-doc-img" style="margin-top:10px;"></div>
-    <div id="md-prog-wrap" style="display:none;margin-top:10px;">
-      <div style="display:flex;justify-content:space-between;font-size:.74rem;color:#9e9e9e;">
-        <span>ຄວາມຄືບໜ້າ</span><span id="md-pct"></span>
-      </div>
-      <div class="prog-bar"><div class="prog-fill" id="md-pfill"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#9e9e9e;margin-top:2px;">
-        <span id="md-paid-txt"></span><span id="md-rem-txt"></span>
-      </div>
-    </div>
-    <div id="md-hist" style="margin-top:12px;"></div>
-    <div id="md-compound-hist"></div>
-    <div id="md-pay-form"></div>
-    <div id="md-topup-form"></div>
-    <div class="ma" id="md-acts"></div>
-    <!-- Barcode Section -->
-    <div id="md-barcode-section" style="display:none;margin-top:14px;background:#f9fbe7;border:1px solid #c8e6c9;border-radius:10px;padding:14px;text-align:center;">
-      <div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">🔲 Barcode ສຳລັບ Agent</div>
-      <svg id="md-barcode-svg" style="max-width:100%;height:70px;"></svg>
-      <div style="margin-top:8px;">
-        <button class="btn btn-outline" style="padding:6px 16px;font-size:.8rem;" onclick="printBarcodeCard()">🖨️ ພິມບັດ</button>
-      </div>
-    </div>
-    <button class="btn btn-outline btn-full" style="margin-top:10px;" onclick="closeLoanModal()">ປິດ</button>
+
   </div>
 </div>
 
@@ -741,14 +993,23 @@
 </div>
 <style>@keyframes ld-spin{to{transform:rotate(360deg);}}</style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 <script>
 // ====== LOGO ======
-(function() {
-  const saved = localStorage.getItem('uf_logo');
-  if (saved) applyLogo(saved);
-})();
+async function loadLogo() {
+  const cached = localStorage.getItem('uf_logo');
+  if (cached) applyLogo(cached);
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','company_logo').single();
+    if (data?.value) {
+      applyLogo(data.value);
+      localStorage.setItem('uf_logo', data.value);
+    }
+  } catch {}
+}
+loadLogo();
 
 function applyLogo(dataUrl) {
   const pb = document.getElementById('logoPreviewBox');
@@ -770,7 +1031,7 @@ function uploadLogo(input) {
   reader.onload = function(e) {
     // Compress to 200px
     const img = new Image();
-    img.onload = function() {
+    img.onload = async function() {
       let w = img.width, h = img.height, maxW = 200;
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       const canvas = document.createElement('canvas');
@@ -779,7 +1040,13 @@ function uploadLogo(input) {
       const compressed = canvas.toDataURL('image/jpeg', 0.85);
       localStorage.setItem('uf_logo', compressed);
       applyLogo(compressed);
-      document.getElementById('logoMsg').textContent = '✅ ບັນທຶກໂລໂກ້ສຳເລັດ';
+      try {
+        await sb.from('app_settings').upsert({ key: 'company_logo', value: compressed, updated_at: new Date().toISOString() });
+        document.getElementById('logoMsg').textContent = '✅ ບັນທຶກໂລໂກ້ສຳເລັດ (ທຸກອຸປະກອນ)';
+      } catch(err) {
+        document.getElementById('logoMsg').textContent = '⚠️ ບັນທຶກສຳເລັດສະເພາະອຸປະກອນນີ້';
+        console.warn('Logo Supabase save failed:', err);
+      }
       showToast('ອັບໂຫລດໂລໂກ້ ✅');
       setTimeout(() => { document.getElementById('logoMsg').textContent = ''; }, 3000);
     };
@@ -788,8 +1055,11 @@ function uploadLogo(input) {
   reader.readAsDataURL(file);
 }
 
-function removeLogo() {
+async function removeLogo() {
   localStorage.removeItem('uf_logo');
+  try {
+    await sb.from('app_settings').delete().eq('key', 'company_logo');
+  } catch(err) { console.warn('Logo Supabase delete failed:', err); }
   const pb = document.getElementById('logoPreviewBox');
   if (pb) pb.innerHTML = '🏦';
   const rb = document.getElementById('logoRemoveBtn');
@@ -812,6 +1082,39 @@ async function saveAdminPwd(newPwd) {
   await sb.from('app_settings').upsert({ key:'admin_password', value:newPwd, updated_at:new Date().toISOString() });
 }
 
+let _openingBalance = 0;
+let _otherIncome = [];
+
+async function getOpeningBalance() {
+  const { data, error } = await sb.from('app_settings').select('value').eq('key','opening_balance').single();
+  console.log('[opening_balance] load:', data?.value, error?.message);
+  if (error) return 0;
+  const val = parseFloat(data?.value) || 0;
+  console.log('[opening_balance] loaded value:', val);
+  return val;
+}
+async function saveOpeningBalanceNow() {
+  const inp = document.getElementById('opening-balance-input');
+  const msg = document.getElementById('ob-save-msg');
+  const amount = getMoneyValue(inp);
+  console.log('[opening_balance] saving:', amount);
+  msg.style.color = '#9e9e9e';
+  msg.textContent = 'ກຳລັງບັນທຶກ...';
+  const { data, error } = await sb.from('app_settings')
+    .upsert({ key: 'opening_balance', value: String(amount) }, { onConflict: 'key' });
+  console.log('[opening_balance] save result — data:', data, '| error:', error);
+  if (error) {
+    msg.style.color = '#c62828';
+    msg.textContent = '❌ Error: ' + error.message;
+  } else {
+    _openingBalance = amount;
+    renderCurrentBalance();
+    msg.style.color = '#2e7d32';
+    msg.textContent = '✅ ບັນທຶກສຳເລັດ';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  }
+}
+
 async function doLogin() {
   const v = document.getElementById('pwdInput').value;
   const errEl = document.getElementById('pwdErr');
@@ -829,6 +1132,7 @@ async function doLogin() {
       btn.disabled = false;
       return;
     }
+    recordLogin(); // fire-and-forget
     sessionStorage.setItem('admin_auth','1');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminBody').style.display = 'block';
@@ -841,6 +1145,76 @@ async function doLogin() {
 }
 function doLogout() { sessionStorage.removeItem('admin_auth'); location.reload(); }
 document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+// ====== LOGIN HISTORY ======
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  let device = 'Computer', os = 'Unknown', browser = 'Unknown';
+  if (/iPhone/.test(ua))            { device = 'iPhone';       os = 'iOS'; }
+  else if (/iPad/.test(ua))         { device = 'iPad';         os = 'iPadOS'; }
+  else if (/Android/.test(ua))      { device = 'Android Phone'; os = 'Android'; }
+  else if (/Windows NT 10/.test(ua)){ device = 'Windows PC';   os = 'Windows 10/11'; }
+  else if (/Mac OS X/.test(ua))     { device = 'Mac';          os = 'macOS'; }
+  if (/Edg\//.test(ua))             browser = 'Edge';
+  else if (/Chrome\//.test(ua))     browser = 'Chrome';
+  else if (/Safari\//.test(ua))     browser = 'Safari';
+  else if (/Firefox\//.test(ua))    browser = 'Firefox';
+  return { device, os, browser };
+}
+async function recordLogin() {
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','login_history').single();
+    const history = JSON.parse(data?.value || '[]');
+    const info = getDeviceInfo();
+    history.unshift({ ...info, time: new Date().toISOString(), ip: 'N/A' });
+    if (history.length > 50) history.length = 50;
+    await sb.from('app_settings').upsert({ key: 'login_history', value: JSON.stringify(history), updated_at: new Date().toISOString() });
+  } catch {}
+}
+async function loadLoginHistory() {
+  const el = document.getElementById('loginHistoryList');
+  if (!el) return;
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','login_history').single();
+    const history = JSON.parse(data?.value || '[]');
+    if (!history.length) {
+      el.innerHTML = '<div style="font-size:.82rem;color:#9e9e9e;padding:8px 0;">ຍັງບໍ່ມີປະຫວັດ</div>';
+      return;
+    }
+    const fmt = iso => {
+      const d = new Date(iso);
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+    const rows = history.slice(0, 20).map(r => `
+      <tr>
+        <td style="padding:8px 10px;font-size:.82rem;font-weight:600;">${r.device || '-'}</td>
+        <td style="padding:8px 10px;font-size:.82rem;color:#616161;">${r.os || '-'}</td>
+        <td style="padding:8px 10px;font-size:.82rem;color:#616161;">${r.browser || '-'}</td>
+        <td style="padding:8px 10px;font-size:.78rem;color:#9e9e9e;white-space:nowrap;">${fmt(r.time)}</td>
+      </tr>`).join('');
+    el.innerHTML = `<div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f5f5f5;">
+            <th style="padding:8px 10px;font-size:.75rem;text-align:left;color:#616161;font-weight:700;">ອຸປະກອນ</th>
+            <th style="padding:8px 10px;font-size:.75rem;text-align:left;color:#616161;font-weight:700;">ລະບົບ</th>
+            <th style="padding:8px 10px;font-size:.75rem;text-align:left;color:#616161;font-weight:700;">Browser</th>
+            <th style="padding:8px 10px;font-size:.75rem;text-align:left;color:#616161;font-weight:700;">ວັນທີ-ເວລາ</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  } catch {
+    el.innerHTML = '<div style="font-size:.82rem;color:#9e9e9e;">ໂຫລດບໍ່ໄດ້</div>';
+  }
+}
+async function clearLoginHistory() {
+  if (!confirm('ລ້າງປະຫວັດທັງໝົດ?')) return;
+  await sb.from('app_settings').upsert({ key: 'login_history', value: '[]', updated_at: new Date().toISOString() });
+  loadLoginHistory();
+  showToast('ລ້າງປະຫວັດ ✅');
+}
 async function changePwd() {
   const p1=document.getElementById('np1').value, p2=document.getElementById('np2').value;
   const msg=document.getElementById('pwdMsg');
@@ -889,11 +1263,13 @@ function showTab(name, btn) {
   if (name==='products') renderProducts();
   if (name==='perf')     renderPerf();
   if (name==='alerts')   renderAlerts();
+  if (name==='tracker')  renderTracker();
   if (name==='charts')   renderCharts();
   if (name==='credits')  renderCreditScore();
   if (name==='agents')   renderAgents();
   if (name==='remit')    renderRemittances();
-  if (name==='settings') loadWorkOptionsAdmin();
+  if (name==='report')   initReport();
+  if (name==='settings') { loadWorkOptionsAdmin(); loadLoginHistory(); }
 }
 
 // ====== INIT ======
@@ -902,11 +1278,13 @@ async function initAdmin() {
   if (overlay) overlay.style.display = 'flex';
   try {
     await DB.loadAll();
+    _openingBalance = await getOpeningBalance().catch(() => 0);
     updatePendingBadge();
     updateAlertsBadge();
     updateRemitBadge();
     setInterval(updateRemitBadge, 60000);
     renderRequests();
+    debugBalance().catch(console.error);
   } catch(err) {
     showToast('ໂຫລດຂໍ້ມູນລົ້ມເຫລວ', 'error');
     console.error(err);
@@ -1000,9 +1378,10 @@ function renderLoans() {
   const tbody = document.getElementById('loanTableBody');
   if (!loans.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="9">ບໍ່ພົບ</td></tr>'; return; }
   tbody.innerHTML = loans.map(l => {
-    const origTotal  = (l.paidAmount || 0) + (l.totalDue || 0);
-    const pct        = origTotal > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / origTotal) * 100)) : 0;
-    const rem        = l.totalDue || 0;
+    const _prod      = DB.products.find(p => p.id === l.productId);
+    const _total     = _prod ? calcLoanTotal(_prod, l.amount, l.duration) : Math.max((l.paidAmount||0) + (l.totalDue||0), l.amount);
+    const pct        = _total > 0 ? Math.min(100, Math.round(((l.paidAmount||0) / _total) * 100)) : 0;
+    const rem        = Math.max(0, _total - (l.paidAmount || 0));
     const due        = calcDueDate(l);
     const overdue    = isLoanOverdue(l);
     const topupCount = DB.getLoanTopups(l.id).length;
@@ -1013,7 +1392,7 @@ function renderLoans() {
       <td>${l.name}<div style="font-size:.7rem;color:#9e9e9e;">${l.phone}</div></td>
       <td style="font-size:.78rem;">${l.productName}</td>
       <td>${formatMoney(l.amount)}</td>
-      <td>${formatMoney(l.totalDue)}</td>
+      <td>${formatMoney(_total)}</td>
       <td>
         <div style="font-size:.8rem;">${formatMoney(l.paidAmount)}</div>
         <div class="mini-prog"><div class="mini-prog-fill" style="width:${pct}%;"></div></div>
@@ -1037,13 +1416,73 @@ function renderLoans() {
 function doStatus(id, newStatus) {
   const labels = { active:'ອະນຸມັດ & ໂອນເງິນ', completed:'ປິດສຳເລັດ', rejected:'ປະຕິເສດ' };
   const icons  = { active:'✅', completed:'🎉', rejected:'❌' };
-  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', `ຢືນຢັນ: ${labels[newStatus]}`, async () => {
+  const today  = new Date().toISOString().slice(0, 10);
+  const loan   = DB.loans.find(l => l.id === id);
+  const _lProd = loan ? DB.products.find(p => p.id === loan.productId) : null;
+  const correctTotal = _lProd ? calcLoanTotal(_lProd, loan.amount, loan.duration) : (loan?.totalDue || 0);
+  const remaining = loan ? Math.max(0, correctTotal - (loan.paidAmount || 0)) : 0;
+
+  let msgHtml;
+  if (newStatus === 'active') {
+    msgHtml = `ຢືນຢັນ: ${labels[newStatus]}<div style="margin-top:12px;">
+       <label style="font-size:.82rem;font-weight:600;color:#1b5e20;display:block;margin-bottom:5px;">📅 ວັນທີກູ້ຢືມ</label>
+       <input type="date" id="approvalDateInput" value="${today}"
+         style="width:100%;padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;"
+         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#e0e0e0'" /></div>`;
+  } else if (newStatus === 'completed' && remaining > 0) {
+    msgHtml = `ປິດສຳເລັດ — ຍອດທີ່ຮັບຈິງ: <strong style="color:#1b5e20;">${formatMoney(loan.paidAmount || 0)}</strong><br>
+      <div style="margin-top:8px;background:#fff3e0;border-radius:8px;padding:8px 12px;font-size:.85rem;">
+        ✂️ ສ່ວນຫຼຸດ (Write-off): <strong style="color:#e65100;">${formatMoney(remaining)}</strong><br>
+        <span style="font-size:.78rem;color:#9e9e9e;">ຍອດຄ້າງ ${formatMoney(remaining)} ຈະຖືກໝາຍ Write-off ໃນ ຍອດດຸ່ນດ່ຽງ</span>
+      </div>`;
+  } else {
+    msgHtml = `ຢືນຢັນ: ${labels[newStatus]}`;
+  }
+  openConfirm(icons[newStatus]||'?', labels[newStatus]+'?', msgHtml, async () => {
     try {
+      // Special handling for 'completed' status with discount
+      if (newStatus === 'completed' && loan) {
+        const discountAmount = Math.max(0, correctTotal - (loan.paidAmount || 0));
+        if (discountAmount > 0) {
+          // Mark as fully paid and record discount
+          const { error } = await sb.from('loans').update({
+            status: 'completed',
+            paid_amount: correctTotal,
+            total_due: correctTotal,
+            remaining_principal: 0,
+            discount_amount: discountAmount
+          }).eq('id', id);
+          if (error) throw error;
+          // Update local state
+          loan.status = 'completed';
+          loan.paidAmount = correctTotal;
+          loan.totalDue = correctTotal;
+          loan.remainingPrincipal = 0;
+          loan.discountAmount = discountAmount;
+          closeConfirm();
+          updatePendingBadge(); updateAlertsBadge(); renderRequests();
+          if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+          if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+          if (document.getElementById('tab-perf').classList.contains('on')) renderPerf();
+          if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
+          showToast(`✅ ສຳເລັດ | ສ່ວນຫຼຸດ: ${formatMoney(discountAmount)} ກີບ`);
+          return;
+        }
+      }
+
+      // Normal status update
       await DB.updateLoanStatus(id, newStatus);
+      if (newStatus === 'active') {
+        const di = document.getElementById('approvalDateInput');
+        if (di?.value) {
+          const iso = new Date(di.value + 'T00:00:00').toISOString();
+          await sb.from('loans').update({ created_at: iso }).eq('id', id);
+          const loan = DB.loans.find(l => l.id === id);
+          if (loan) loan.createdAt = iso;
+        }
+      }
       closeConfirm();
-      updatePendingBadge();
-      updateAlertsBadge();
-      renderRequests();
+      updatePendingBadge(); updateAlertsBadge(); renderRequests();
       if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
       if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
       if (document.getElementById('loanModal').classList.contains('open')) openLoanModal(id);
@@ -1069,47 +1508,124 @@ function openLoanModal(id, focus) {
   currentLoanId = id;
   const loan = DB.loans.find(l=>l.id===id);
   if (!loan) return;
+  // Reset admin tools panel on each open
+  const _fsEl = document.getElementById('md-force-status-section');
+  if (_fsEl) _fsEl.style.display = 'none';
   const payments = DB.getLoanPayments(id);
   const paid  = loan.paidAmount || 0;
-  const rem   = loan.totalDue || 0;
-  const total = paid + rem;
-  const pct   = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
-  const MTD   = {bcel:'BCEL',ldb:'LDB',cash:'ເງິນສົດ',transfer:'ໂອນ'};
+  const _prod = DB.products.find(p => p.id === loan.productId);
 
-  document.getElementById('md-id').textContent = loan.id;
-  document.getElementById('md-status').innerHTML = stBadge(loan.status);
+  // Always derive totals from the product formula so the display is correct
+  // regardless of whether totalDue in DB was decremented (e.g. manual loans with initial paidAmount).
+  // Interest = Principal × rate/100  (flat)  or  Principal × rate/100 × days  (daily)
+  // Total    = Principal + Interest
+  // Remaining = Total − Amount already paid
+  const total    = _prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : Math.max(paid + (loan.totalDue || 0), loan.amount);
+  const interest = Math.max(0, total - loan.amount);
+  const rem      = Math.max(0, total - paid);
+  const pct      = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+  const MTD   = {bcel:'BCEL',ldb:'LDB',cash:'ເງິນສົດ',transfer:'ໂອນ'};
 
   const DOC_TYPE_NAMES = {id:'🪪 ບັດປະຈຳໂຕ', family:'📖 ສຳມະໂນຄົວ', passport:'✈️ ພາດສະປອດ'};
   const due      = calcDueDate(loan);
   const overdue  = isLoanOverdue(loan);
   const dueTxt   = due ? (overdue
-    ? `<span style="color:#c62828;font-weight:900;">⚠️ ${due.toLocaleDateString('lo-LA',{year:'numeric',month:'long',day:'numeric'})} — ເກີນກຳໜົດ</span>`
+    ? `<span style="color:#ffcdd2;font-weight:700;">⚠️ ${due.toLocaleDateString('lo-LA',{year:'numeric',month:'long',day:'numeric'})} — ເກີນກຳໜົດ</span>`
     : due.toLocaleDateString('lo-LA',{year:'numeric',month:'long',day:'numeric'}))
     : '-';
-  document.getElementById('md-grid').innerHTML = [
-    {l:'ຊື່',v:loan.name},{l:'ເບີ',v:loan.phone},
-    {l:'ປະເພດເອກ',v:DOC_TYPE_NAMES[loan.docType]||loan.docType||'-'},{l:'ເລກເອກ',v:loan.idCard||'-'},
-    {l:'ບ່ອນເຮັດວຽກ',v:loan.workplace||'-'},{l:'ລາຍໄດ້',v:loan.income?formatMoney(loan.income):'-'},
-    {l:'ຜະລິດຕະພັນ',v:loan.productName||'-'},{l:'ໄລຍະ',v:(loan.duration||'-')+' ວັນ'},
-    {l:'ວັນສ້າງ',v:formatDate(loan.createdAt)},{l:'ວັນຄົບກຳໜົດ',v:dueTxt},
-    {l:'ກູ້',v:formatMoney(loan.amount)},{l:'ຍອດລວມ',v:formatMoney(total)},
-    {l:'ຊຳລະ',v:formatMoney(paid)},{l:'ຄ້າງ',v:formatMoney(rem)},
-    {l:'ຕົ້ນທຶນຄ້າງ',v:formatMoney(loan.remainingPrincipal ?? loan.amount)},{l:'ດອກທີ່ໄດ້ຮັບ',v:formatMoney(loan.interestPaid||0)},
-    {l:'ທີ່ຢູ່',v:loan.address||'-',full:true},
-    {l:'ໝາຍເຫດ',v:loan.note||'-',full:true},
-  ].map(r=>`<div class="dr${r.full?' full':''}"><div class="dl">${r.l}</div><div class="dv">${r.v}</div></div>`).join('');
 
-  const docImgEl = document.getElementById('md-doc-img');
+  // ── HEADER BAND ──
+  document.getElementById('md-header').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div>
+        <div style="font-size:.62rem;opacity:.7;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px;">ລາຍລະອຽດເງິນກູ້</div>
+        <div style="font-size:1.55rem;font-weight:800;letter-spacing:2px;line-height:1;">${loan.id}</div>
+      </div>
+      <div>${stBadge(loan.status)}</div>
+    </div>
+    <div style="font-size:1.05rem;font-weight:700;">${loan.name}</div>
+    <div style="font-size:.85rem;opacity:.8;margin-top:2px;">📞 ${loan.phone}</div>`;
+
+  // ── 3-COLUMN INFO CARDS ──
+  const mkR = (lbl, val) =>
+    `<div class="md-row"><span class="md-lbl">${lbl}</span><span class="md-val">${val}</span></div>`;
+
+  document.getElementById('md-info-cards').innerHTML = `
+    <div class="md-card">
+      <div class="md-card-title">👤 ລູກຄ້າ</div>
+      ${mkR('ບ່ອນເຮັດວຽກ', loan.workplace||'-')}
+      ${mkR('ລາຍໄດ້', loan.income ? formatMoney(loan.income)+' ກີບ' : '-')}
+      ${mkR('ປະເພດເອກ', DOC_TYPE_NAMES[loan.docType]||loan.docType||'-')}
+      ${mkR('ເລກເອກ', loan.idCard||'-')}
+      ${loan.address ? `<div style="margin-top:7px;padding-top:7px;border-top:1px solid #f0f0f0;font-size:.78rem;color:#616161;line-height:1.5;">📍 ${loan.address}</div>` : ''}
+    </div>
+    <div class="md-card">
+      <div class="md-card-title">📋 ເງິນກູ້</div>
+      ${mkR('ຜະລິດຕະພັນ', `<span style="background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:4px;font-size:.78rem;">${loan.productName||'-'}</span>`)}
+      ${mkR('ໄລຍະ', (loan.duration||'-')+' ວັນ')}
+      ${mkR('ວັນເລີ່ມ', formatDate(loan.createdAt))}
+      ${mkR('ວັນຄົບ', dueTxt)}
+      ${loan.note ? mkR('ໝາຍເຫດ', `<span style="font-size:.78rem;">${loan.note}</span>`) : ''}
+    </div>
+    <div class="md-money-card">
+      <div class="md-card-title" style="border-bottom-color:#dcedc8;">💰 ຍອດເງິນ</div>
+      <div class="md-money-item">
+        <div class="md-money-lbl">ເງິນຕົ້ນ</div>
+        <div style="font-size:1.15rem;font-weight:800;color:#1b5e20;">${formatMoney(loan.amount)}</div>
+      </div>
+      <div class="md-money-item">
+        <div class="md-money-lbl">ດອກ</div>
+        ${interest === 0
+          ? `<div style="font-weight:700;color:#2e7d32;">🎁 ກູ້ດອກ 0%</div>`
+          : `<div style="font-weight:700;color:#e65100;">${formatMoney(interest)}</div>`}
+      </div>
+      <div class="md-money-item" style="border-top:1.5px solid #c8e6c9;padding-top:7px;margin-top:4px;">
+        <div class="md-money-lbl">ລວມ</div>
+        <div style="font-size:1rem;font-weight:800;color:#212121;">${formatMoney(total)}</div>
+      </div>
+      <div class="md-money-item">
+        <div class="md-money-lbl">ຄ້າງ</div>
+        <div style="font-size:1rem;font-weight:800;color:${rem > 0 ? '#c62828' : '#1b5e20'};">${formatMoney(rem)}</div>
+      </div>
+      ${loan.interestPaid ? `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
+        <div class="md-money-lbl">ດອກຮັບແລ້ວ</div>
+        <div style="font-weight:600;color:#388e3c;">${formatMoney(loan.interestPaid)}</div>
+      </div>` : ''}
+      ${(() => {
+        const prod = DB.products.find(p => p.id === loan.productId);
+        if (prod?.paymentType !== 'daily_installment') return '';
+        const dp = loan.dailyPayment || (loan.duration > 0 ? Math.round(total / loan.duration) : 0);
+        const paidDays = dp > 0 ? Math.floor(paid / dp) : 0;
+        return `<div class="md-money-item" style="border-top:1.5px solid #90caf9;padding-top:7px;margin-top:6px;background:#e3f2fd;border-radius:7px;padding:7px 8px;">
+          <div class="md-money-lbl" style="color:#1565c0;">ຜ່ອນລາຍວັນ</div>
+          <div style="font-weight:800;color:#1565c0;">${formatMoney(dp)} ກີບ/ວັນ</div>
+          <div class="md-money-lbl" style="color:#1565c0;margin-top:4px;">ຈ່າຍແລ້ວ</div>
+          <div style="font-weight:600;color:#1b5e20;">${paidDays} / ${loan.duration || '-'} ວັນ</div>
+        </div>`;
+      })()}
+    </div>`;
+
+  // ── DOCUMENT SECTION (collapsible) ──
+  const docSection  = document.getElementById('md-doc-section');
+  const docTypeName = DOC_TYPE_NAMES[loan.docType] || 'ເອກະສານ';
+  const docTogId    = 'dtog-' + loan.id;
   if (loan.docImage) {
-    const typeName = DOC_TYPE_NAMES[loan.docType] || 'ເອກະສານ';
-    docImgEl.innerHTML = `
-      <div style="background:#f1f8e9;border-radius:8px;padding:12px;">
-        <div style="font-size:.72rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">📎 ຮູບເອກະສານ — ${typeName}</div>
-        <img src="${loan.docImage}" style="max-width:100%;border-radius:8px;border:1px solid #c8e6c9;display:block;cursor:zoom-in;" alt="ເອກະສານ"
-             onclick="this.style.maxWidth=this.style.maxWidth==='none'?'100%':'none'" title="ຄລິກເພື່ອຂະຫຍາຍ" />
+    docSection.innerHTML = `
+      <div class="md-collapsible">
+        <div class="md-collapsible-hdr" onclick="toggleMdSection('${docTogId}')">
+          <span>📎 ${docTypeName} · ${loan.idCard||'-'}</span>
+          <span id="${docTogId}-arr" style="color:#9e9e9e;font-size:.8rem;">▼</span>
+        </div>
+        <div id="${docTogId}" style="display:none;" class="md-collapsible-body">
+          <img src="${loan.docImage}" style="max-width:100%;border-radius:8px;border:1px solid #c8e6c9;display:block;cursor:zoom-in;"
+               onclick="this.style.maxWidth=this.style.maxWidth==='none'?'100%':'none'" title="ຄລິກຂະຫຍາຍ" />
+        </div>
       </div>`;
   } else {
-    docImgEl.innerHTML = `<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;font-size:.8rem;color:#e65100;">⚠️ ບໍ່ມີຮູບເອກະສານ</div>`;
+    docSection.innerHTML = `
+      <div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:10px 14px;font-size:.82rem;color:#e65100;">
+        ⚠️ ${docTypeName} · ${loan.idCard||'-'} — ບໍ່ມີຮູບເອກະສານ
+      </div>`;
   }
 
   const pw = document.getElementById('md-prog-wrap');
@@ -1121,44 +1637,72 @@ function openLoanModal(id, focus) {
     document.getElementById('md-rem-txt').textContent  = 'ຄ້າງ: '+formatMoney(rem);
   } else pw.style.display = 'none';
 
-  document.getElementById('md-hist').innerHTML = payments.length
-    ? `<div style="font-size:.78rem;font-weight:700;color:#1b5e20;margin-bottom:6px;">🧾 ປະຫວັດຊຳລະ (${payments.length})</div>
-       <div class="history-list">${[...payments].reverse().map(p=>`
-         <div class="hist-item">
-           <div><div style="font-weight:600;">${formatDate(p.date)}</div>
-           <div class="hi-ref">${p.ref} · ${MTD[p.method]||p.method}${p.note?' · '+p.note:''}</div></div>
-           <div class="hi-amt">+${formatMoney(p.amount)}</div>
-         </div>`).join('')}</div>` : '';
+  // ── PAYMENT HISTORY (collapsible) ──
+  const histTogId = 'htog-' + loan.id;
+  document.getElementById('md-hist').innerHTML = payments.length ? `
+    <div class="md-collapsible">
+      <div class="md-collapsible-hdr" onclick="toggleMdSection('${histTogId}')">
+        <span>🧾 ປະຫວັດຊຳລະ <span style="background:#e8f5e9;color:#1b5e20;padding:1px 8px;border-radius:50px;font-size:.72rem;margin-left:4px;">${payments.length}</span></span>
+        <span id="${histTogId}-arr" style="color:#9e9e9e;font-size:.8rem;">▼</span>
+      </div>
+      <div id="${histTogId}" style="display:none;" class="md-collapsible-body">
+        <div class="history-list">${[...payments].reverse().map(p=>`
+          <div class="hist-item">
+            <div>
+              <div style="font-weight:600;font-size:.83rem;">${formatDate(p.date)}</div>
+              <div class="hi-ref">${p.ref} · ${MTD[p.method]||p.method}${p.note?' · '+p.note:''}</div>
+            </div>
+            <div class="hi-amt">+${formatMoney(p.amount)}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>` : '';
 
-  const cphList = DB.getCompoundHistory(id);
-  document.getElementById('md-compound-hist').innerHTML = cphList.length
-    ? `<div style="font-size:.78rem;font-weight:700;color:#3949ab;margin:10px 0 6px;">🔄 ປະຫວັດທົບຕົ້ນດອກ (${cphList.length})</div>
-       <div class="history-list">${[...cphList].reverse().map(h=>`
-         <div class="hist-item">
-           <div>
-             <div style="font-weight:600;">${formatDate(h.date)}</div>
-             <div class="hi-ref">ດອກຄ້າງ ${formatMoney(h.unpaidInterest)} → ຕົ້ນໃໝ່ ${formatMoney(h.newPrincipal)}${h.note?' · '+h.note:''}</div>
-           </div>
-           <div class="hi-amt" style="color:#3949ab;">ລວມ ${formatMoney(h.newTotalDue)}</div>
-         </div>`).join('')}</div>` : '';
+  // ── COMPOUND INTEREST HISTORY (collapsible) ──
+  const cphList   = DB.getCompoundHistory(id);
+  const cphTogId  = 'ctog-' + loan.id;
+  document.getElementById('md-compound-hist').innerHTML = cphList.length ? `
+    <div class="md-collapsible" style="border-color:#c5cae9;">
+      <div class="md-collapsible-hdr" style="color:#3949ab;" onclick="toggleMdSection('${cphTogId}')">
+        <span>🔄 ປະຫວັດທົບຕົ້ນດອກ <span style="background:#e8eaf6;color:#3949ab;padding:1px 8px;border-radius:50px;font-size:.72rem;margin-left:4px;">${cphList.length}</span></span>
+        <span id="${cphTogId}-arr" style="color:#9e9e9e;font-size:.8rem;">▼</span>
+      </div>
+      <div id="${cphTogId}" style="display:none;" class="md-collapsible-body">
+        <div class="history-list">${[...cphList].reverse().map(h=>`
+          <div class="hist-item">
+            <div>
+              <div style="font-weight:600;font-size:.83rem;">${formatDate(h.date)}</div>
+              <div class="hi-ref">ດອກຄ້າງ ${formatMoney(h.unpaidInterest)} → ຕົ້ນໃໝ່ ${formatMoney(h.newPrincipal)}${h.note?' · '+h.note:''}</div>
+            </div>
+            <div class="hi-amt" style="color:#3949ab;">ລວມ ${formatMoney(h.newTotalDue)}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>` : '';
 
   // Payment form for active loans
   const pf = document.getElementById('md-pay-form');
   if (loan.status === 'active') {
-    pf.innerHTML = `<div class="pay-form">
-      <h4>💳 ບັນທຶກການຊຳລະ</h4>
-      <div class="pay-row">
-        <input type="text" inputmode="numeric" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" class="money-input" oninput="formatMoneyInput(this)" />
-        <select id="pay-method">
-          <option value="bcel">BCEL</option>
-          <option value="ldb">LDB</option>
-          <option value="cash">ເງິນສົດ</option>
-          <option value="transfer">ໂອນ</option>
-        </select>
-      </div>
-      <input type="text" id="pay-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:8px;" />
-      <button class="btn btn-primary btn-full" style="padding:9px;" onclick="doPayment()">✅ ຢືນຢັນຊຳລະ</button>
-    </div>`;
+    pf.innerHTML = `
+      <div style="background:#f9fbe7;border:1.5px solid #c8e6c9;border-radius:11px;padding:14px 16px;margin-top:12px;">
+        <div style="font-size:.82rem;font-weight:700;color:#1b5e20;margin-bottom:12px;">💳 ບັນທຶກການຊຳລະ</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <input type="text" inputmode="numeric" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" class="money-input"
+            style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+            oninput="formatMoneyInput(this)" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+          <select id="pay-method" style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;"
+            onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'">
+            <option value="bcel">🏦 BCEL</option>
+            <option value="ldb">🏛 LDB</option>
+            <option value="cash">💵 ເງິນສົດ</option>
+            <option value="transfer">💳 ໂອນ</option>
+          </select>
+        </div>
+        <input type="text" id="pay-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)"
+          style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:10px;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+        <button class="btn btn-primary btn-full" style="padding:11px;font-size:.9rem;" onclick="doPayment()">✅ ຢືນຢັນຊຳລະ</button>
+      </div>`;
     if (focus === 'pay') {
       setTimeout(()=>document.getElementById('pay-amt')?.focus(), 300);
     }
@@ -1200,25 +1744,31 @@ function openLoanModal(id, focus) {
   const acts = document.getElementById('md-acts');
   acts.innerHTML = '';
   if (loan.status === 'pending') {
-    acts.innerHTML += `<button class="btn btn-primary" onclick="doStatus('${id}','active')">✅ ອະນຸມັດ</button>`;
-    acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:none;" onclick="doStatus('${id}','rejected')">❌ ປະຕິເສດ</button>`;
+    acts.innerHTML += `<button class="btn btn-primary" style="flex:1;min-width:120px;" onclick="doStatus('${id}','active')">✅ ອະນຸມັດ</button>`;
+    acts.innerHTML += `<button class="btn" style="flex:1;min-width:100px;background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;" onclick="doStatus('${id}','rejected')">❌ ປະຕິເສດ</button>`;
   }
   if (loan.status === 'active') {
-    acts.innerHTML += `<button class="btn btn-primary" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
-    acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:none;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
+    acts.innerHTML += `<button class="btn btn-primary" style="flex:1;min-width:120px;" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
+    acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
     if (DB.products.some(p => p.isVip && p.status === 'active')) {
-      acts.innerHTML += `<button class="btn btn-vip" onclick="doInviteVip('${id}')">👑 ເຊີນ VIP</button>`;
+      acts.innerHTML += `<button class="btn btn-vip" onclick="openVipModal('${id}')">👑 VIP</button>`;
     }
     const product = DB.products.find(p => p.id === loan.productId);
     if (overdue && rem > 0 && product?.compound) {
-      acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:none;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
+      acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
     }
     const _curP = loan.remainingPrincipal ?? loan.amount;
     const _iDue = Math.max(0, loan.totalDue - _curP);
     if (_iDue > 0) {
-      acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:none;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
+      acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
     }
   }
+  acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
+  acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
+  if (loan.status === 'completed') {
+    acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openRenewLoan('${id}')">🔄 ສ້າງສັນຍາໃໝ່</button>`;
+  }
+  acts.innerHTML += `<button class="btn" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-weight:700;font-size:.78rem;" onclick="toggleForceStatusSection('${loan.status}')">🔧 ແກ້ໄຂສະຖານະ</button>`;
 
   // Barcode
   const barcodeSection = document.getElementById('md-barcode-section');
@@ -1237,6 +1787,68 @@ function openLoanModal(id, focus) {
   }
 
   document.getElementById('loanModal').classList.add('open');
+}
+
+async function printCustomerCard(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+
+  const logo     = localStorage.getItem('uf_logo') || '';
+  const logoHtml = logo
+    ? `<img src="${logo}" style="height:26px;border-radius:4px;vertical-align:middle;">`
+    : `<div style="background:white;color:#1b5e20;font-weight:900;padding:2px 6px;border-radius:4px;font-size:13px;">UF</div>`;
+
+  const product  = DB.products.find(p => p.id === loan.productId);
+  const prodDesc = product
+    ? `${product.duration || '-'}ວັນ ${product.interestRate}%`
+    : (loan.productName || '-');
+
+  document.getElementById('customerCardEl').innerHTML = `
+    <div style="background:#1b5e20;color:white;padding:10px 14px;
+      display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${logoHtml}
+        <span style="font-weight:800;font-size:13px;letter-spacing:.4px;">Unjai Finance</span>
+      </div>
+      <span style="font-size:10px;opacity:.85;letter-spacing:1px;">${loan.id}</span>
+    </div>
+    <div style="background:white;padding:10px 14px 8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+        <span style="color:#757575;">ຊື່:</span>
+        <span style="font-weight:700;color:#1b5e20;">${loan.name || '-'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+        <span style="color:#757575;">ເບີ:</span>
+        <span style="font-weight:700;color:#1b5e20;">${loan.phone || '-'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;">
+        <span style="color:#757575;">ຜະລິດຕະພັນ:</span>
+        <span style="font-weight:700;color:#1b5e20;">${prodDesc}</span>
+      </div>
+      <div style="text-align:center;border-top:1px solid #e8f5e9;padding-top:6px;">
+        <svg id="printBarcode"></svg>
+        <div style="font-size:9px;color:#9e9e9e;margin-top:2px;">${loan.id}</div>
+      </div>
+    </div>`;
+
+  document.getElementById('cardModal').style.display = 'flex';
+
+  JsBarcode('#printBarcode', loan.id, {
+    format: 'CODE128', width: 2, height: 55,
+    displayValue: false, margin: 2,
+    lineColor: '#1b5e20',
+  });
+}
+
+async function downloadCardImage() {
+  const el = document.getElementById('customerCardEl');
+  try {
+    const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: null });
+    const link = document.createElement('a');
+    link.download = `card-${currentLoanId || Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(err) { showToast('ດາວໂຫຼດລົ້ມເຫລວ: ' + err.message, 'error'); }
 }
 
 function printBarcodeCard() {
@@ -1267,6 +1879,73 @@ function printBarcodeCard() {
 function closeLoanModal() {
   document.getElementById('loanModal').classList.remove('open');
   currentLoanId = null;
+}
+
+// ====== ADMIN: FORCE STATUS OVERRIDE ======
+function toggleForceStatusSection(currentStatus) {
+  const el = document.getElementById('md-force-status-section');
+  if (!el) return;
+  const isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : 'block';
+  if (!isVisible && currentStatus) {
+    const sel = document.getElementById('md-force-status-sel');
+    if (sel) sel.value = currentStatus;
+  }
+}
+
+async function doForceStatus() {
+  const sel = document.getElementById('md-force-status-sel');
+  const newStatus = sel?.value;
+  if (!newStatus || !currentLoanId) return;
+  const STATUS_LBL = { pending:'ລໍຖ້າ', active:'ດຳເນີນ', completed:'ສຳເລັດ', rejected:'ປະຕິເສດ' };
+  const label = STATUS_LBL[newStatus] || newStatus;
+  openConfirm('🔧', 'ບັນທຶກສະຖານະ?',
+    `ຕ້ອງການປ່ຽນສະຖານະເປັນ: <strong style="color:#e65100;">${label}</strong><br>
+     <span style="font-size:.8rem;color:#9e9e9e;">ຈະ bypass ທຸກ validation ແລະ ອັບເດດໂດຍກົງ</span>`,
+    async () => {
+      try {
+        const { error } = await sb.from('loans').update({ status: newStatus }).eq('id', currentLoanId);
+        if (error) throw error;
+        const loan = DB.loans.find(l => l.id === currentLoanId);
+        if (loan) loan.status = newStatus;
+        closeConfirm();
+        openLoanModal(currentLoanId);
+        updatePendingBadge(); updateAlertsBadge(); renderRequests();
+        if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+        if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+        showToast(`✅ ປ່ຽນສະຖານະເປັນ "${label}" ສຳເລັດ`);
+      } catch(err) { showToast('Error: ' + err.message, 'error'); }
+    }
+  );
+}
+
+// ====== ADMIN: RENEW LOAN FROM COMPLETED ======
+function openRenewLoan(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  openManualLoanModal();
+  // Pre-fill customer info from completed loan
+  document.getElementById('ml-name').value      = loan.name      || '';
+  document.getElementById('ml-phone').value     = loan.phone     || '';
+  document.getElementById('ml-idcard').value    = loan.idCard    || '';
+  document.getElementById('ml-doctype').value   = loan.docType   || 'id';
+  document.getElementById('ml-workplace').value = loan.workplace || '';
+  document.getElementById('ml-address').value   = loan.address   || '';
+  // New loan starts as pending; admin must pick product & amount
+  document.getElementById('ml-status').value    = 'pending';
+  document.getElementById('ml-paid-group').style.display = 'none';
+  document.getElementById('ml-amount').value   = '';
+  document.getElementById('ml-duration').value = '';
+  document.getElementById('ml-preview').style.display = 'none';
+}
+
+function toggleMdSection(id) {
+  const el  = document.getElementById(id);
+  const arr = document.getElementById(id + '-arr');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display  = open ? 'none' : 'block';
+  if (arr) arr.textContent = open ? '▼' : '▲';
 }
 
 function doPayment() {
@@ -1368,11 +2047,18 @@ function onProdTypeChange() {
   updateProdPreview();
 }
 function updateProdPreview() {
-  const rate = parseFloat(document.getElementById('pf-rate').value);
+  const rateVal = document.getElementById('pf-rate').value;
+  const rate = parseFloat(rateVal);
   const type = document.getElementById('pf-type').value;
   const dur  = parseInt(document.getElementById('pf-dur').value);
   const box  = document.getElementById('prodCalcPreview');
-  if (!rate || rate <= 0) { box.style.display='none'; return; }
+  if (rateVal === '' || isNaN(rate) || rate < 0) { box.style.display='none'; return; }
+
+  if (rate === 0) {
+    box.style.display = 'block';
+    box.textContent = '📊 ບໍ່ມີດອກເບ້ຍ (0%) — ລູກຄ້າຄືນແຕ່ຕົ້ນ';
+    return;
+  }
 
   let ex = '';
   const exAmt = 1000000;
@@ -1409,11 +2095,12 @@ async function saveProd(e) {
   const vipCustomers = isVip
     ? document.getElementById('pf-vip-phones').value.split(',').map(s=>s.trim()).filter(Boolean)
     : [];
+  const paymentType  = document.getElementById('pf-payment-type').value;
 
-  if (!name || !rate || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
+  if (!name || isNaN(rate) || rate < 0 || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
-  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers };
+  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers, paymentType };
   try {
     if (id) {
       await DB.updateProduct(id, data);
@@ -1441,6 +2128,7 @@ function cancelProdEdit() {
   document.getElementById('pf-vip').checked = false;
   document.getElementById('pf-vip-phones').value = '';
   document.getElementById('pf-vip-phones-group').style.display = 'none';
+  document.getElementById('pf-payment-type').value = 'lump_sum';
   document.getElementById('prodCalcPreview').style.display = 'none';
   document.getElementById('prodFormTitle').textContent = '➕ ສ້າງຜະລິດຕະພັນໃໝ່';
 }
@@ -1461,6 +2149,7 @@ function editProd(id) {
   document.getElementById('pf-vip').checked = !!p.isVip;
   document.getElementById('pf-vip-phones').value = (p.vipCustomers || []).join(', ');
   document.getElementById('pf-vip-phones-group').style.display = p.isVip ? 'flex' : 'none';
+  document.getElementById('pf-payment-type').value = p.paymentType || 'lump_sum';
   document.getElementById('prodFormTitle').textContent = '✏️ ແກ້ໄຂ: '+p.name;
   updateProdPreview();
   document.getElementById('pf-name').scrollIntoView({behavior:'smooth'});
@@ -1511,6 +2200,7 @@ function renderProducts() {
       <div class="pi-actions">
         <span class="sbadge ${active?'sb-active':'sb-rejected'}" style="font-size:.7rem;">${active?'ເປີດ':'ປິດ'}</span>
         ${p.compound?'<span class="sbadge sb-restructured" style="font-size:.7rem;">ທົບຕົ້ນ</span>':''}
+        ${p.paymentType==='daily_installment'?'<span class="sbadge" style="font-size:.7rem;background:#e3f2fd;color:#1565c0;">📅 ຜ່ອນລາຍວັນ</span>':''}
         ${p.isVip?`<span class="vip-badge">👑 VIP · ${(p.vipCustomers||[]).length} ເບີ</span>`  :''}
         <button class="act-btn ${active?'a-warn':'a-ok'}" onclick="toggleProd('${p.id}')">${active?'ປິດ':'ເປີດ'}</button>
         <button class="act-btn a-view" onclick="editProd('${p.id}')">✏️ ແກ້ໄຂ</button>
@@ -1528,9 +2218,9 @@ function debtRemaining(d) {
 }
 function debtAccruedInterest(d) {
   const start = new Date(d.borrowDate || d.createdAt);
-  const end   = d.status === 'settled' ? new Date(d.settledDate) : new Date();
+  const end   = (d.status === 'settled' && d.dueDate) ? new Date(d.dueDate) : new Date();
   const days  = Math.max(0, Math.floor((end - start) / 86400000));
-  return Math.round(d.amount * (d.rate / 100 / 30) * days);
+  return Math.round(d.amount * ((d.rate || 0) / 100 / 30) * days);
 }
 function debtDaysUntilDue(d) {
   if (!d.dueDate) return null;
@@ -1541,14 +2231,15 @@ function debtDaysUntilDue(d) {
 function addDebt() {
   const creditor   = document.getElementById('dbt-creditor').value.trim();
   const amount     = getMoneyValue(document.getElementById('dbt-amount'));
-  const rate       = parseFloat(document.getElementById('dbt-rate').value);
+  const rateRaw    = document.getElementById('dbt-rate').value.trim();
+  const rate       = rateRaw === '' ? 0 : parseFloat(rateRaw);
   const borrowDate = document.getElementById('dbt-borrow').value;
   const dueDate    = document.getElementById('dbt-due').value;
   const note       = document.getElementById('dbt-note').value.trim();
-  if (!creditor)         { showToast('ໃສ່ຊື່ເຈົ້າໜີ້','error'); return; }
+  if (!creditor)            { showToast('ໃສ່ຊື່ເຈົ້າໜີ້','error'); return; }
   if (!amount || amount<=0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
-  if (!rate   || rate<0)    { showToast('ໃສ່ອັດຕາດອກ','error'); return; }
-  if (!borrowDate)       { showToast('ເລືອກວັນທີກູ້','error'); return; }
+  if (isNaN(rate) || rate<0){ showToast('ອັດຕາດອກຕ້ອງ >= 0','error'); return; }
+  if (!borrowDate)          { showToast('ເລືອກວັນທີກູ້','error'); return; }
   (async () => {
     try {
       await DB.addDebt({ creditor, amount, rate, borrowDate, dueDate, note });
@@ -1606,7 +2297,12 @@ function deleteExpense(id) {
   })();
 }
 
-function renderPerf() {
+async function renderPerf() {
+  // ── Opening balance — load first so balance calc is correct ────────
+  _openingBalance = await getOpeningBalance().catch(() => _openingBalance);
+  const inp = document.getElementById('opening-balance-input');
+  if (inp) inp.value = _openingBalance > 0 ? _openingBalance.toLocaleString('en-US') : '';
+
   // ── Core loan metrics ──────────────────────────────────────────────
   const activeLns  = DB.loans.filter(l=>l.status==='active');
   const totalLoans = DB.loans.length;
@@ -1787,6 +2483,11 @@ function renderPerf() {
       <th style="padding:10px 13px;">ດອກຮັບ</th>
     </tr></thead>
     <tbody>${prodRows.join('')}</tbody>`;
+
+  // ── Balance + other income ─────────────────────────────────────────
+  await loadOtherIncome();
+  renderOtherIncome();
+  renderCurrentBalance();
 }
 
 // ====== OVERDUE HELPERS ======
@@ -1947,6 +2648,107 @@ function exportLoansCSV() {
   showToast('Export CSV ສຳເລັດ ✅');
 }
 
+// ====== TAB: DAILY COLLECTION TRACKER ======
+let trackerFilter = 'all';
+
+function setTrackerFilter(btn, f) {
+  trackerFilter = f;
+  document.querySelectorAll('#trackerFilterBar .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderTracker();
+}
+
+function renderTracker() {
+  const today    = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // Build enriched rows for every active loan
+  const allRows = DB.loans
+    .filter(l => l.status === 'active')
+    .map(loan => {
+      const loanPayments = DB.getLoanPayments(loan.id);
+      const paidToday    = loanPayments.some(p => p.date && p.date.slice(0, 10) === todayStr);
+
+      // Most recent payment overall
+      const lastPay = loanPayments.length > 0
+        ? loanPayments.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b)
+        : null;
+
+      let daysMissed = 0;
+      if (!paidToday) {
+        if (lastPay) {
+          daysMissed = Math.max(0, Math.floor((today - new Date(lastPay.date)) / 86400000));
+        } else {
+          daysMissed = Math.max(0, Math.floor((today - new Date(loan.createdAt)) / 86400000));
+        }
+      }
+
+      const status = paidToday ? 'paid' : (daysMissed >= 2 ? 'overdue' : 'unpaid');
+      return { loan, lastPay, paidToday, daysMissed, status };
+    });
+
+  // Default sort: overdue (most days first) → unpaid → paid
+  allRows.sort((a, b) => {
+    const ord = { overdue: 0, unpaid: 1, paid: 2 };
+    if (ord[a.status] !== ord[b.status]) return ord[a.status] - ord[b.status];
+    return b.daysMissed - a.daysMissed;
+  });
+
+  // Summary numbers
+  const activeIds      = new Set(DB.loans.filter(l => l.status === 'active').map(l => l.id));
+  const paymentsToday  = DB.payments.filter(p => activeIds.has(p.loanId) && p.date && p.date.slice(0, 10) === todayStr);
+  const totalCollected = paymentsToday.reduce((s, p) => s + (p.amount || 0), 0);
+  const paidCount      = allRows.filter(r => r.status === 'paid').length;
+  const unpaidCount    = allRows.filter(r => r.status === 'unpaid').length;
+  const overdueCount   = allRows.filter(r => r.status === 'overdue').length;
+
+  // Render KPI strip
+  document.getElementById('trackerKpi').innerHTML = [
+    { icon:'👥', label:'ທັງໝົດ',        val: allRows.length,              color:'#1b5e20' },
+    { icon:'✅', label:'ຈ່າຍແລ້ວ',      val: paidCount,                   color:'#2e7d32' },
+    { icon:'⏰', label:'ຍັງບໍ່ຈ່າຍ',    val: unpaidCount,                 color:'#e65100' },
+    { icon:'⚠️', label:'ຄ້າງ',          val: overdueCount,                color:'#c62828' },
+    { icon:'💰', label:'ເກັບໄດ້ວັນນີ້',  val: formatMoney(totalCollected), color:'#1565c0' },
+  ].map(k => `<div class="kcard" style="border-left-color:${k.color};">
+    <div class="ki">${k.icon}</div>
+    <div class="kv" style="color:${k.color};font-size:${String(k.val).length > 10 ? '.9rem' : '1.4rem'};">${k.val}</div>
+    <div class="kl">${k.label}</div>
+  </div>`).join('');
+
+  // Apply filter + search
+  const q = (document.getElementById('trackerSearch')?.value || '').toLowerCase().trim();
+  let rows = trackerFilter === 'all' ? allRows : allRows.filter(r => r.status === trackerFilter);
+  if (q) rows = rows.filter(({ loan }) =>
+    loan.id.toLowerCase().includes(q) ||
+    loan.name.toLowerCase().includes(q) ||
+    loan.phone.replace(/\D/g, '').includes(q.replace(/\D/g, ''))
+  );
+
+  const rowBg = s => s === 'paid' ? '#f1fff3' : s === 'overdue' ? '#fff5f5' : '#fffde7';
+
+  const tbody = document.getElementById('trackerTableBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">ບໍ່ມີຂໍ້ມູນ</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(({ loan, lastPay, daysMissed, status }) => `
+    <tr onclick="openLoanModal('${loan.id}')" style="background:${rowBg(status)};">
+      <td><strong style="color:#1b5e20;font-size:.8rem;">${loan.id}</strong></td>
+      <td><strong>${loan.name}</strong></td>
+      <td onclick="event.stopPropagation()">
+        <a class="trk-phone" href="tel:${loan.phone}">${loan.phone}</a>
+      </td>
+      <td style="font-size:.78rem;">${loan.productName || '-'}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">
+        ${lastPay ? formatMoney(lastPay.amount) : '<span style="color:#bdbdbd;">-</span>'}
+      </td>
+      <td style="font-size:.78rem;color:#616161;white-space:nowrap;">
+        ${lastPay ? formatDate(lastPay.date) : '<span style="color:#bdbdbd;">-</span>'}
+        ${status === 'overdue' ? `<div style="font-size:.68rem;color:#c62828;font-weight:700;">ຂາດ ${daysMissed} ວັນ</div>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
 // ====== CHARTS ======
 const _charts = {};
 function renderCharts() {
@@ -2101,41 +2903,170 @@ function onVipChange() {
   document.getElementById('pf-vip-phones-group').style.display = checked ? 'flex' : 'none';
 }
 
-function doInviteVip(loanId) {
-  const loan     = DB.loans.find(l => l.id === loanId);
+// ====== VIP UPGRADE MODAL ======
+let _vipLoanId = null;
+
+function openVipModal(loanId) {
+  _vipLoanId = loanId;
+  const loan = DB.loans.find(l => l.id === loanId);
   if (!loan) return;
   const vipProds = DB.products.filter(p => p.isVip && p.status === 'active');
   if (!vipProds.length) { showToast('ຍັງບໍ່ມີຜະລິດຕະພັນ VIP', 'error'); return; }
-  const opts = vipProds.map(p =>
-    `<option value="${p.id}">${p.name} (${p.interestRate}%${p.isVip?' · '+((p.vipCustomers||[]).length)+' ເບີ':''})</option>`
-  ).join('');
+
+  const remaining   = loan.remainingPrincipal ?? loan.amount;
+  const interestDue = Math.max(0, (loan.totalDue || 0) - remaining);
+
   const already = vipProds.filter(p =>
-    (p.vipCustomers||[]).some(v => v.replace(/\D/g,'') === loan.phone.replace(/\D/g,''))
+    (p.vipCustomers || []).some(v => v.replace(/\D/g,'') === loan.phone.replace(/\D/g,''))
   ).map(p => p.name);
-  const alreadyMsg = already.length
-    ? `<div style="color:#2e7d32;font-size:.78rem;margin-top:6px;">✅ ເປັນ VIP ຢູ່ແລ້ວ: ${already.join(', ')}</div>`
+  const alreadyBadge = already.length
+    ? `<div style="margin-top:6px;font-size:.75rem;color:#2e7d32;font-weight:600;">✅ VIP ຢູ່ແລ້ວ: ${already.join(', ')}</div>`
     : '';
-  const msg = `ລູກຄ້າ: <strong>${loan.name}</strong> (${loan.phone})${alreadyMsg}
-    <div style="margin-top:10px;">
-      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ຜະລິດຕະພັນ VIP:</label>
-      <select id="vip-prod-sel" style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;">${opts}</select>
-    </div>
-    <div style="margin-top:8px;">
-      <label style="font-size:.82rem;color:#616161;display:block;margin-bottom:4px;">ໝາຍເຫດ (ທາງເລືອກ):</label>
-      <input type="text" id="vip-note-inp" placeholder="ໝາຍເຫດ"
-        style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;box-sizing:border-box;" />
-    </div>`;
-  openConfirm('👑', 'ເຊີນລູກຄ້າ VIP', msg, async () => {
-    const productId = document.getElementById('vip-prod-sel')?.value;
-    const note      = document.getElementById('vip-note-inp')?.value.trim() || '';
-    if (!productId) return;
-    try {
-      await DB.addVipInvitation(loanId, productId, loan.phone, note);
-      closeConfirm();
-      renderProducts();
-      showToast('ເຊີນລູກຄ້າເຂົ້າ VIP ສຳເລັດ ✅');
-    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+
+  document.getElementById('vip-cust-info').innerHTML = `
+    <div style="font-weight:800;font-size:.95rem;color:#e65100;margin-bottom:4px;">👤 ${loan.name}</div>
+    <div style="font-size:.82rem;color:#616161;">📞 ${loan.phone} &nbsp;·&nbsp; ${loan.productName || '-'}</div>
+    <div style="display:flex;gap:20px;margin-top:8px;flex-wrap:wrap;">
+      <div><div style="font-size:.68rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ເງິນຕົ້ນຄ້າງ</div>
+           <div style="font-weight:800;color:#1b5e20;font-size:.95rem;">${formatMoney(remaining)} ກີບ</div></div>
+      <div><div style="font-size:.68rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ດອກຄ້າງ</div>
+           <div style="font-weight:800;color:#e65100;font-size:.95rem;">${formatMoney(interestDue)} ກີບ</div></div>
+    </div>${alreadyBadge}`;
+
+  const sel = document.getElementById('vip-prod-sel2');
+  sel.innerHTML = vipProds.map(p =>
+    `<option value="${p.id}">${p.name} (${p.interestRate}% ${p.interestType==='daily'?'ລາຍວັນ':'flat'})</option>`
+  ).join('');
+
+  document.querySelector('input[name="vip-mode"][value="instant"]').checked = true;
+  document.getElementById('vip-note2').value = '';
+  const btn = document.getElementById('vip-confirm-btn');
+  if (btn) { btn.textContent = '✅ ຢືນຢັນຍ້າຍ VIP'; btn.disabled = false; }
+  onVipModeChange();
+  document.getElementById('vipModal').classList.add('open');
+}
+
+function closeVipModal() {
+  document.getElementById('vipModal').classList.remove('open');
+  _vipLoanId = null;
+}
+
+function onVipProdChange() { onVipModeChange(); }
+
+function onVipModeChange() {
+  const loan = _vipLoanId ? DB.loans.find(l => l.id === _vipLoanId) : null;
+  if (!loan) return;
+  const prodId = document.getElementById('vip-prod-sel2')?.value;
+  const prod   = DB.products.find(p => p.id === prodId);
+  if (!prod) return;
+  const mode = document.querySelector('input[name="vip-mode"]:checked')?.value || 'instant';
+
+  const remaining = loan.remainingPrincipal ?? loan.amount;
+  const dur = mode === 'instant'
+    ? (loan.duration || prod.duration || 30)
+    : (prod.duration || loan.duration || 30);
+  const newTotal    = calcLoanTotal(prod, remaining, dur);
+  const newInterest = newTotal - remaining;
+  const isDaily     = prod.paymentType === 'daily_installment';
+  const dailyAmt    = isDaily && dur > 0 ? Math.round(newTotal / dur) : 0;
+
+  // Update mode label styles
+  ['instant','new'].forEach(m => {
+    const lbl = document.getElementById('vip-mode-lbl-' + m);
+    if (!lbl) return;
+    lbl.style.borderColor = mode === m ? '#f9a825' : '#e0e0e0';
+    lbl.style.background  = mode === m ? '#fff8e1' : 'white';
   });
+
+  const modeDesc = mode === 'instant'
+    ? 'ປ່ຽນ product ໃນ loan ນີ້ ແລ້ວ recalculate ດອກ'
+    : 'ປິດ loan ນີ້ ແລ້ວ ສ້າງ loan VIP ໃໝ່';
+
+  document.getElementById('vip-preview').innerHTML = `
+    <div style="background:#f1f8e9;border:1px solid #c8e6c9;border-radius:9px;padding:11px 14px;font-size:.83rem;color:#1b5e20;line-height:1.9;">
+      <strong>${prod.name}</strong><br>
+      ເງິນຕົ້ນ: <strong>${formatMoney(remaining)} ກີບ</strong> &nbsp;|&nbsp;
+      ດອກ VIP ໃໝ່: <strong style="color:#e65100;">${formatMoney(newInterest)} ກີບ</strong> &nbsp;|&nbsp;
+      ຍອດລວມ: <strong>${formatMoney(newTotal)} ກີບ</strong>
+      ${isDaily ? `<br>ຜ່ອນ/ວັນ: <strong>${formatMoney(dailyAmt)} ກີບ</strong>` : ''}
+      <br><span style="font-size:.73rem;color:#9e9e9e;">${modeDesc}</span>
+    </div>`;
+}
+
+async function confirmVipUpgrade() {
+  const loan = _vipLoanId ? DB.loans.find(l => l.id === _vipLoanId) : null;
+  if (!loan) return;
+  const prodId = document.getElementById('vip-prod-sel2')?.value;
+  const prod   = DB.products.find(p => p.id === prodId);
+  if (!prod) { showToast('ເລືອກຜະລິດຕະພັນ', 'error'); return; }
+  const mode = document.querySelector('input[name="vip-mode"]:checked')?.value || 'instant';
+  const note = document.getElementById('vip-note2')?.value.trim() || '';
+
+  const remaining = loan.remainingPrincipal ?? loan.amount;
+  const btn = document.getElementById('vip-confirm-btn');
+  if (btn) { btn.textContent = 'ກຳລັງດຳເນີນ...'; btn.disabled = true; }
+
+  try {
+    if (mode === 'instant') {
+      const dur        = loan.duration || prod.duration || 30;
+      const newTotalDue = calcLoanTotal(prod, remaining, dur);
+      const dateStr    = new Date().toLocaleDateString('lo-LA', {year:'numeric',month:'short',day:'numeric'});
+      const appendNote = `ຍ້າຍໄປ VIP: ${prod.name} ວັນທີ ${dateStr}${note ? ' · ' + note : ''}`;
+      const newNote    = [loan.note, appendNote].filter(Boolean).join('\n');
+
+      const { error } = await sb.from('loans').update({
+        product_id:   prod.id,
+        product_name: prod.name,
+        total_due:    newTotalDue,
+        note:         newNote,
+      }).eq('id', loan.id);
+      if (error) throw error;
+
+      loan.productId   = prod.id;
+      loan.productName = prod.name;
+      loan.totalDue    = newTotalDue;
+      loan.note        = newNote;
+
+      await DB.addVipInvitation(loan.id, prod.id, loan.phone, note);
+      closeVipModal();
+      openLoanModal(loan.id);
+      renderLoans(); renderRequests(); renderProducts();
+      showToast('✅ ຍ້າຍ VIP ສຳເລັດ');
+
+    } else {
+      const dur        = prod.duration || loan.duration || 30;
+      const newTotalDue = calcLoanTotal(prod, remaining, dur);
+      const isDaily    = prod.paymentType === 'daily_installment';
+      const dailyPay   = isDaily && dur > 0 ? Math.round(newTotalDue / dur) : null;
+      const newId      = 'LAO' + Date.now().toString().slice(-6);
+
+      await DB.updateLoanStatus(loan.id, 'completed');
+
+      const { data: r, error } = await sb.from('loans').insert({
+        id: newId,
+        product_id: prod.id, product_name: prod.name,
+        name: loan.name, phone: loan.phone,
+        id_card: loan.idCard || null, doc_type: loan.docType, doc_image: loan.docImage || null,
+        occupation: loan.workplace || null, income: loan.income || null,
+        address: loan.address || null, note: note || '',
+        amount: remaining, duration: dur, total_due: newTotalDue,
+        status: 'active', paid_amount: 0,
+        created_at: new Date().toISOString(),
+        original_principal: remaining, remaining_principal: remaining,
+        interest_paid: 0, daily_payment: dailyPay,
+      }).select().single();
+      if (error) throw error;
+      DB.loans.push(mapLoan(r));
+
+      await DB.addVipInvitation(newId, prod.id, loan.phone, note);
+      closeVipModal(); closeLoanModal();
+      updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans(); renderProducts();
+      showToast('✅ ສ້າງ VIP ລາຍການໃໝ່ສຳເລັດ');
+    }
+  } catch(err) {
+    showToast('Error: ' + err.message, 'error');
+    if (btn) { btn.textContent = '✅ ຢືນຢັນຍ້າຍ VIP'; btn.disabled = false; }
+  }
 }
 
 // ====== TAB: CREDIT SCORE ======
@@ -2870,6 +3801,16 @@ async function confirmRemittance(remitId) {
           .in('id', remit.collection_ids);
       }
 
+      // 5. Auto-record commission as expense
+      if (remit.commission > 0) {
+        const agentName = remit.agent_name || remit.agent_id || '-';
+        await DB.addExpense({
+          category: 'ຄ່າຈ້າງ Agent',
+          amount:   remit.commission,
+          note:     'ຄ່າຈ້າງ Agent: ' + agentName + ' | Remittance: ' + remitId,
+        });
+      }
+
       closeConfirm();
       showToast('ຢືນຢັນ ✅ ຄ່າຈ້າງຖືກຫັກເດືອນ ' + currentMonth);
       renderRemittances();
@@ -2877,21 +3818,709 @@ async function confirmRemittance(remitId) {
   });
 }
 
-// Backdrop close
-['loanModal','confirmModal','debtPayModal'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e){
-    if (e.target === this) {
-      if (id==='loanModal') closeLoanModal();
-      else if (id==='debtPayModal') closeDebtPayModal();
-      else closeConfirm();
+// ====== MANUAL LOAN MODAL ======
+function openManualLoanModal() {
+  const sel = document.getElementById('ml-product');
+  sel.innerHTML = '<option value="">-- ເລືອກຜະລິດຕະພັນ --</option>' +
+    DB.products.filter(p => p.status === 'active').map(p =>
+      `<option value="${p.id}">${p.name} (${p.interestRate}% ${p.interestType==='daily'?'ລາຍວັນ':'flat'} · ${p.duration||'?'} ວັນ)</option>`
+    ).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('ml-date').value = today;
+  ['ml-name','ml-phone','ml-idcard','ml-workplace','ml-address','ml-amount','ml-note','ml-paid'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('ml-duration').value = '';
+  document.getElementById('ml-product').value  = '';
+  document.getElementById('ml-status').value   = 'active';
+  document.getElementById('ml-doctype').value  = 'id';
+  document.getElementById('ml-paid-group').style.display = 'flex';
+  document.getElementById('ml-preview').style.display    = 'none';
+  document.getElementById('manualLoanModal').classList.add('open');
+}
+function closeManualLoanModal() {
+  document.getElementById('manualLoanModal').classList.remove('open');
+}
+function onManualStatusChange() {
+  const s = document.getElementById('ml-status').value;
+  document.getElementById('ml-paid-group').style.display = ['active','completed'].includes(s) ? 'flex' : 'none';
+}
+function onManualProdChange() {
+  const prodId = document.getElementById('ml-product').value;
+  const amt    = getMoneyValue(document.getElementById('ml-amount'));
+  const durIn  = document.getElementById('ml-duration');
+  const prev   = document.getElementById('ml-preview');
+  if (!prodId) { prev.style.display = 'none'; return; }
+  const prod = DB.products.find(p => p.id === prodId);
+  if (!prod) { prev.style.display = 'none'; return; }
+  if (prod.duration > 0 && !durIn.value) durIn.value = prod.duration;
+  const dur = parseInt(durIn.value) || prod.duration || 30;
+  if (!amt) { prev.style.display = 'none'; return; }
+  const total    = calcLoanTotal(prod, amt, dur);
+  const interest = total - amt;
+  const isDaily  = prod.paymentType === 'daily_installment';
+  const dailyAmt = isDaily && dur > 0 ? Math.round(total / dur) : 0;
+  prev.style.display = 'block';
+  prev.innerHTML = `<strong>ສະຫຼຸບ:</strong><br>
+    ເງິນຕົ້ນ: <strong>${formatMoney(amt)} ກີບ</strong> &nbsp;|&nbsp;
+    ດອກ: <strong>${formatMoney(interest)} ກີບ</strong> &nbsp;|&nbsp;
+    ຍອດລວມ: <strong>${formatMoney(total)} ກີບ</strong>
+    ${isDaily ? `<br>ຜ່ອນ/ວັນ: <strong>${formatMoney(dailyAmt)} ກີບ</strong>` : ''}`;
+}
+async function saveManualLoan() {
+  const name      = document.getElementById('ml-name').value.trim();
+  const phone     = document.getElementById('ml-phone').value.trim();
+  const prodId    = document.getElementById('ml-product').value;
+  const amount    = getMoneyValue(document.getElementById('ml-amount'));
+  const dur       = parseInt(document.getElementById('ml-duration').value) || 0;
+  const dateVal   = document.getElementById('ml-date').value;
+  const status    = document.getElementById('ml-status').value;
+  const paidAmt   = getMoneyValue(document.getElementById('ml-paid')) || 0;
+  const docType   = document.getElementById('ml-doctype').value;
+  const idCard    = document.getElementById('ml-idcard').value.trim();
+  const workplace = document.getElementById('ml-workplace').value.trim();
+  const address   = document.getElementById('ml-address').value.trim();
+  const note      = document.getElementById('ml-note').value.trim();
+  if (!name)              { showToast('ໃສ່ຊື່ລູກຄ້າ','error'); return; }
+  if (!phone)             { showToast('ໃສ່ເບີໂທ','error'); return; }
+  if (!prodId)            { showToast('ເລືອກຜະລິດຕະພັນ','error'); return; }
+  if (!amount || amount <= 0) { showToast('ໃສ່ຈຳນວນກູ້','error'); return; }
+  if (!dur || dur <= 0)   { showToast('ໃສ່ໄລຍະ','error'); return; }
+  if (!dateVal)           { showToast('ເລືອກວັນທີ','error'); return; }
+  const prod = DB.products.find(p => p.id === prodId);
+  if (!prod) { showToast('ບໍ່ພົບຜະລິດຕະພັນ','error'); return; }
+  const totalDue  = calcLoanTotal(prod, amount, dur);
+  const isDaily   = prod.paymentType === 'daily_installment';
+  const dailyPay  = isDaily && dur > 0 ? Math.round(totalDue / dur) : null;
+  const createdAt = new Date(dateVal + 'T00:00:00').toISOString();
+  const id        = 'LAO' + Date.now().toString().slice(-6);
+  const row = {
+    id,
+    product_id: prodId, product_name: prod.name,
+    name, phone,
+    id_card: idCard || null, doc_type: docType, doc_image: null,
+    occupation: workplace || null, income: null,
+    address: address || null, note: note || '',
+    amount, duration: dur, total_due: totalDue,
+    status, paid_amount: paidAmt,
+    created_at: createdAt,
+    original_principal: amount, remaining_principal: amount,
+    interest_paid: 0, daily_payment: dailyPay,
+  };
+  try {
+    const { data: r, error } = await sb.from('loans').insert(row).select().single();
+    if (error) throw error;
+    DB.loans.push(mapLoan(r));
+
+    // If an initial paid amount was set, write a payment record so the
+    // payments table stays in sync with loans.paid_amount.
+    if (paidAmt > 0) {
+      const payRef = 'BF-' + id;
+      await sb.from('payments').insert({
+        id: payRef, loan_id: id, amount: paidAmt, method: 'cash',
+        note: 'ຊຳລະຕ້ອງການ (manual entry)', date: createdAt, ref: payRef,
+      });
+      DB.payments.push({ id: payRef, loanId: id, amount: paidAmt, method: 'cash',
+        note: 'ຊຳລະຕ້ອງການ (manual entry)', date: createdAt, ref: payRef });
     }
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape')
-      document.getElementById('slipModal').style.display = 'none';
-  });
+
+    closeManualLoanModal();
+    updatePendingBadge(); updateAlertsBadge(); renderRequests(); renderLoans();
+    showToast(`✅ ສ້າງສັນຍາໃໝ່ສຳເລັດ | ລະຫັດ: ${id}`);
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+// Backdrop close
+['loanModal','confirmModal','debtPayModal','manualLoanModal','vipModal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', function(e){
+      if (e.target === this) {
+        if (id==='loanModal') closeLoanModal();
+        else if (id==='debtPayModal') closeDebtPayModal();
+        else if (id==='manualLoanModal') closeManualLoanModal();
+        else if (id==='vipModal') closeVipModal();
+        else closeConfirm();
+      }
+    });
+  }
 });
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const slipModal = document.getElementById('slipModal');
+    if (slipModal) slipModal.style.display = 'none';
+  }
+});
+
+// ====== BANK STATEMENT ======
+let _stmtFilter = 'all';
+
+function setStmtFilter(f, btn) {
+  _stmtFilter = f;
+  document.querySelectorAll('.stmt-ftype').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  renderStatement();
+}
+
+function fmtD(dateStr) {
+  if (!dateStr) return '—';
+  const s = String(dateStr).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
+  return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+}
+
+function buildStmtEntries() {
+  const entries = [];
+
+  if (_openingBalance > 0) {
+    entries.push({ sortKey: '', dateStr: '—', label: 'ຍອດຍົກມາ', dr: 0, cr: _openingBalance, rowClass: 'ob-row' });
+  }
+
+  DB.debts.forEach(d => {
+    const sk = d.borrowDate ? String(d.borrowDate).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(d.borrowDate), label: 'ກູ້ທຶນ: ' + (d.creditor || ''), dr: 0, cr: d.amount || 0, rowClass: 'cr-row' });
+  });
+
+  DB.loans.filter(l => !['pending', 'rejected'].includes(l.status)).forEach(l => {
+    const sk = l.createdAt ? String(l.createdAt).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: l.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  DB.payments.forEach(p => {
+    const loan = DB.loans.find(l => l.id === p.loanId);
+    const sk = p.date ? String(p.date).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(p.date), label: 'ຮັບຊຳລະ: ' + (loan?.name || ''), dr: 0, cr: p.amount || 0, rowClass: 'cr-row' });
+  });
+
+  DB.expenses.forEach(e => {
+    const sk = e.date ? String(e.date).slice(0, 10) : '';
+    const note = e.note ? ' · ' + e.note : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(e.date), label: 'ລາຍຈ່າຍ: ' + (e.category || '') + note, dr: e.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  (DB.debtPayments || []).forEach(p => {
+    const debt = DB.debts.find(d => d.id === p.debtId);
+    const sk = p.date ? String(p.date).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(p.date), label: 'ຈ່າຍໜີ້: ' + (debt?.creditor || ''), dr: p.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
+  (_otherIncome || []).forEach(r => {
+    const sk = r.date ? String(r.date).slice(0, 10) : '';
+    const note = r.note ? ' · ' + r.note : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(r.date), label: 'ລາຍໄດ້: ' + (r.category || '') + note, dr: 0, cr: r.amount || 0, rowClass: 'cr-row' });
+  });
+
+  // Sort: empty sortKey (opening balance) first, then ascending by date
+  entries.sort((a, b) => {
+    if (a.sortKey === b.sortKey) return 0;
+    if (a.sortKey === '') return -1;
+    if (b.sortKey === '') return 1;
+    return a.sortKey < b.sortKey ? -1 : 1;
+  });
+
+  // Compute running balance across all entries
+  let running = 0;
+  entries.forEach(e => { running += e.cr - e.dr; e.balance = running; });
+
+  return entries;
+}
+
+function renderStatement() {
+  const fromVal = (document.getElementById('stmt-from')?.value || '').slice(0, 10);
+  const toVal   = (document.getElementById('stmt-to')?.value   || '').slice(0, 10);
+
+  const entries = buildStmtEntries();
+  const finalBalance = entries.length ? entries[entries.length - 1].balance : 0;
+
+  // Date filter: opening balance row only shown when no date range active
+  const dateFiltered = entries.filter(e => {
+    if (e.rowClass === 'ob-row') return !fromVal && !toVal;
+    if (fromVal && e.sortKey < fromVal) return false;
+    if (toVal   && e.sortKey > toVal)   return false;
+    return true;
+  });
+
+  // Type filter
+  const visible = _stmtFilter === 'dr' ? dateFiltered.filter(e => e.dr > 0)
+                : _stmtFilter === 'cr' ? dateFiltered.filter(e => e.cr > 0)
+                : dateFiltered;
+
+  let dispDr = 0, dispCr = 0;
+  visible.forEach(e => { dispDr += e.dr; dispCr += e.cr; });
+
+  const fmtAmt = n => n > 0 ? formatMoney(Math.round(n)) : '';
+
+  const tbody = document.getElementById('stmtBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = visible.length
+    ? visible.map(e => {
+        const balColor = e.balance >= 0 ? '#1b5e20' : '#c62828';
+        return `<tr class="${e.rowClass}">
+          <td style="white-space:nowrap;font-size:.76rem;color:#757575;">${e.dateStr}</td>
+          <td style="max-width:240px;">${e.label}</td>
+          <td style="text-align:right;color:#c62828;white-space:nowrap;font-weight:600;">${fmtAmt(e.dr)}</td>
+          <td style="text-align:right;color:#2e7d32;white-space:nowrap;font-weight:600;">${fmtAmt(e.cr)}</td>
+          <td style="text-align:right;font-weight:700;color:${balColor};white-space:nowrap;">${formatMoney(Math.round(e.balance))}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:28px;color:#9e9e9e;">ບໍ່ມີລາຍການ</td></tr>';
+
+  // Totals summary row
+  tbody.innerHTML += `<tr style="background:#f5f5f5;border-top:2px solid #bdbdbd;">
+    <td colspan="2" style="font-weight:700;font-size:.82rem;color:#424242;padding:9px 12px;">ລວມ Dr / Cr</td>
+    <td style="text-align:right;font-weight:800;color:#c62828;white-space:nowrap;">${fmtAmt(dispDr)}</td>
+    <td style="text-align:right;font-weight:800;color:#2e7d32;white-space:nowrap;">${fmtAmt(dispCr)}</td>
+    <td></td>
+  </tr>`;
+
+  // Footer: authoritative balance from renderCurrentBalance()
+  renderCurrentBalance();
+}
+
+function exportStatementExcel() {
+  const fromVal = (document.getElementById('stmt-from')?.value || '').slice(0, 10);
+  const toVal   = (document.getElementById('stmt-to')?.value   || '').slice(0, 10);
+
+  const entries = buildStmtEntries();
+
+  const filtered = entries.filter(e => {
+    if (e.rowClass === 'ob-row') return !fromVal && !toVal;
+    if (fromVal && e.sortKey < fromVal) return false;
+    if (toVal   && e.sortKey > toVal)   return false;
+    return true;
+  });
+
+  // Same formula as renderCurrentBalance()
+  const _d = DB.loans.filter(l => !['pending','rejected'].includes(l.status));
+  const finalBalance = (_openingBalance || 0)
+    + DB.payments.reduce((s,p) => s+(p.amount||0), 0)                                                       // totalPaymentsReceived
+    + DB.debts.reduce((s,d) => s+(d.amount||0), 0)                                                          // ourDebts
+    - _d.reduce((s,l) => s+(l.amount||0), 0)                                                                // moneyLentOut
+    - DB.expenses.reduce((s,e) => s+(e.amount||0), 0)                                                       // expenses
+    - _d.reduce((s,l) => s+(l.discountApplied||0), 0);                                                      // discountsGiven
+
+  const aoa = [['ວັນທີ', 'ລາຍການ', 'Dr (ເງິນອອກ)', 'Cr (ເງິນເຂົ້າ)', 'ຍອດຄົງເຫຼືອ']];
+  filtered.forEach(e => aoa.push([e.dateStr, e.label, e.dr || '', e.cr || '', Math.round(e.balance)]));
+  aoa.push(['', 'ຍອດຄົງເຫຼືອປັດຈຸບັນ', '', '', Math.round(finalBalance)]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 10 }, { wch: 38 }, { wch: 16 }, { wch: 16 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Statement');
+  XLSX.writeFile(wb, 'statement.xlsx');
+}
+
+function renderCurrentBalance() {
+  const openingBalance = _openingBalance || 0;
+
+  // Same source as Dr/Cr ledger: sum every payment transaction
+  const totalPaymentsReceived = DB.payments.reduce((s, p) => s + (p.amount || 0), 0);
+
+  // Money we borrowed (cash IN from debts table, same as Dr/Cr ledger)
+  const ourDebts = DB.debts.reduce((s, d) => s + (d.amount || 0), 0);
+
+  // Money we sent out to customers (disbursed loans only)
+  const disbursed = DB.loans.filter(l => !['pending', 'rejected'].includes(l.status));
+  const moneyLentOut = disbursed.reduce((s, l) => s + (l.amount || 0), 0);
+
+  // Operating expenses
+  const expenses = DB.expenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+  // Discounts / write-offs
+  const discountsGiven = disbursed.reduce((s, l) => s + (l.discountApplied || 0), 0);
+
+  const balance = openingBalance
+               + totalPaymentsReceived
+               + ourDebts
+               - moneyLentOut
+               - expenses
+               - discountsGiven;
+
+  const balColor = balance < 0 ? '#c62828' : '#2e7d32';
+
+  const row = (plus, label, value) => {
+    const sign  = plus ? '+' : '−';
+    const color = plus ? '#2e7d32' : '#c62828';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.83rem;">
+      <span style="color:#616161;">${sign} ${label}</span>
+      <span style="font-weight:700;color:${color};">${formatMoney(Math.round(value))}</span>
+    </div>`;
+  };
+
+  const footer = document.getElementById('stmtFooter');
+  if (!footer) return;
+
+  footer.innerHTML = `
+    <div style="padding:12px 18px 10px;border-top:2px solid #c8e6c9;background:#fafafa;">
+      ${openingBalance > 0 ? row(true,  'ຍອດຍົກມາ',        openingBalance)        : ''}
+      ${row(true,  'ຮັບຊຳລະ (ລວມ)',         totalPaymentsReceived)}
+      ${ourDebts > 0 ? row(true, 'ເງິນກູ້ທຶນ', ourDebts) : ''}
+      ${row(false, 'ປ່ອຍກູ້ (ທັງໝົດ)',     moneyLentOut)}
+      ${row(false, 'ລາຍຈ່າຍ',             expenses)}
+      ${discountsGiven > 0 ? row(false, 'ສ່ວນຫຼຸດ / Write-off', discountsGiven) : ''}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;background:white;border-top:1px solid #e0e0e0;">
+      <span style="font-size:.95rem;font-weight:800;color:#424242;">ຍອດຄົງເຫຼືອປັດຈຸບັນ</span>
+      <span style="font-size:1.7rem;font-weight:900;color:${balColor};">${formatMoney(Math.round(balance))}&thinsp;<span style="font-size:.85rem;font-weight:500;color:#9e9e9e;">ກີບ</span></span>
+    </div>`;
+}
+
+// ====== OTHER INCOME ======
+async function loadOtherIncome() {
+  try {
+    const { data } = await sb.from('other_income').select('*').order('date', { ascending: false });
+    _otherIncome = (data || []).map(r => ({
+      id: r.id,
+      category: r.category,
+      amount: r.amount,
+      note: r.note || '',
+      date: r.date
+    }));
+  } catch { _otherIncome = []; }
+}
+
+function renderOtherIncome() {
+  const el = document.getElementById('otherIncomeList');
+  if (!el) return;
+  if (!_otherIncome.length) {
+    el.innerHTML = '<p style="text-align:center;color:#9e9e9e;font-size:.82rem;padding:12px;">ຍັງບໍ່ມີ</p>';
+    return;
+  }
+  el.innerHTML = _otherIncome.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;gap:8px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:700;color:#1b5e20;">${r.category}</div>
+        <div style="font-size:.75rem;color:#9e9e9e;">${r.date}${r.note ? ' · ' + r.note : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:800;color:#2e7d32;white-space:nowrap;">+${formatMoney(r.amount)} ກີບ</span>
+        <button class="act-btn a-del" onclick="deleteOtherIncome('${r.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function addOtherIncome() {
+  const cat  = document.getElementById('incCat').value;
+  const amt  = getMoneyValue(document.getElementById('incAmt'));
+  const note = document.getElementById('incNote').value.trim();
+  const date = document.getElementById('incDate').value || new Date().toISOString().slice(0,10);
+  if (!cat)  { showToast('ເລືອກໝວດ','error'); return; }
+  if (!amt)  { showToast('ໃສ່ຈຳນວນ','error'); return; }
+  try {
+    await sb.from('other_income').insert({ category: cat, amount: amt, note, date });
+    document.getElementById('incCat').value  = '';
+    document.getElementById('incAmt').value  = '';
+    document.getElementById('incNote').value = '';
+    document.getElementById('incDate').value = '';
+    showToast('ບັນທຶກລາຍໄດ້ ✅');
+    await loadOtherIncome();
+    renderOtherIncome();
+    renderCurrentBalance();
+  } catch { showToast('ບັນທຶກບໍ່ໄດ້','error'); }
+}
+
+async function deleteOtherIncome(id) {
+  try {
+    await sb.from('other_income').delete().eq('id', id);
+    showToast('ລຶບສຳເລັດ');
+    await loadOtherIncome();
+    renderOtherIncome();
+    renderCurrentBalance();
+  } catch { showToast('ລຶບບໍ່ໄດ້','error'); }
+}
+
+// ====== TAB: REPORT ======
+function initReport() {
+  const active = DB.loans.filter(l => l.status === 'active');
+  const wpSet  = new Set(active.map(l => l.workplace || '').filter(Boolean));
+  const wps    = Array.from(wpSet).sort();
+
+  const container = document.getElementById('reportWpChecks');
+  if (!container) return;
+  container.innerHTML = ['ທັງໝົດ', ...wps].map(wp => `
+    <label class="wp-check-label${wp === 'ທັງໝົດ' ? ' all-chk' : ''}">
+      <input type="checkbox" checked value="${wp.replace(/"/g,'&quot;')}" onchange="onReportWpChange(this)" />
+      ${wp}
+    </label>`).join('');
+
+  renderReport();
+}
+
+function onReportWpChange(cb) {
+  const all = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
+  if (cb.value === 'ທັງໝົດ') {
+    all.forEach(c => c.checked = cb.checked);
+  } else {
+    const nonAll = Array.from(all).filter(c => c.value !== 'ທັງໝົດ');
+    const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
+    if (allCb) allCb.checked = nonAll.every(c => c.checked);
+  }
+  renderReport();
+}
+
+function _getReportLoans() {
+  const all    = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
+  const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
+  const active = DB.loans.filter(l => l.status === 'active');
+  if (!allCb || allCb.checked) return active;
+  const checked = Array.from(all).filter(c => c.checked && c.value !== 'ທັງໝົດ').map(c => c.value);
+  if (!checked.length) return [];
+  return active.filter(l => checked.includes(l.workplace || ''));
+}
+
+function renderReport() {
+  const tbody   = document.getElementById('reportTableBody');
+  const summary = document.getElementById('reportSummary');
+  if (!tbody) return;
+
+  const loans  = _getReportLoans();
+  const fmtNum = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0));
+
+  if (!loans.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">ບໍ່ພົບລາຍການ</td></tr>';
+    if (summary) summary.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = loans.map((l, i) => {
+    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    const interest  = (l.totalDue ?? 0) - principal;
+    return `<tr>
+      <td style="text-align:center;">${i + 1}</td>
+      <td style="font-weight:600;">${l.name || '-'}</td>
+      <td style="font-size:.78rem;color:#1b5e20;">${l.id}</td>
+      <td>${l.phone || '-'}</td>
+      <td>${l.workplace || '-'}</td>
+      <td>${l.productName || '-'}</td>
+      <td style="text-align:right;">${fmtNum(principal)}</td>
+      <td style="text-align:right;">${fmtNum(interest)}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(l.totalDue ?? 0)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalDue = loans.reduce((s, l) => s + (l.totalDue ?? 0), 0);
+  if (summary) summary.innerHTML = `
+    <div style="display:flex;gap:28px;flex-wrap:wrap;">
+      <span>👥 ຈຳນວນລູກຄ້າ: <strong style="color:#1b5e20;">${loans.length} ຄົນ</strong></span>
+      <span>💰 ລວມເງິນຕ້ອງເກັບ: <strong style="color:#1b5e20;">${new Intl.NumberFormat('lo-LA').format(Math.round(totalDue))} ກີບ</strong></span>
+    </div>`;
+}
+
+function exportReportExcel() {
+  if (typeof XLSX === 'undefined') { showToast('XLSX library ບໍ່ໄດ້ໂຫລດ', 'error'); return; }
+  const loans = _getReportLoans();
+  if (!loans.length) { showToast('ບໍ່ມີຂໍ້ມູນ', 'error'); return; }
+
+  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
+  const rows = loans.map((l, i) => {
+    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, (l.totalDue ?? 0) - principal, l.totalDue ?? 0];
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, 'ລາຍງານ');
+  XLSX.writeFile(wb, 'ລາຍງານ_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+
+// ====== DEBUG: BALANCE AUDIT ======
+async function debugBalance() {
+  const [
+    { data: loans },
+    { data: expenses },
+    { data: debts },
+    { data: settings },
+  ] = await Promise.all([
+    sb.from('loans').select('id, name, amount, status, paid_amount, interest_paid, discount_applied'),
+    sb.from('expenses').select('amount, category, date'),
+    sb.from('debts').select('amount, creditor, status'),
+    sb.from('app_settings').select('key, value').in('key', ['opening_balance']),
+  ]);
+
+  const openingBalance = parseFloat(settings?.find(s => s.key === 'opening_balance')?.value || 0);
+
+  // Only disbursed loans (not pending/rejected)
+  const disbursed = (loans || []).filter(l => !['pending','rejected'].includes(l.status));
+
+  const moneyLentOut       = disbursed.reduce((s,l) => s+(l.amount||0), 0);
+  const interestReceived   = disbursed.reduce((s,l) => s+(l.interest_paid||0), 0);
+  const principalReturned  = disbursed.reduce((s,l) => {
+    const paid = l.paid_amount||0, int = l.interest_paid||0;
+    return s + Math.max(0, paid - int);
+  }, 0);
+  const totalPaidByCustomers = principalReturned + interestReceived;
+  const expensesTotal      = (expenses||[]).reduce((s,e) => s+(e.amount||0), 0);
+  const discountsGiven     = disbursed.reduce((s,l) => s+(l.discount_applied||0), 0);
+  const debtsTotal         = (debts||[]).reduce((s,d) => s+(d.amount||0), 0);
+
+  const balance = openingBalance + principalReturned + interestReceived
+                - moneyLentOut - expensesTotal - discountsGiven;
+
+  console.group('%c🏦 Balance Audit — exact formula match', 'color:#1b5e20;font-weight:bold;font-size:14px;');
+  console.table({
+    'openingBalance (+)':          { value: openingBalance,      loans: '—' },
+    'principalReturned (+)':       { value: principalReturned,   loans: disbursed.length },
+    'interestReceived (+)':        { value: interestReceived,    loans: disbursed.length },
+    'moneyLentOut (−)':            { value: moneyLentOut,        loans: disbursed.length },
+    'expenses (−)':                { value: expensesTotal,       loans: (expenses||[]).length },
+    'discountsGiven (−)':          { value: discountsGiven,      loans: disbursed.filter(l=>l.discount_applied>0).length },
+    '══ BALANCE ══':               { value: balance,             loans: '—' },
+    '── (info) ourDebts ──':       { value: debtsTotal,          loans: (debts||[]).length },
+    '── (info) totalPaidRaw ──':   { value: totalPaidByCustomers,loans: '—' },
+  });
+
+  console.log('%cDisbursed loan breakdown:', 'color:#1565c0;font-weight:bold;');
+  if (disbursed.length) {
+    console.table(disbursed.map(l => ({
+      name:             l.name,
+      status:           l.status,
+      amount:           l.amount,
+      paid_amount:      l.paid_amount,
+      interest_paid:    l.interest_paid,
+      principal_ret:    Math.max(0,(l.paid_amount||0)-(l.interest_paid||0)),
+      discount_applied: l.discount_applied,
+    })));
+  }
+
+  console.log('%cExpenses:', 'color:#c62828;font-weight:bold;');
+  if (expenses?.length) {
+    console.table(expenses.map(e => ({ date: e.date, category: e.category, amount: e.amount })));
+  }
+
+  console.groupEnd();
+  return { openingBalance, principalReturned, interestReceived, moneyLentOut, expensesTotal, discountsGiven, balance };
+}
 </script>
+
+<!-- ====== VIP UPGRADE MODAL ====== -->
+<div class="modal-overlay" id="vipModal">
+  <div class="modal" style="max-width:500px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#e65100,#f9a825);color:white;padding:18px 20px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:.65rem;opacity:.8;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">VIP Upgrade</div>
+        <div style="font-size:1.1rem;font-weight:800;">👑 ຍ້າຍລູກຄ້າໄປ VIP</div>
+      </div>
+      <button onclick="closeVipModal()" style="background:rgba(255,255,255,.2);border:none;color:white;font-size:1.1rem;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;max-height:calc(90vh - 110px);overflow-y:auto;">
+      <!-- Customer info -->
+      <div id="vip-cust-info" style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:12px 16px;margin-bottom:14px;"></div>
+      <!-- VIP product -->
+      <div class="fi" style="margin-bottom:12px;">
+        <label>👑 ຜະລິດຕະພັນ VIP *</label>
+        <select id="vip-prod-sel2" onchange="onVipProdChange()" style="border:2px solid #ffe082 !important;"></select>
+      </div>
+      <!-- Mode toggle -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:.8rem;font-weight:600;color:#1b5e20;display:block;margin-bottom:6px;">ປະເພດການຍ້າຍ *</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label id="vip-mode-lbl-instant" style="border:2px solid #f9a825;background:#fff8e1;border-radius:9px;padding:10px 12px;cursor:pointer;transition:.15s;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <input type="radio" name="vip-mode" value="instant" checked onchange="onVipModeChange()" style="accent-color:#f9a825;" />
+              <span style="font-weight:700;font-size:.85rem;">⚡ ຍ້າຍທັນທີ</span>
+            </div>
+            <div style="font-size:.72rem;color:#9e9e9e;padding-left:20px;">ປ່ຽນ product ໃນ loan ນີ້</div>
+          </label>
+          <label id="vip-mode-lbl-new" style="border:2px solid #e0e0e0;background:white;border-radius:9px;padding:10px 12px;cursor:pointer;transition:.15s;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <input type="radio" name="vip-mode" value="new" onchange="onVipModeChange()" style="accent-color:#f9a825;" />
+              <span style="font-weight:700;font-size:.85rem;">🔄 ຮອບໃໝ່</span>
+            </div>
+            <div style="font-size:.72rem;color:#9e9e9e;padding-left:20px;">ປິດ loan ເກົ່າ, ສ້າງໃໝ່</div>
+          </label>
+        </div>
+      </div>
+      <!-- Preview -->
+      <div id="vip-preview" style="margin-bottom:12px;"></div>
+      <!-- Note -->
+      <div class="fi" style="margin-bottom:16px;">
+        <label>ໝາຍເຫດ</label>
+        <input type="text" id="vip-note2" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" />
+      </div>
+      <button id="vip-confirm-btn" class="btn btn-full" style="padding:12px;background:linear-gradient(135deg,#e65100,#f9a825);color:white;border:none;font-weight:700;font-size:.92rem;cursor:pointer;" onclick="confirmVipUpgrade()">
+        ✅ ຢືນຢັນຍ້າຍ VIP
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MANUAL LOAN MODAL ====== -->
+<div class="modal-overlay" id="manualLoanModal">
+  <div class="modal" style="max-width:600px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;padding:18px 20px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:.65rem;opacity:.7;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">Admin</div>
+        <div style="font-size:1.1rem;font-weight:800;">➕ ສ້າງສັນຍາກູ້ໃໝ່</div>
+      </div>
+      <button onclick="closeManualLoanModal()" style="background:rgba(255,255,255,.2);border:none;color:white;font-size:1.1rem;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;max-height:calc(90vh - 110px);overflow-y:auto;">
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi"><label>ຊື່ລູກຄ້າ *</label><input type="text" id="ml-name" placeholder="ຊື່-ນາມສະກຸນ" /></div>
+        <div class="fi"><label>ເບີໂທ *</label><input type="text" id="ml-phone" placeholder="020XXXXXXXX" inputmode="tel" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ປະເພດເອກະສານ</label>
+          <select id="ml-doctype">
+            <option value="id">🪪 ບັດປະຈຳໂຕ</option>
+            <option value="family">📖 ສຳມະໂນຄົວ</option>
+            <option value="passport">✈️ ພາດສະປອດ</option>
+          </select>
+        </div>
+        <div class="fi"><label>ເລກເອກະສານ</label><input type="text" id="ml-idcard" placeholder="ເລກບັດ / ສຳໂນ" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi"><label>ບ່ອນເຮັດວຽກ</label><input type="text" id="ml-workplace" placeholder="ຊື່ບ່ອນເຮັດວຽກ" /></div>
+        <div class="fi"><label>ທີ່ຢູ່</label><input type="text" id="ml-address" placeholder="ທີ່ຢູ່" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ຜະລິດຕະພັນ *</label>
+          <select id="ml-product" onchange="onManualProdChange()"><option value="">-- ເລືອກ --</option></select>
+        </div>
+        <div class="fi">
+          <label>ຈຳນວນກູ້ (ກີບ) *</label>
+          <input type="text" inputmode="numeric" id="ml-amount" placeholder="ຈຳນວນ" class="money-input" oninput="formatMoneyInput(this);onManualProdChange()" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ໄລຍະ (ວັນ) *</label>
+          <input type="number" id="ml-duration" placeholder="30" min="1" oninput="onManualProdChange()" />
+        </div>
+        <div class="fi"><label>📅 ວັນທີກູ້ຢືມ *</label><input type="date" id="ml-date" /></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="fi">
+          <label>ສະຖານະ *</label>
+          <select id="ml-status" onchange="onManualStatusChange()">
+            <option value="pending">⏳ ລໍຖ້າ</option>
+            <option value="active" selected>💰 ດຳເນີນ</option>
+            <option value="completed">🎉 ສຳເລັດ</option>
+            <option value="rejected">❌ ປະຕິເສດ</option>
+          </select>
+        </div>
+        <div class="fi" id="ml-paid-group">
+          <label>ຊຳລະແລ້ວ (ກີບ)</label>
+          <input type="text" inputmode="numeric" id="ml-paid" placeholder="0" class="money-input" oninput="formatMoneyInput(this)" />
+        </div>
+      </div>
+      <div class="fi" style="margin-bottom:12px;">
+        <label>ໝາຍເຫດ</label>
+        <textarea id="ml-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" style="min-height:50px;"></textarea>
+      </div>
+      <div id="ml-preview" style="display:none;background:#e8f5e9;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.85rem;color:#1b5e20;line-height:1.8;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary btn-full" style="padding:12px;" onclick="saveManualLoan()">💾 ສ້າງສັນຍາ</button>
+        <button class="btn btn-outline" style="padding:12px 18px;" onclick="closeManualLoanModal()">ຍົກເລີກ</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="slipModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:zoom-out; align-items:center; justify-content:center;" onclick="document.getElementById('slipModal').style.display='none'">
   <img id="slipModalImg" style="max-width:90%; max-height:90vh; border-radius:12px; box-shadow:0 4px 32px rgba(0,0,0,0.5);" />
@@ -2904,5 +4533,30 @@ function viewSlip(src) {
   document.getElementById('slipModal').style.display = 'flex';
 }
 </script>
+
+<div id="cardModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,.82);z-index:9999;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;">
+  <div id="customerCardEl" style="
+    width:320px;background:white;border-radius:12px;
+    border:2px solid #1b5e20;overflow:hidden;
+    font-family:'Noto Sans Lao','Noto Sans',sans-serif;
+    box-shadow:0 8px 40px rgba(0,0,0,.4);">
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button onclick="downloadCardImage()" style="
+      background:#1b5e20;color:white;border:none;
+      padding:10px 22px;border-radius:8px;cursor:pointer;
+      font-size:14px;font-family:inherit;font-weight:700;">
+      💾 ດາວໂຫຼດຮູບ
+    </button>
+    <button onclick="document.getElementById('cardModal').style.display='none'" style="
+      background:#f5f5f5;color:#424242;border:1px solid #e0e0e0;
+      padding:10px 16px;border-radius:8px;cursor:pointer;
+      font-size:14px;font-family:inherit;">
+      ປິດ
+    </button>
+  </div>
+</div>
 </body>
 </html>
