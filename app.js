@@ -46,7 +46,7 @@ const mapDebt = r => ({
 });
 const mapDebtPayment = r => ({
   id: r.id, debtId: r.debt_id, amount: r.amount, method: r.method,
-  date: r.date, note: r.note || '', createdAt: r.created_at,
+  date: r.date, note: r.note || '',
 });
 const mapTopup = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, note: r.note || '', date: r.date,
@@ -575,7 +575,7 @@ const DB = {
     const { data: r, error } = await sb.from('debt_payments').insert({
       id, debt_id: debtId, amount, method: method || 'cash',
       date: payDate ? new Date(payDate).toISOString() : new Date().toISOString(),
-      note: note || '', created_at: new Date().toISOString(),
+      note: note || '',
     }).select().single();
     if (error) throw error;
     const p = mapDebtPayment(r);

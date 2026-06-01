@@ -263,6 +263,14 @@
   .wp-check-label:hover { background:#e8f5e9; border-color:#4caf50; }
   .wp-check-label input[type=checkbox] { accent-color:#2e7d32; width:15px; height:15px; cursor:pointer; }
   .wp-check-label.all-chk { font-weight:700; background:#e8f5e9; border-color:#2e7d32; }
+
+  /* ====== DAILY COLLECTION TRACKER ====== */
+  .trk-badge { display:inline-flex; align-items:center; gap:3px; padding:3px 10px; border-radius:50px; font-size:.73rem; font-weight:700; white-space:nowrap; }
+  .trk-paid    { background:#e8f5e9; color:#1b5e20; border:1px solid #a5d6a7; }
+  .trk-unpaid  { background:#fff8e1; color:#e65100; border:1px solid #ffe082; }
+  .trk-overdue { background:#ffebee; color:#c62828; border:1px solid #ef9a9a; }
+  .trk-phone   { color:#1565c0; text-decoration:none; font-weight:600; }
+  .trk-phone:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -305,6 +313,7 @@
       <button class="atab" onclick="showTab('products',this)">📦 ຜະລິດຕະພັນ</button>
       <button class="atab" onclick="showTab('perf',this)">📊 ຜົນດຳເນີນງານ</button>
       <button class="atab" onclick="showTab('alerts',this)">🔔 ແຈ້ງເຕືອນ <span id="badge-alerts" style="background:#c62828;color:white;padding:1px 6px;border-radius:50px;font-size:.68rem;margin-left:3px;display:none;"></span></button>
+      <button class="atab" onclick="showTab('tracker',this)">📋 ຕິດຕາມ</button>
       <button class="atab" onclick="showTab('charts',this)">📈 ກຣາຟ</button>
       <button class="atab" onclick="showTab('credits',this)">⭐ Credit Score</button>
       <button class="atab" onclick="showTab('agents',this)">👥 ຜູ້ຊ່ວຍ</button>
@@ -663,6 +672,39 @@
 
       <div class="sec-title" style="color:#e65100;margin-top:18px;">🟠 ໃກ້ຄົບກຳໜົດ (ພາຍໃນ 7 ວັນ)</div>
       <div id="alert-duesoon-list"></div>
+    </div>
+
+    <!-- ====== TAB: TRACKER ====== -->
+    <div id="tab-tracker" class="tab-pane">
+
+      <!-- Summary KPIs -->
+      <div class="kpi-row" id="trackerKpi"></div>
+
+      <!-- Filter + search bar -->
+      <div class="fbar" id="trackerFilterBar">
+        <button class="fbtn on" onclick="setTrackerFilter(this,'all')">ທັງໝົດ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'paid')" style="border-color:#a5d6a7;color:#1b5e20;">✅ ຈ່າຍແລ້ວ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'unpaid')" style="border-color:#ffe082;color:#e65100;">⏰ ຍັງບໍ່ຈ່າຍ</button>
+        <button class="fbtn" onclick="setTrackerFilter(this,'overdue')" style="border-color:#ef9a9a;color:#c62828;">⚠️ ຄ້າງ</button>
+        <input class="sbox" id="trackerSearch" placeholder="🔍 ຊື່ / ລະຫັດ / ເບີ..." oninput="renderTracker()" />
+      </div>
+
+      <!-- Table -->
+      <div class="tbl-card">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>ລະຫັດ</th>
+              <th>ຊື່ລູກຄ້າ</th>
+              <th>ເບີໂທ</th>
+              <th>ຜະລິດຕະພັນ</th>
+              <th style="text-align:right;">ຈ່າຍລ່າສຸດ</th>
+              <th>ວັນທີ</th>
+            </tr></thead>
+            <tbody id="trackerTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ====== TAB: CHARTS ====== -->
@@ -1221,6 +1263,7 @@ function showTab(name, btn) {
   if (name==='products') renderProducts();
   if (name==='perf')     renderPerf();
   if (name==='alerts')   renderAlerts();
+  if (name==='tracker')  renderTracker();
   if (name==='charts')   renderCharts();
   if (name==='credits')  renderCreditScore();
   if (name==='agents')   renderAgents();
@@ -2603,6 +2646,107 @@ function exportLoansCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('Export CSV ສຳເລັດ ✅');
+}
+
+// ====== TAB: DAILY COLLECTION TRACKER ======
+let trackerFilter = 'all';
+
+function setTrackerFilter(btn, f) {
+  trackerFilter = f;
+  document.querySelectorAll('#trackerFilterBar .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderTracker();
+}
+
+function renderTracker() {
+  const today    = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // Build enriched rows for every active loan
+  const allRows = DB.loans
+    .filter(l => l.status === 'active')
+    .map(loan => {
+      const loanPayments = DB.getLoanPayments(loan.id);
+      const paidToday    = loanPayments.some(p => p.date && p.date.slice(0, 10) === todayStr);
+
+      // Most recent payment overall
+      const lastPay = loanPayments.length > 0
+        ? loanPayments.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b)
+        : null;
+
+      let daysMissed = 0;
+      if (!paidToday) {
+        if (lastPay) {
+          daysMissed = Math.max(0, Math.floor((today - new Date(lastPay.date)) / 86400000));
+        } else {
+          daysMissed = Math.max(0, Math.floor((today - new Date(loan.createdAt)) / 86400000));
+        }
+      }
+
+      const status = paidToday ? 'paid' : (daysMissed >= 2 ? 'overdue' : 'unpaid');
+      return { loan, lastPay, paidToday, daysMissed, status };
+    });
+
+  // Default sort: overdue (most days first) → unpaid → paid
+  allRows.sort((a, b) => {
+    const ord = { overdue: 0, unpaid: 1, paid: 2 };
+    if (ord[a.status] !== ord[b.status]) return ord[a.status] - ord[b.status];
+    return b.daysMissed - a.daysMissed;
+  });
+
+  // Summary numbers
+  const activeIds      = new Set(DB.loans.filter(l => l.status === 'active').map(l => l.id));
+  const paymentsToday  = DB.payments.filter(p => activeIds.has(p.loanId) && p.date && p.date.slice(0, 10) === todayStr);
+  const totalCollected = paymentsToday.reduce((s, p) => s + (p.amount || 0), 0);
+  const paidCount      = allRows.filter(r => r.status === 'paid').length;
+  const unpaidCount    = allRows.filter(r => r.status === 'unpaid').length;
+  const overdueCount   = allRows.filter(r => r.status === 'overdue').length;
+
+  // Render KPI strip
+  document.getElementById('trackerKpi').innerHTML = [
+    { icon:'👥', label:'ທັງໝົດ',        val: allRows.length,              color:'#1b5e20' },
+    { icon:'✅', label:'ຈ່າຍແລ້ວ',      val: paidCount,                   color:'#2e7d32' },
+    { icon:'⏰', label:'ຍັງບໍ່ຈ່າຍ',    val: unpaidCount,                 color:'#e65100' },
+    { icon:'⚠️', label:'ຄ້າງ',          val: overdueCount,                color:'#c62828' },
+    { icon:'💰', label:'ເກັບໄດ້ວັນນີ້',  val: formatMoney(totalCollected), color:'#1565c0' },
+  ].map(k => `<div class="kcard" style="border-left-color:${k.color};">
+    <div class="ki">${k.icon}</div>
+    <div class="kv" style="color:${k.color};font-size:${String(k.val).length > 10 ? '.9rem' : '1.4rem'};">${k.val}</div>
+    <div class="kl">${k.label}</div>
+  </div>`).join('');
+
+  // Apply filter + search
+  const q = (document.getElementById('trackerSearch')?.value || '').toLowerCase().trim();
+  let rows = trackerFilter === 'all' ? allRows : allRows.filter(r => r.status === trackerFilter);
+  if (q) rows = rows.filter(({ loan }) =>
+    loan.id.toLowerCase().includes(q) ||
+    loan.name.toLowerCase().includes(q) ||
+    loan.phone.replace(/\D/g, '').includes(q.replace(/\D/g, ''))
+  );
+
+  const rowBg = s => s === 'paid' ? '#f1fff3' : s === 'overdue' ? '#fff5f5' : '#fffde7';
+
+  const tbody = document.getElementById('trackerTableBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">ບໍ່ມີຂໍ້ມູນ</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(({ loan, lastPay, daysMissed, status }) => `
+    <tr onclick="openLoanModal('${loan.id}')" style="background:${rowBg(status)};">
+      <td><strong style="color:#1b5e20;font-size:.8rem;">${loan.id}</strong></td>
+      <td><strong>${loan.name}</strong></td>
+      <td onclick="event.stopPropagation()">
+        <a class="trk-phone" href="tel:${loan.phone}">${loan.phone}</a>
+      </td>
+      <td style="font-size:.78rem;">${loan.productName || '-'}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">
+        ${lastPay ? formatMoney(lastPay.amount) : '<span style="color:#bdbdbd;">-</span>'}
+      </td>
+      <td style="font-size:.78rem;color:#616161;white-space:nowrap;">
+        ${lastPay ? formatDate(lastPay.date) : '<span style="color:#bdbdbd;">-</span>'}
+        ${status === 'overdue' ? `<div style="font-size:.68rem;color:#c62828;font-weight:700;">ຂາດ ${daysMissed} ວັນ</div>` : ''}
+      </td>
+    </tr>`).join('');
 }
 
 // ====== CHARTS ======
