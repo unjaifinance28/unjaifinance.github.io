@@ -3987,6 +3987,12 @@ function buildStmtEntries() {
     entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: l.amount || 0, cr: 0, rowClass: 'dr-row' });
   });
 
+  (DB.topups || []).forEach(t => {
+    const loan = DB.loans.find(l => l.id === t.loanId);
+    const sk = t.date ? String(t.date).slice(0, 10) : '';
+    entries.push({ sortKey: sk, dateStr: fmtD(t.date), label: 'ຢືມເພີ່ມ: ' + (loan?.name || t.loanId), dr: t.amount || 0, cr: 0, rowClass: 'dr-row' });
+  });
+
   DB.payments.forEach(p => {
     const loan = DB.loans.find(l => l.id === p.loanId);
     const sk = p.date ? String(p.date).slice(0, 10) : '';
