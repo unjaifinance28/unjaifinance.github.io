@@ -31,6 +31,7 @@ const mapLoan = r => ({
   discountApplied: r.discount_applied || 0,
   discountAmount: r.discount_amount || 0,
   dailyPayment: r.daily_payment || null,
+  cycleSettled: r.cycle_settled || false,
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
@@ -84,6 +85,7 @@ const mapCreditScore = r => ({
 // update loans set remaining_principal = amount where remaining_principal is null;
 // alter table products add column if not exists payment_type text default 'lump_sum';
 // alter table loans add column if not exists daily_payment numeric;
+// alter table loans add column if not exists cycle_settled boolean default false;
 
 // Supabase SQL — run once to create the compound_history table:
 // create table compound_history (
@@ -326,6 +328,7 @@ const DB = {
       remaining_principal: newPrincipal,
       total_due:           newTotalDue,
       interest_paid:       0,
+      cycle_settled:       false,
     }).eq('id', loanId);
     if (upErr) {
       const { error: upErr2 } = await sb.from('loans').update({ total_due: newTotalDue }).eq('id', loanId);
@@ -336,6 +339,7 @@ const DB = {
     loan.remainingPrincipal = newPrincipal;
     loan.totalDue           = newTotalDue;
     loan.interestPaid       = 0;
+    loan.cycleSettled       = false;
   },
 
   async addTopup(loanId, amount, note) {
@@ -352,10 +356,14 @@ const DB = {
     const newTotalDue           = calcLoanTotal(product, newAmount, loan.duration);
     const newOriginalPrincipal  = (loan.originalPrincipal ?? loan.amount) + amount;
     const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
+    // cycle_settled = true closes the current interest cycle: the payment made before the
+    // top-up counts as full settlement, so the loan detail page shows 0 still-owed and no
+    // compound warning until a new cycle begins (compounding clears the flag again).
     let { error: upErr } = await sb.from('loans').update({
       amount: newAmount, total_due: newTotalDue,
       original_principal: newOriginalPrincipal,
       remaining_principal: newRemainingPrincipal,
+      cycle_settled: true,
     }).eq('id', loanId);
     if (upErr) {
       const { error: upErr2 } = await sb.from('loans').update({
@@ -368,6 +376,7 @@ const DB = {
     loan.totalDue            = newTotalDue;
     loan.originalPrincipal   = newOriginalPrincipal;
     loan.remainingPrincipal  = newRemainingPrincipal;
+    loan.cycleSettled        = true;
   },
 
   async addPayment(loanId, amount, method, note) {

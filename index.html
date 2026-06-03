@@ -768,13 +768,21 @@ function doStatusSearch() {
 
     // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
     const interestPaidCycle = l.interestPaid || 0;
-    const interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
+    let   interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
 
     // Compound interest (ທົບຕົ້ນ) applies whenever the customer pays LESS THAN the full
     // interest due for the period. Only a full (or more) interest payment stops compounding;
     // a partial payment still compounds. interest_paid resets to 0 on compound, so it tracks
     // how much interest was paid this period.
-    const compoundApplies = interestPaidCycle < cycleInterest;
+    let   compoundApplies = interestPaidCycle < cycleInterest;
+
+    // A top-up settles the current cycle (see DB.addTopup): the partial payment made before
+    // the top-up counts as full settlement, so nothing is still owed and no compounding
+    // applies until a new cycle begins. The flag is cleared again when interest is compounded.
+    if (l.cycleSettled) {
+      interestOwed    = 0;
+      compoundApplies = false;
+    }
 
     // Due date and countdown (always from createdAt + duration, the contract date)
     const dueDate    = new Date(new Date(l.createdAt).getTime() + (l.duration || 30) * 86400000);

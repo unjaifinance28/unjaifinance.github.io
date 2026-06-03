@@ -1762,7 +1762,9 @@ function openLoanModal(id, focus) {
     // Offer compounding whenever interest is not fully paid for the period. _iDue is the
     // remaining unpaid interest, so _iDue > 0 means the customer paid less than the full
     // interest due — a full interest payment drives _iDue to 0 and hides the button.
-    if (_iDue > 0) {
+    // A top-up settles the current cycle (loan.cycleSettled), so hide the button until a
+    // new cycle begins, matching the customer-facing detail page.
+    if (_iDue > 0 && !loan.cycleSettled) {
       acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
     }
   }
