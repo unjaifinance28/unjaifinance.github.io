@@ -1759,6 +1759,9 @@ function openLoanModal(id, focus) {
     }
     const _curP = loan.remainingPrincipal ?? loan.amount;
     const _iDue = Math.max(0, loan.totalDue - _curP);
+    // Offer compounding whenever interest is not fully paid for the period. _iDue is the
+    // remaining unpaid interest, so _iDue > 0 means the customer paid less than the full
+    // interest due — a full interest payment drives _iDue to 0 and hides the button.
     if (_iDue > 0) {
       acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
     }
@@ -3984,13 +3987,20 @@ function buildStmtEntries() {
 
   DB.loans.filter(l => !['pending', 'rejected'].includes(l.status)).forEach(l => {
     const sk = l.createdAt ? String(l.createdAt).slice(0, 10) : '';
-    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: l.amount || 0, cr: 0, rowClass: 'dr-row' });
+    // l.amount grows with every top-up (see DB.addTopup), and top-ups are listed as their
+    // own Dr rows below — so the disbursement row must show the ORIGINAL principal only,
+    // otherwise each top-up is counted twice in the ledger.
+    const topupSum     = (DB.topups || []).filter(t => t.loanId === l.id).reduce((s, t) => s + (t.amount || 0), 0);
+    const principalOut = Math.max(0, (l.amount || 0) - topupSum);
+    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: principalOut, cr: 0, rowClass: 'dr-row' });
   });
 
   (DB.topups || []).forEach(t => {
     const loan = DB.loans.find(l => l.id === t.loanId);
+    // Skip top-ups on loans that aren't disbursed, so the ledger matches renderCurrentBalance()
+    if (!loan || ['pending', 'rejected'].includes(loan.status)) return;
     const sk = t.date ? String(t.date).slice(0, 10) : '';
-    entries.push({ sortKey: sk, dateStr: fmtD(t.date), label: 'ຢືມເພີ່ມ: ' + (loan?.name || t.loanId), dr: t.amount || 0, cr: 0, rowClass: 'dr-row' });
+    entries.push({ sortKey: sk, dateStr: fmtD(t.date), label: 'ຢືມເພີ່ມ: ' + (loan.name || t.loanId), dr: t.amount || 0, cr: 0, rowClass: 'dr-row' });
   });
 
   DB.payments.forEach(p => {

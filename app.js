@@ -15,6 +15,7 @@ const mapProduct = r => ({
   compoundDays: r.compound_days || 0,
   isVip: r.is_vip || false,
   vipCustomers: r.vip_customers || [],
+  paymentType: r.payment_type || 'lump_sum',
 });
 const mapLoan = r => ({
   id: r.id, productId: r.product_id, productName: r.product_name,
@@ -28,6 +29,8 @@ const mapLoan = r => ({
   originalRate: r.original_rate || null,
   discountedRate: r.discounted_rate || null,
   discountApplied: r.discount_applied || 0,
+  discountAmount: r.discount_amount || 0,
+  dailyPayment: r.daily_payment || null,
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
@@ -37,13 +40,13 @@ const mapExpense = r => ({
   id: r.id, category: r.category, amount: r.amount, note: r.note || '', date: r.date,
 });
 const mapDebt = r => ({
-  id: r.id, creditor: r.creditor, amount: r.amount, rate: r.rate,
+  id: r.id, creditor: r.creditor, amount: r.amount, rate: r.interest_rate,
   borrowDate: r.borrow_date, dueDate: r.due_date, note: r.note || '',
-  status: r.status, settledDate: r.settled_date, createdAt: r.created_at,
+  status: r.status, createdAt: r.created_at,
 });
 const mapDebtPayment = r => ({
   id: r.id, debtId: r.debt_id, amount: r.amount, method: r.method,
-  date: r.date, note: r.note || '', createdAt: r.created_at,
+  date: r.date, note: r.note || '',
 });
 const mapTopup = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, note: r.note || '', date: r.date,
@@ -79,6 +82,8 @@ const mapCreditScore = r => ({
 // alter table loans add column if not exists interest_paid numeric default 0;
 // update loans set original_principal = amount where original_principal is null;
 // update loans set remaining_principal = amount where remaining_principal is null;
+// alter table products add column if not exists payment_type text default 'lump_sum';
+// alter table loans add column if not exists daily_payment numeric;
 
 // Supabase SQL — run once to create the compound_history table:
 // create table compound_history (
@@ -190,6 +195,7 @@ const DB = {
       compound_days: data.compoundDays || 0,
       is_vip: data.isVip || false,
       vip_customers: data.vipCustomers || [],
+      payment_type: data.paymentType || 'lump_sum',
     }).select().single();
     if (error) ({ data: r, error } = await sb.from('products').insert(core).select().single());
     if (error) throw error;
@@ -213,6 +219,7 @@ const DB = {
     if (data.compoundDays !== undefined) ext.compound_days  = data.compoundDays;
     if (data.isVip        !== undefined) ext.is_vip         = data.isVip;
     if (data.vipCustomers !== undefined) ext.vip_customers  = data.vipCustomers;
+    if (data.paymentType  !== undefined) ext.payment_type   = data.paymentType;
     let { error } = await sb.from('products').update({ ...core, ...ext }).eq('id', id);
     if (error && Object.keys(ext).length) {
       ({ error } = await sb.from('products').update(core).eq('id', id));
@@ -246,6 +253,7 @@ const DB = {
       original_principal: data.amount,
       remaining_principal: data.amount,
       interest_paid: 0,
+      daily_payment: data.dailyPayment || null,
     }).select().single();
     if (error) ({ data: r, error } = await sb.from('loans').insert(core).select().single());
     if (error) throw error;
@@ -369,9 +377,14 @@ const DB = {
 
     const curPrincipal = loan.remainingPrincipal ?? loan.amount;
     const interestDue  = Math.max(0, loan.totalDue - curPrincipal);
+    const isZeroInterest = (loan.totalDue || 0) <= (loan.amount || 0);
 
     let interestCollected, principalReduced;
-    if (amount >= interestDue) {
+    if (isZeroInterest || interestDue === 0) {
+      // 0% interest loan — entire payment reduces principal directly
+      interestCollected = 0;
+      principalReduced  = amount;
+    } else if (amount >= interestDue) {
       interestCollected = interestDue;
       principalReduced  = amount - interestDue;
     } else {
@@ -433,10 +446,10 @@ const DB = {
   async addDebt(data) {
     const id = 'DBT' + Date.now();
     const { data: r, error } = await sb.from('debts').insert({
-      id, creditor: data.creditor, amount: data.amount, rate: data.rate,
+      id, creditor: data.creditor, amount: data.amount, interest_rate: data.rate,
       borrow_date: data.borrowDate || null, due_date: data.dueDate || null,
       note: data.note || '', status: 'active',
-      settled_date: null, created_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     const d = mapDebt(r);
@@ -446,8 +459,7 @@ const DB = {
 
   async updateDebt(id, data) {
     const row = {};
-    if (data.status      !== undefined) row.status       = data.status;
-    if (data.settledDate !== undefined) row.settled_date = data.settledDate;
+    if (data.status !== undefined) row.status = data.status;
     const { error } = await sb.from('debts').update(row).eq('id', id);
     if (error) throw error;
     const i = this.debts.findIndex(d => d.id === id);
@@ -469,7 +481,6 @@ const DB = {
     const { data: r, error } = await sb.from('vip_invitations').insert({
       id, loan_id: loanId, product_id: productId,
       phone: cleanPhone, note: note || '',
-      created_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;
     this.vipInvitations.push(mapVipInvitation(r));
@@ -564,14 +575,14 @@ const DB = {
     const { data: r, error } = await sb.from('debt_payments').insert({
       id, debt_id: debtId, amount, method: method || 'cash',
       date: payDate ? new Date(payDate).toISOString() : new Date().toISOString(),
-      note: note || '', created_at: new Date().toISOString(),
+      note: note || '',
     }).select().single();
     if (error) throw error;
     const p = mapDebtPayment(r);
     this.debtPayments.push(p);
     const totalRepaid = this.debtPayments.filter(x => x.debtId === debtId).reduce((s, x) => s + x.amount, 0);
     if (totalRepaid >= debt.amount && debt.status !== 'settled') {
-      await this.updateDebt(debtId, { status: 'settled', settledDate: new Date().toISOString() });
+      await this.updateDebt(debtId, { status: 'settled' });
     }
     return p;
   },
@@ -579,6 +590,7 @@ const DB = {
 
 // ===== UTILS =====
 function calcLoanTotal(product, amount, customDays) {
+  if (product.interestRate === 0) return amount;
   const days = customDays || product.duration || 30;
   if (product.interestType === 'flat')
     return Math.round(amount * (1 + product.interestRate / 100));

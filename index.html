@@ -231,6 +231,9 @@
             <select id="f-occ">
               <option value="">-- ເລືອກ --</option>
             </select>
+            <input type="text" id="workplaceOther"
+              placeholder="ກະລຸນາລະບຸບ່ອນເຮັດວຽກຂອງທ່ານ"
+              style="display:none;margin-top:8px;" />
             <span class="error-msg" id="e-occ"></span>
           </div>
 
@@ -351,17 +354,25 @@ let selectedProduct  = null;
 let docImageData     = null; // compressed base64
 let _activeDiscount  = null; // { cs, loan } if customer has approved discount
 
-// ====== LOGO: load company logo if saved ======
-(function() {
-  const saved = localStorage.getItem('uf_logo');
-  if (saved) {
-    // Replace fallback UF with actual image in nav and hero
-    const navEl  = document.getElementById('navLogoIcon');
-    const heroEl = document.getElementById('heroLogoIcon');
-    if (navEl)  navEl.innerHTML  = `<img src="${saved}" alt="Logo" />`;
-    if (heroEl) heroEl.innerHTML = `<img src="${saved}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" />`;
-  }
-})();
+// ====== LOGO: load company logo (Supabase → cross-device) ======
+function applyLogo(dataUrl) {
+  const navEl  = document.getElementById('navLogoIcon');
+  const heroEl = document.getElementById('heroLogoIcon');
+  if (navEl)  navEl.innerHTML  = `<img src="${dataUrl}" alt="Logo" />`;
+  if (heroEl) heroEl.innerHTML = `<img src="${dataUrl}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" />`;
+}
+async function loadLogo() {
+  const cached = localStorage.getItem('uf_logo');
+  if (cached) applyLogo(cached);
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key','company_logo').single();
+    if (data?.value) {
+      applyLogo(data.value);
+      localStorage.setItem('uf_logo', data.value);
+    }
+  } catch {}
+}
+loadLogo();
 
 // ====== RENDER PRODUCTS ======
 function renderProducts() {
@@ -539,7 +550,14 @@ function updatePreview() {
   }
   document.getElementById('pv-prod').textContent  = selectedProduct.name;
   document.getElementById('pv-amt').textContent   = formatMoney(amt);
-  document.getElementById('pv-int').textContent   = formatMoney(interest);
+  const pvInt = document.getElementById('pv-int');
+  if (interest === 0) {
+    pvInt.textContent = 'ບໍ່ມີ (0%)';
+    pvInt.style.color = '#2e7d32';
+  } else {
+    pvInt.textContent = formatMoney(interest);
+    pvInt.style.color = '#c62828';
+  }
   document.getElementById('pv-dur').textContent   = dur;
   document.getElementById('pv-total').textContent = formatMoney(total);
   document.getElementById('pv-pay').textContent   = payNote;
@@ -554,6 +572,10 @@ function validate() {
     ['f-phone','e-phone','ກະລຸນາໃສ່ເບີໂທ'],
     ['f-idcard','e-idcard','ກະລຸນາໃສ່ເລກເອກະສານ'],
     ['f-occ','e-occ','ກະລຸນາເລືອກບ່ອນເຮັດວຽກ'],
+    // 'ອື່ນໆ' requires the free-text field to be filled
+    ...(document.getElementById('f-occ')?.value === 'ອື່ນໆ'
+      ? [['workplaceOther','e-occ','ກະລຸນາລະບຸບ່ອນເຮັດວຽກ']]
+      : []),
     ['f-income','e-income','ກະລຸນາໃສ່ລາຍໄດ້'],
     ['f-address','e-address','ກະລຸນາໃສ່ທີ່ຢູ່'],
   ];
@@ -644,13 +666,18 @@ document.getElementById('applyForm').addEventListener('submit', async e => {
       idCard:   document.getElementById('f-idcard').value.trim(),
       docType:  docTypeRadio ? docTypeRadio.value : 'id',
       docImage: docImageData || null,
-      occupation: document.getElementById('f-occ').value,
+      workplace: document.getElementById('f-occ').value === 'ອື່ນໆ'
+        ? (document.getElementById('workplaceOther').value.trim() || 'ອື່ນໆ')
+        : document.getElementById('f-occ').value,
       income:   getMoneyValue(document.getElementById('f-income')),
       address:  document.getElementById('f-address').value.trim(),
       note:     document.getElementById('f-note').value.trim(),
       amount:   amt,
       duration: dur,
       totalDue: total,
+      dailyPayment: selectedProduct.paymentType === 'daily_installment' && dur > 0
+        ? Math.round(total / dur)
+        : null,
       originalRate, discountedRate, discountApplied,
     });
 
@@ -726,15 +753,28 @@ function doStatusSearch() {
     const principal    = l.remainingPrincipal ?? l.amount ?? 0;
     const interestRate = product?.interestRate ?? 0;
     const interestType = product?.interestType ?? 'flat';
+    const isDailyLoan  = product?.paymentType === 'daily_installment';
 
-    // Full interest for one cycle, calculated from rate (never reads from totalDue)
-    const cycleInterest = interestType === 'daily'
-      ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
-      : Math.round(principal * (interestRate / 100));
+    // Daily installment: flat rate on ORIGINAL amount only — remainingPrincipal is unreliable
+    // (for completed loans it may be 0 or leftover balance, not the original 30M)
+    // Lump-sum daily-type: rate × duration days
+    const origAmount    = l.amount ?? 0;
+    const cycleInterest = isDailyLoan
+      ? Math.round(origAmount * (interestRate / 100))
+      : interestType === 'daily'
+        ? Math.round(principal * (interestRate / 100) * (l.duration || 30))
+        : Math.round(principal * (interestRate / 100));
+    const dailyTotal = isDailyLoan ? origAmount + cycleInterest : 0;
 
     // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
     const interestPaidCycle = l.interestPaid || 0;
     const interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
+
+    // Compound interest (ທົບຕົ້ນ) applies whenever the customer pays LESS THAN the full
+    // interest due for the period. Only a full (or more) interest payment stops compounding;
+    // a partial payment still compounds. interest_paid resets to 0 on compound, so it tracks
+    // how much interest was paid this period.
+    const compoundApplies = interestPaidCycle < cycleInterest;
 
     // Due date and countdown (always from createdAt + duration, the contract date)
     const dueDate    = new Date(new Date(l.createdAt).getTime() + (l.duration || 30) * 86400000);
@@ -746,9 +786,9 @@ function doStatusSearch() {
     const cycleInterestDisplay = cycleInterest;
     const interestPaidDisplay  = interestPaidCycle;
 
-    // ---- Compound warning (uses interestOwed, not old interestDue) ----
+    // ---- Compound warning (only for products with compound=true) ----
     let compoundWarning = '';
-    if (l.status === 'active' && l.duration > 0 && interestOwed > 0) {
+    if (l.status === 'active' && product?.compound === true && l.duration > 0 && compoundApplies) {
       const cDays        = product ? (product.compoundDays || 0) : 0;
       const compoundDate = new Date(dueDate.getTime() + cDays * 86400000);
       const compStart    = new Date(compoundDate); compStart.setHours(0, 0, 0, 0);
@@ -763,9 +803,57 @@ function doStatusSearch() {
     const cardBorder = isVipLoan ? '1.5px solid #fdd835' : '1.5px solid #e0e0e0';
     const cardBg     = isVipLoan ? 'linear-gradient(135deg,#fffde7,white)' : 'white';
 
+    const dailyAmt  = l.dailyPayment || (isDailyLoan && l.duration > 0 ? Math.round(dailyTotal / l.duration) : 0);
+    const totalPaid = l.paidAmount || 0;
+    const totalRem  = isDailyLoan ? Math.max(0, dailyTotal - totalPaid) : Math.max(0, (l.totalDue || 0) - totalPaid);
+    const paidDays  = dailyAmt > 0 ? Math.floor(totalPaid / dailyAmt) : 0;
+    if (isDailyLoan) console.log('daily loan debug:', {
+      amount: l.amount, originalPrincipal: l.originalPrincipal, remainingPrincipal: l.remainingPrincipal,
+      totalDue: l.totalDue, duration: l.duration, paidAmount: l.paidAmount,
+      dailyPayment: l.dailyPayment, productPaymentType: product?.paymentType,
+      computed: { origAmount, cycleInterest, dailyTotal, dailyAmt, paidDays },
+    });
+
     // ---- Payment details card (active loans only) ----
     const paymentCard = (() => {
       if (l.status !== 'active') return '';
+      if (isDailyLoan) {
+        const fmtDMY = iso => {
+          if (!iso) return '-';
+          const d = new Date(iso);
+          return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        };
+        let countdownBg, countdownColor, countdownIcon, countdownText;
+        if (daysLeft > 7) {
+          countdownBg = '#e8f5e9'; countdownColor = '#2e7d32'; countdownIcon = '🟢';
+          countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+        } else if (daysLeft >= 1) {
+          countdownBg = '#fff3e0'; countdownColor = '#e65100'; countdownIcon = '🟡';
+          countdownText = `ຄົບກຳນົດໃນອີກ ${daysLeft} ວັນ`;
+        } else {
+          countdownBg = '#ffebee'; countdownColor = '#c62828'; countdownIcon = '🔴';
+          countdownText = `ເກີນກຳນົດ ${Math.abs(daysLeft)} ວັນແລ້ວ`;
+        }
+        return `<div style="margin-top:10px;background:linear-gradient(135deg,#e3f2fd,#e8f5e9);border:1px solid #90caf9;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:.72rem;font-weight:800;color:#1565c0;margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase;">📅 ຜ່ອນລາຍວັນ</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-bottom:4px;">
+            <span style="color:#616161;">ຜ່ອນວັນລະ</span>
+            <span style="font-weight:800;color:#1565c0;">${formatMoney(dailyAmt)} ກີບ/ວັນ</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-bottom:4px;">
+            <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+            <span style="font-weight:700;color:#2e7d32;">${formatMoney(totalPaid)} (${paidDays} ວັນ)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;padding-top:6px;border-top:1px dashed #90caf9;margin-bottom:8px;">
+            <span style="color:#616161;">ຄ້າງຊຳລະ</span>
+            <span style="font-weight:800;color:${totalRem > 0 ? '#c62828' : '#1b5e20'};">${totalRem > 0 ? formatMoney(totalRem) : '✅ ຊຳລະຄົບ'}</span>
+          </div>
+          <div style="font-size:.77rem;color:#1565c0;font-style:italic;margin-bottom:8px;padding:5px 8px;background:rgba(21,101,192,.07);border-radius:6px;">💡 ຈ່າຍວັນລະ ${formatMoney(dailyAmt)} ກີບ ຫຼື ສະສົມຈ່າຍໄດ້ · ຄົບ ${fmtDMY(dueDate)}</div>
+          <div style="margin-top:4px;padding:7px 10px;background:${countdownBg};border-radius:8px;font-size:.83rem;font-weight:700;color:${countdownColor};text-align:center;">
+            ${countdownIcon} ${countdownText}
+          </div>
+        </div>`;
+      }
       const fmtDMY = iso => {
         if (!iso) return '-';
         const d = new Date(iso);
@@ -802,10 +890,20 @@ function doStatusSearch() {
       if (interestOwed > 0 && !isOverdue && daysLeft <= 7) {
         warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:.81rem;font-weight:700;color:#e65100;">⚠️ ກະລຸນາຊຳລະດອກ ${formatMoney(interestOwed)} ກ່ອນວັນທີ ${fmtDMY(dueDate)}</div>`;
       } else if (interestOwed > 0 && isOverdue) {
-        warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`;
+        // Only threaten compounding when it actually applies (nothing paid this period).
+        // A partial payer who is overdue still owes interest, but will NOT be compounded.
+        const mayCompound = product?.compound === true && compoundApplies;
+        warningHtml = mayCompound
+          ? `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`
+          : `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ກະລຸນາຊຳລະດອກຄ້າງ ${formatMoney(interestOwed)}</div>`;
       }
 
-      const interestNextHtml = interestOwed > 0
+      const interestNextHtml = interestRate === 0
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
+             <span style="color:#616161;">ຕົ້ນທີ່ຕ້ອງຊຳລະ</span>
+             <span style="font-weight:700;color:${principal > 0 ? '#c62828' : '#2e7d32'};">${principal > 0 ? formatMoney(principal) : '✅ ຊຳລະຄົບ'}</span>
+           </div>`
+        : interestOwed > 0
         ? `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;margin-top:3px;">
              <span style="color:#616161;">ດອກທີ່ຕ້ອງຊຳລະ</span>
              <span style="font-weight:700;color:#e65100;">${formatMoney(interestOwed)}</span>
@@ -836,23 +934,55 @@ function doStatusSearch() {
     })();
 
     // ---- Main info grid ----
-    // Active loans: 4-line interest breakdown; other statuses: simple summary
-    const gridRows = l.status === 'active' ? `
+    // Daily installment: show principal/total/daily/paid/remaining
+    // Active lump_sum: 4-line interest breakdown; other statuses: simple summary
+    const gridRows = isDailyLoan ? (l.status === 'active' ? `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(origAmount)}</span>
+      <span style="color:#616161;">ດອກ</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterest)}</span>
+      <span style="color:#616161;">ລວມ</span>
+      <span style="font-weight:800;color:#212121;text-align:right;">${formatMoney(dailyTotal)}</span>
+      <span style="color:#616161;">ຜ່ອນວັນລະ</span>
+      <span style="font-weight:700;color:#1565c0;text-align:right;">${formatMoney(dailyAmt)} ກີບ/ວັນ</span>
+      <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">${formatMoney(totalPaid)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຄ້າງ</span>
+      <span style="font-weight:900;color:${totalRem > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${totalRem > 0 ? formatMoney(totalRem) : '✅ ຊຳລະຄົບ'}</span>
+      <span style="color:#616161;">ສະຖານະ</span>
+      <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    ` : `
+      <span style="color:#616161;">ເງິນຕົ້ນ</span>
+      <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(origAmount)}</span>
+      <span style="color:#616161;">ລວມ</span>
+      <span style="font-weight:700;color:#212121;text-align:right;">${formatMoney(dailyTotal)}</span>
+      <span style="color:#616161;">ຊຳລະແລ້ວ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">${formatMoney(totalPaid)}</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ສະຖານະ</span>
+      <span style="text-align:right;border-top:1px solid #f0f0f0;padding-top:5px;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
+    `) : l.status === 'active' ? `
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
       <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
+      ${interestRate === 0 ? `
+      <span style="color:#616161;">ດອກເບ້ຍ</span>
+      <span style="font-weight:700;color:#2e7d32;text-align:right;">🎁 ບໍ່ມີ (0%)</span>
+      <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຍັງຕ້ອງຊຳລະ</span>
+      <span style="font-weight:900;color:${principal > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${principal > 0 ? formatMoney(principal) : '✅ ຊຳລະຄົບ'}</span>
+      ` : `
       <span style="color:#616161;">ດອກເບ້ຍງວດນີ້</span>
       <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterestDisplay)}</span>
       <span style="color:#616161;">ຊຳລະດອກແລ້ວ</span>
       <span style="font-weight:700;color:#2e7d32;text-align:right;">− ${formatMoney(interestPaidDisplay)}</span>
       <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ຍັງຕ້ອງຊຳລະ</span>
       <span style="font-weight:900;color:${interestOwed > 0 ? '#c62828' : '#2e7d32'};border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${interestOwed > 0 ? formatMoney(interestOwed) : '✅ ດອກຊຳລະຄົບ'}</span>
+      `}
       <span style="color:#616161;">ສະຖານະ</span>
       <span style="text-align:right;"><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:50px;font-size:.73rem;font-weight:700;">${st.label}</span></span>
     ` : `
       <span style="color:#616161;">ເງິນຕົ້ນ</span>
       <span style="font-weight:700;color:#1b5e20;text-align:right;">${formatMoney(principal)}</span>
       <span style="color:#616161;">ດອກເບ້ຍ</span>
-      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(interestInDb)}</span>
+      <span style="font-weight:700;color:#e65100;text-align:right;">${formatMoney(cycleInterest)}</span>
       <span style="color:#616161;border-top:1px solid #f0f0f0;padding-top:5px;">ລວມທັງໝົດ</span>
       <span style="font-weight:900;color:#1b5e20;border-top:1px solid #f0f0f0;padding-top:5px;text-align:right;">${formatMoney(l.totalDue || 0)}</span>
       <span style="color:#616161;">ສະຖານະ</span>
@@ -872,6 +1002,29 @@ function doStatusSearch() {
       </div>
       ${paymentCard}
       ${compoundWarning}
+      ${(() => {
+        if (l.status !== 'completed' || !isDailyLoan || !dailyAmt) return '';
+        const pd = Math.round(totalPaid / dailyAmt);
+        const sd = (l.duration || 0) - pd;
+        if (sd <= 0) return '';
+        const disc     = sd * dailyAmt;
+        const loanTotal = dailyTotal || l.totalDue || origAmount;
+        return `<div style="margin-top:10px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:1.5px solid #66bb6a;border-radius:11px;padding:13px 14px;">
+          <div style="font-size:.88rem;font-weight:800;color:#1b5e20;margin-bottom:4px;">🎉 ສຳເລັດກ່ອນກຳນົດ!</div>
+          <div style="font-size:.79rem;color:#2e7d32;margin-bottom:10px;">ຈ່າຍຄົບພາຍໃນ ${pd} ວັນ (ໄວກວ່າ ${sd} ວັນ)</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:.82rem;align-items:center;">
+            <span style="color:#616161;">ຈ່າຍຈິງ</span>
+            <span style="font-weight:700;text-align:right;">${formatMoney(totalPaid)} ກີບ</span>
+            <span style="color:#2e7d32;font-weight:600;">ສ່ວນຫຼຸດ</span>
+            <span style="font-weight:700;color:#2e7d32;text-align:right;">− ${formatMoney(disc)} ກີບ</span>
+            <span style="color:#616161;border-top:1px solid #c8e6c9;padding-top:5px;">ລວມທັງໝົດ</span>
+            <span style="font-weight:800;color:#1b5e20;border-top:1px solid #c8e6c9;padding-top:5px;text-align:right;">${formatMoney(loanTotal)} ກີບ</span>
+          </div>
+          <div style="margin-top:9px;text-align:center;background:#fff;border-radius:8px;padding:7px 10px;font-size:.84rem;font-weight:700;color:#1b5e20;border:1px solid #a5d6a7;">
+            ໄດ້ຮັບສ່ວນຫຼຸດ: ${formatMoney(disc)} ກີບ 🎁
+          </div>
+        </div>`;
+      })()}
       ${(() => {
         const hist = DB.getCompoundHistory(l.id);
         if (!hist.length) return '';
@@ -941,8 +1094,22 @@ function printBarcode(loanId) {
     const workOpts = await loadWorkplaceOptions().catch(() => null);
     if (workOpts && workOpts.length) {
       const sel = document.getElementById('f-occ');
-      if (sel) sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
-        workOpts.map(o => `<option>${o}</option>`).join('');
+      if (sel) {
+        sel.innerHTML = '<option value="">-- ເລືອກ --</option>' +
+          workOpts.map(o => `<option>${o}</option>`).join('');
+        sel.addEventListener('change', function() {
+          const otherInput = document.getElementById('workplaceOther');
+          if (this.value === 'ອື່ນໆ') {
+            otherInput.style.display = 'block';
+            otherInput.required = true;
+            otherInput.focus();
+          } else {
+            otherInput.style.display = 'none';
+            otherInput.required = false;
+            otherInput.value = '';
+          }
+        });
+      }
     }
   } catch(err) {
     console.error(err);
