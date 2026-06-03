@@ -883,6 +883,9 @@
         </div>
       </div>
 
+      <!-- Compound interest decision (approve / reject — built by JS) -->
+      <div id="md-compound-decision"></div>
+
       <!-- Document section (collapsible, built by JS) -->
       <div id="md-doc-section" style="margin-bottom:10px;"></div>
 
@@ -1565,7 +1568,7 @@ function openLoanModal(id, focus) {
       ${mkR('ໄລຍະ', (loan.duration||'-')+' ວັນ')}
       ${mkR('ວັນເລີ່ມ', formatDate(loan.createdAt))}
       ${mkR('ວັນຄົບ', dueTxt)}
-      ${loan.note ? mkR('ໝາຍເຫດ', `<span style="font-size:.78rem;">${loan.note}</span>`) : ''}
+      ${loan.note ? mkR('ໝາຍເຫດ', `<span style="font-size:.78rem;white-space:pre-line;">${loan.note}</span>`) : ''}
     </div>
     <div class="md-money-card">
       <div class="md-card-title" style="border-bottom-color:#dcedc8;">💰 ຍອດເງິນ</div>
@@ -1757,12 +1760,10 @@ function openLoanModal(id, focus) {
     if (overdue && rem > 0 && product?.compound) {
       acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
     }
-    const _curP = loan.remainingPrincipal ?? loan.amount;
-    const _iDue = Math.max(0, loan.totalDue - _curP);
-    if (_iDue > 0) {
-      acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
-    }
+    // The compound interest approve/reject decision is rendered as its own section
+    // (#md-compound-decision) below — see renderCompoundDecision().
   }
+  renderCompoundDecision(loan);
   acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
   if (loan.status === 'completed') {
@@ -2038,6 +2039,63 @@ function doCompoundInterest(loanId) {
       if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
       updateAlertsBadge();
       showToast('ທົບຕົ້ນດອກສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+// Compound interest decision section — admin approves or rejects compounding.
+// Appears when an active loan is overdue with interest not fully paid (interestDue > 0) and
+// the cycle has not already been settled (e.g. by a top-up). Mirrors the customer warning.
+function renderCompoundDecision(loan) {
+  const el = document.getElementById('md-compound-decision');
+  if (!el) return;
+  const curP = loan.remainingPrincipal ?? loan.amount;
+  const iDue = Math.max(0, (loan.totalDue || 0) - curP);
+  // Only offer the compound decision once the cycle is overdue (the customer had the full
+  // period to pay). A settled cycle (top-up or a prior compound) suppresses it.
+  if (loan.status !== 'active' || iDue <= 0 || loan.cycleSettled || !isLoanOverdue(loan)) {
+    el.innerHTML = '';
+    return;
+  }
+  const newPrincipal = curP + iDue;
+  el.innerHTML = `
+    <div style="background:#fff3e0;border:1.5px solid #ffb74d;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <div style="font-weight:800;color:#e65100;font-size:.92rem;margin-bottom:8px;">🔄 ດອກຄ້າງ — ຕັດສິນໃຈທົບຕົ້ນ</div>
+      <div style="font-size:.84rem;color:#5d4037;line-height:1.8;">
+        <div style="display:flex;justify-content:space-between;"><span>ດອກຄ້າງ (ຍັງບໍ່ໄດ້ຊຳລະ)</span><strong style="color:#c62828;">${formatMoney(iDue)}</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span>ທຶນຕົ້ນປັດຈຸບັນ</span><strong>${formatMoney(curP)}</strong></div>
+        <div style="border-top:1px dashed #ffb74d;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;">
+          <span>ຖ້າທົບຕົ້ນ: ທຶນຕົ້ນໃໝ່</span><strong style="color:#1b5e20;">${formatMoney(newPrincipal)}</strong>
+        </div>
+        <div style="font-size:.76rem;color:#8d6e63;text-align:right;margin-top:2px;">${formatMoney(curP)} + ${formatMoney(iDue)} = ${formatMoney(newPrincipal)} ກີບ</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn" style="flex:1;background:#2e7d32;color:white;border:none;font-weight:700;" onclick="doCompoundInterest('${loan.id}')">✅ ຢືນຢັນທົບຕົ້ນ</button>
+        <button class="btn" style="flex:1;background:white;color:#c62828;border:1.5px solid #ef9a9a;font-weight:700;" onclick="rejectCompoundInterest('${loan.id}')">❌ ປະຕິເສດທົບຕົ້ນ</button>
+      </div>
+    </div>`;
+}
+
+// Reject / waive compounding: the unpaid interest is written off and the cycle is closed.
+function rejectCompoundInterest(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const curP = loan.remainingPrincipal ?? loan.amount;
+  const iDue = Math.max(0, (loan.totalDue || 0) - curP);
+  if (iDue <= 0) { showToast('ບໍ່ມີດອກຄ້າງ', 'error'); return; }
+
+  const msg = `ຍົກເວັ້ນ (ບໍ່ທົບຕົ້ນ) ດອກຄ້າງ <strong style="color:#c62828;">${formatMoney(iDue)}</strong><br>
+    <span style="font-size:.82rem;color:#616161;">ດອກຄ້າງຈະຖືກຍົກເລີກ ແລະ ປິດຮອບນີ້ — ລູກຄ້າຄ້າງສະເພາະທຶນຕົ້ນ <strong>${formatMoney(curP)}</strong></span>`;
+
+  openConfirm('🚫', 'ປະຕິເສດທົບຕົ້ນ', msg, async () => {
+    try {
+      await DB.rejectCompoundInterest(loanId);
+      closeConfirm();
+      openLoanModal(loanId);
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      updateAlertsBadge();
+      showToast('ປະຕິເສດທົບຕົ້ນ — ຍົກເວັ້ນດອກຄ້າງ ✅');
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
@@ -2504,15 +2562,61 @@ function isLoanOverdue(loan) {
 // ====== ALERTS BADGE (called on init and after status changes) ======
 function updateAlertsBadge() {
   const now = new Date();
-  const in7 = new Date(now.getTime() + 7 * 86400000);
-  const cnt = DB.loans.filter(l => {
-    if (l.status !== 'active') return false;
-    if ((l.totalDue||0) <= 0) return false;
-    const due = calcDueDate(l);
-    return due && due <= in7;
-  }).length;
+  const cnt = DB.loans.filter(l => loanAlertStatus(l, now)).length;
   const b = document.getElementById('badge-alerts');
   if (b) { b.textContent = cnt || ''; b.style.display = cnt ? 'inline' : 'none'; }
+}
+
+// Most recent customer activity on a loan (latest payment or top-up), in ms, or null if none.
+function lastLoanActivity(loan) {
+  const ts = [
+    ...DB.getLoanPayments(loan.id).map(p => p.date),
+    ...DB.getLoanTopups(loan.id).map(t => t.date),
+  ].filter(Boolean).map(d => new Date(d).getTime());
+  return ts.length ? Math.max(...ts) : null;
+}
+
+// Decide whether a loan needs an alert, using payment recency so customers who pay regularly
+// are NOT flagged. Returns 'overdue', 'soon', or null (no alert).
+//   Daily-installment (ຈ່າຍເປັນມື້): 'overdue' only after 2+ consecutive days with no payment.
+//   Lump-sum / monthly (ຈ່າຍຄັ້ງດຽວ):
+//     'overdue' when past due AND no activity within the last cycle length (≈ duration days);
+//     'soon'    when within 7 days of due AND nothing paid in the current cycle.
+// A settled cycle (top-up, or an applied/rejected compound) is never alerted.
+function loanAlertStatus(loan, now = new Date()) {
+  if (loan.status !== 'active') return null;
+  if ((loan.totalDue || 0) <= 0) return null;
+  if (loan.cycleSettled) return null;
+
+  const DAY     = 86400000;
+  const product = DB.products.find(p => p.id === loan.productId);
+  const isDaily = product?.paymentType === 'daily_installment';
+  const lastAct = lastLoanActivity(loan);
+
+  if (isDaily) {
+    // Behind by 2+ consecutive days with no payment.
+    const ref = lastAct ?? new Date(loan.createdAt).getTime();
+    return Math.floor((now.getTime() - ref) / DAY) >= 2 ? 'overdue' : null;
+  }
+
+  const due = calcDueDate(loan);
+  if (!due) return null;
+  const cycleLen = loan.duration || 30;
+
+  if (now > due) {
+    // Overdue: skip if the customer paid/topped-up within the last cycle length.
+    const paidRecently = lastAct != null && (now.getTime() - lastAct) / DAY < cycleLen;
+    return paidRecently ? null : 'overdue';
+  }
+
+  const daysToDue = Math.ceil((due.getTime() - now.getTime()) / DAY);
+  if (daysToDue <= 7) {
+    // Within 7 days of due: skip if anything was paid this cycle (since cycle start).
+    const cycleStart   = due.getTime() - cycleLen * DAY;
+    const paidThisCycle = lastAct != null && lastAct >= cycleStart;
+    return paidThisCycle ? null : 'soon';
+  }
+  return null;
 }
 
 // ====== TAB: ALERTS ======
@@ -2565,21 +2669,16 @@ function alertCard(l, dueDate, days, remaining, type) {
 
 function renderAlerts() {
   const now  = new Date();
-  const in7  = new Date(now.getTime() + 7 * 86400000);
 
-  const overdue = DB.loans.filter(l => {
-    if (l.status !== 'active') return false;
-    if ((l.totalDue||0) <= 0) return false;
-    const due = calcDueDate(l);
-    return due && due < now;
-  }).sort((a,b) => calcDueDate(a) - calcDueDate(b));
-
-  const dueSoon = DB.loans.filter(l => {
-    if (l.status !== 'active') return false;
-    if ((l.totalDue||0) <= 0) return false;
-    const due = calcDueDate(l);
-    return due && due >= now && due <= in7;
-  }).sort((a,b) => calcDueDate(a) - calcDueDate(b));
+  const overdue = [];
+  const dueSoon = [];
+  DB.loans.forEach(l => {
+    const status = loanAlertStatus(l, now);
+    if (status === 'overdue') overdue.push(l);
+    else if (status === 'soon') dueSoon.push(l);
+  });
+  overdue.sort((a,b) => calcDueDate(a) - calcDueDate(b));
+  dueSoon.sort((a,b) => calcDueDate(a) - calcDueDate(b));
 
   // KPI strip
   document.getElementById('alertKpi').innerHTML = [
@@ -2597,8 +2696,17 @@ function renderAlerts() {
   const overdueEl = document.getElementById('alert-overdue-list');
   overdueEl.innerHTML = overdue.length
     ? overdue.map(l => {
-        const due  = calcDueDate(l);
-        const days = Math.floor((now - due) / 86400000);
+        const due     = calcDueDate(l);
+        const product = DB.products.find(p => p.id === l.productId);
+        // Daily loans are flagged by missed days, not by a passed term-end, so show days
+        // since the last payment/top-up instead of days past the due date.
+        let days;
+        if (product?.paymentType === 'daily_installment') {
+          const ref = lastLoanActivity(l) ?? new Date(l.createdAt).getTime();
+          days = Math.floor((now - ref) / 86400000);
+        } else {
+          days = Math.floor((now - due) / 86400000);
+        }
         return alertCard(l, due, days, l.totalDue||0, 'overdue');
       }).join('')
     : '<div style="text-align:center;padding:24px;color:#9e9e9e;background:white;border-radius:12px;">✅ ບໍ່ມີລາຍການເກີນກຳໜົດ</div>';
@@ -3984,13 +4092,20 @@ function buildStmtEntries() {
 
   DB.loans.filter(l => !['pending', 'rejected'].includes(l.status)).forEach(l => {
     const sk = l.createdAt ? String(l.createdAt).slice(0, 10) : '';
-    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: l.amount || 0, cr: 0, rowClass: 'dr-row' });
+    // l.amount grows with every top-up (see DB.addTopup), and top-ups are listed as their
+    // own Dr rows below — so the disbursement row must show the ORIGINAL principal only,
+    // otherwise each top-up is counted twice in the ledger.
+    const topupSum     = (DB.topups || []).filter(t => t.loanId === l.id).reduce((s, t) => s + (t.amount || 0), 0);
+    const principalOut = Math.max(0, (l.amount || 0) - topupSum);
+    entries.push({ sortKey: sk, dateStr: fmtD(l.createdAt), label: 'ປ່ອຍກູ້: ' + (l.name || ''), dr: principalOut, cr: 0, rowClass: 'dr-row' });
   });
 
   (DB.topups || []).forEach(t => {
     const loan = DB.loans.find(l => l.id === t.loanId);
+    // Skip top-ups on loans that aren't disbursed, so the ledger matches renderCurrentBalance()
+    if (!loan || ['pending', 'rejected'].includes(loan.status)) return;
     const sk = t.date ? String(t.date).slice(0, 10) : '';
-    entries.push({ sortKey: sk, dateStr: fmtD(t.date), label: 'ຢືມເພີ່ມ: ' + (loan?.name || t.loanId), dr: t.amount || 0, cr: 0, rowClass: 'dr-row' });
+    entries.push({ sortKey: sk, dateStr: fmtD(t.date), label: 'ຢືມເພີ່ມ: ' + (loan.name || t.loanId), dr: t.amount || 0, cr: 0, rowClass: 'dr-row' });
   });
 
   DB.payments.forEach(p => {

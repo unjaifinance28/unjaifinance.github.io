@@ -768,7 +768,21 @@ function doStatusSearch() {
 
     // Use interest_paid directly from DB — addPayment increments it, addCompoundInterest resets it to 0
     const interestPaidCycle = l.interestPaid || 0;
-    const interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
+    let   interestOwed      = Math.max(0, cycleInterest - interestPaidCycle);
+
+    // Compound interest (ທົບຕົ້ນ) applies whenever the customer pays LESS THAN the full
+    // interest due for the period. Only a full (or more) interest payment stops compounding;
+    // a partial payment still compounds. interest_paid resets to 0 on compound, so it tracks
+    // how much interest was paid this period.
+    let   compoundApplies = interestPaidCycle < cycleInterest;
+
+    // A top-up or an applied/rejected compound decision settles the current cycle (see
+    // DB.addTopup / addCompoundInterest / rejectCompoundInterest): the cycle is considered
+    // resolved, so nothing is shown as still-owed and no compounding applies for this cycle.
+    if (l.cycleSettled) {
+      interestOwed    = 0;
+      compoundApplies = false;
+    }
 
     // Due date and countdown (always from createdAt + duration, the contract date)
     const dueDate    = new Date(new Date(l.createdAt).getTime() + (l.duration || 30) * 86400000);
@@ -782,7 +796,7 @@ function doStatusSearch() {
 
     // ---- Compound warning (only for products with compound=true) ----
     let compoundWarning = '';
-    if (l.status === 'active' && product?.compound === true && l.duration > 0 && interestOwed > 0) {
+    if (l.status === 'active' && product?.compound === true && l.duration > 0 && compoundApplies) {
       const cDays        = product ? (product.compoundDays || 0) : 0;
       const compoundDate = new Date(dueDate.getTime() + cDays * 86400000);
       const compStart    = new Date(compoundDate); compStart.setHours(0, 0, 0, 0);
@@ -884,7 +898,12 @@ function doStatusSearch() {
       if (interestOwed > 0 && !isOverdue && daysLeft <= 7) {
         warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:.81rem;font-weight:700;color:#e65100;">⚠️ ກະລຸນາຊຳລະດອກ ${formatMoney(interestOwed)} ກ່ອນວັນທີ ${fmtDMY(dueDate)}</div>`;
       } else if (interestOwed > 0 && isOverdue) {
-        warningHtml = `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`;
+        // Only threaten compounding when it actually applies (nothing paid this period).
+        // A partial payer who is overdue still owes interest, but will NOT be compounded.
+        const mayCompound = product?.compound === true && compoundApplies;
+        warningHtml = mayCompound
+          ? `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ດອກຄ້າງ ${formatMoney(interestOwed)} ອາດຖືກທົບຕົ້ນ</div>`
+          : `<div style="margin-top:6px;padding:6px 10px;background:#ffebee;border:1px solid #ef9a9a;border-radius:7px;font-size:.81rem;font-weight:700;color:#c62828;">🔴 ເກີນກຳນົດ! ກະລຸນາຊຳລະດອກຄ້າງ ${formatMoney(interestOwed)}</div>`;
       }
 
       const interestNextHtml = interestRate === 0
