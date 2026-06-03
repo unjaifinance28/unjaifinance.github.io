@@ -776,9 +776,9 @@ function doStatusSearch() {
     // how much interest was paid this period.
     let   compoundApplies = interestPaidCycle < cycleInterest;
 
-    // A top-up settles the current cycle (see DB.addTopup): the partial payment made before
-    // the top-up counts as full settlement, so nothing is still owed and no compounding
-    // applies until a new cycle begins. The flag is cleared again when interest is compounded.
+    // A top-up or an applied/rejected compound decision settles the current cycle (see
+    // DB.addTopup / addCompoundInterest / rejectCompoundInterest): the cycle is considered
+    // resolved, so nothing is shown as still-owed and no compounding applies for this cycle.
     if (l.cycleSettled) {
       interestOwed    = 0;
       compoundApplies = false;

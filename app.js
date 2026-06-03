@@ -324,14 +324,22 @@ const DB = {
     }).select().single();
     if (herr) throw herr;
 
+    // Append a human-readable line to the loan notes (in addition to compound_history).
+    const noteLine = `ທົບຕົ້ນ ${new Date().toLocaleDateString('lo-LA')}: +${formatMoney(interestDue)}`;
+    const newNote  = loan.note ? `${loan.note}\n${noteLine}` : noteLine;
+
+    // cycle_settled = true closes the rolled-over cycle: the unpaid interest is now part of
+    // the principal and the new (higher-principal) cycle starts fresh, so nothing is shown as
+    // still-owed and the compound decision does not immediately re-trigger on the same loan.
     let { error: upErr } = await sb.from('loans').update({
       remaining_principal: newPrincipal,
       total_due:           newTotalDue,
       interest_paid:       0,
-      cycle_settled:       false,
+      cycle_settled:       true,
+      note:                newNote,
     }).eq('id', loanId);
     if (upErr) {
-      const { error: upErr2 } = await sb.from('loans').update({ total_due: newTotalDue }).eq('id', loanId);
+      const { error: upErr2 } = await sb.from('loans').update({ total_due: newTotalDue, note: newNote }).eq('id', loanId);
       if (upErr2) throw upErr2;
     }
 
@@ -339,7 +347,38 @@ const DB = {
     loan.remainingPrincipal = newPrincipal;
     loan.totalDue           = newTotalDue;
     loan.interestPaid       = 0;
-    loan.cycleSettled       = false;
+    loan.cycleSettled       = true;
+    loan.note               = newNote;
+  },
+
+  // Reject / waive compounding: write off the unpaid interest for the current cycle and
+  // close it. The customer is then left owing only the principal; interest_paid (real cash
+  // collected) is preserved so the admin interest-earned reports stay accurate.
+  async rejectCompoundInterest(loanId) {
+    const loan = this.loans.find(l => l.id === loanId);
+    if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+
+    const curPrincipal = loan.remainingPrincipal ?? loan.amount;
+    const interestDue  = Math.max(0, (loan.totalDue || 0) - curPrincipal);
+    if (interestDue <= 0) throw new Error('ບໍ່ມີດອກຄ້າງ');
+
+    const newTotalDue = curPrincipal; // unpaid interest written off
+    const noteLine = `ປະຕິເສດທົບຕົ້ນ ${new Date().toLocaleDateString('lo-LA')}: ຍົກເວັ້ນດອກ ${formatMoney(interestDue)}`;
+    const newNote  = loan.note ? `${loan.note}\n${noteLine}` : noteLine;
+
+    let { error: upErr } = await sb.from('loans').update({
+      total_due:     newTotalDue,
+      cycle_settled: true,
+      note:          newNote,
+    }).eq('id', loanId);
+    if (upErr) {
+      const { error: upErr2 } = await sb.from('loans').update({ total_due: newTotalDue, note: newNote }).eq('id', loanId);
+      if (upErr2) throw upErr2;
+    }
+
+    loan.totalDue     = newTotalDue;
+    loan.cycleSettled = true;
+    loan.note         = newNote;
   },
 
   async addTopup(loanId, amount, note) {
@@ -358,7 +397,7 @@ const DB = {
     const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
     // cycle_settled = true closes the current interest cycle: the payment made before the
     // top-up counts as full settlement, so the loan detail page shows 0 still-owed and no
-    // compound warning until a new cycle begins (compounding clears the flag again).
+    // compound warning for this cycle. (Compounding likewise closes its rolled-over cycle.)
     let { error: upErr } = await sb.from('loans').update({
       amount: newAmount, total_due: newTotalDue,
       original_principal: newOriginalPrincipal,

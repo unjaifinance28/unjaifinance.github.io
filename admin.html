@@ -883,6 +883,9 @@
         </div>
       </div>
 
+      <!-- Compound interest decision (approve / reject — built by JS) -->
+      <div id="md-compound-decision"></div>
+
       <!-- Document section (collapsible, built by JS) -->
       <div id="md-doc-section" style="margin-bottom:10px;"></div>
 
@@ -1565,7 +1568,7 @@ function openLoanModal(id, focus) {
       ${mkR('ໄລຍະ', (loan.duration||'-')+' ວັນ')}
       ${mkR('ວັນເລີ່ມ', formatDate(loan.createdAt))}
       ${mkR('ວັນຄົບ', dueTxt)}
-      ${loan.note ? mkR('ໝາຍເຫດ', `<span style="font-size:.78rem;">${loan.note}</span>`) : ''}
+      ${loan.note ? mkR('ໝາຍເຫດ', `<span style="font-size:.78rem;white-space:pre-line;">${loan.note}</span>`) : ''}
     </div>
     <div class="md-money-card">
       <div class="md-card-title" style="border-bottom-color:#dcedc8;">💰 ຍອດເງິນ</div>
@@ -1757,17 +1760,10 @@ function openLoanModal(id, focus) {
     if (overdue && rem > 0 && product?.compound) {
       acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
     }
-    const _curP = loan.remainingPrincipal ?? loan.amount;
-    const _iDue = Math.max(0, loan.totalDue - _curP);
-    // Offer compounding whenever interest is not fully paid for the period. _iDue is the
-    // remaining unpaid interest, so _iDue > 0 means the customer paid less than the full
-    // interest due — a full interest payment drives _iDue to 0 and hides the button.
-    // A top-up settles the current cycle (loan.cycleSettled), so hide the button until a
-    // new cycle begins, matching the customer-facing detail page.
-    if (_iDue > 0 && !loan.cycleSettled) {
-      acts.innerHTML += `<button class="btn" style="background:#fce4ec;color:#880e4f;border:1px solid #f8bbd0;font-weight:700;" onclick="doCompoundInterest('${id}')">🔄 ທົບຕົ້ນດອກ</button>`;
-    }
+    // The compound interest approve/reject decision is rendered as its own section
+    // (#md-compound-decision) below — see renderCompoundDecision().
   }
+  renderCompoundDecision(loan);
   acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
   if (loan.status === 'completed') {
@@ -2043,6 +2039,63 @@ function doCompoundInterest(loanId) {
       if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
       updateAlertsBadge();
       showToast('ທົບຕົ້ນດອກສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+// Compound interest decision section — admin approves or rejects compounding.
+// Appears when an active loan is overdue with interest not fully paid (interestDue > 0) and
+// the cycle has not already been settled (e.g. by a top-up). Mirrors the customer warning.
+function renderCompoundDecision(loan) {
+  const el = document.getElementById('md-compound-decision');
+  if (!el) return;
+  const curP = loan.remainingPrincipal ?? loan.amount;
+  const iDue = Math.max(0, (loan.totalDue || 0) - curP);
+  // Only offer the compound decision once the cycle is overdue (the customer had the full
+  // period to pay). A settled cycle (top-up or a prior compound) suppresses it.
+  if (loan.status !== 'active' || iDue <= 0 || loan.cycleSettled || !isLoanOverdue(loan)) {
+    el.innerHTML = '';
+    return;
+  }
+  const newPrincipal = curP + iDue;
+  el.innerHTML = `
+    <div style="background:#fff3e0;border:1.5px solid #ffb74d;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <div style="font-weight:800;color:#e65100;font-size:.92rem;margin-bottom:8px;">🔄 ດອກຄ້າງ — ຕັດສິນໃຈທົບຕົ້ນ</div>
+      <div style="font-size:.84rem;color:#5d4037;line-height:1.8;">
+        <div style="display:flex;justify-content:space-between;"><span>ດອກຄ້າງ (ຍັງບໍ່ໄດ້ຊຳລະ)</span><strong style="color:#c62828;">${formatMoney(iDue)}</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span>ທຶນຕົ້ນປັດຈຸບັນ</span><strong>${formatMoney(curP)}</strong></div>
+        <div style="border-top:1px dashed #ffb74d;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;">
+          <span>ຖ້າທົບຕົ້ນ: ທຶນຕົ້ນໃໝ່</span><strong style="color:#1b5e20;">${formatMoney(newPrincipal)}</strong>
+        </div>
+        <div style="font-size:.76rem;color:#8d6e63;text-align:right;margin-top:2px;">${formatMoney(curP)} + ${formatMoney(iDue)} = ${formatMoney(newPrincipal)} ກີບ</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn" style="flex:1;background:#2e7d32;color:white;border:none;font-weight:700;" onclick="doCompoundInterest('${loan.id}')">✅ ຢືນຢັນທົບຕົ້ນ</button>
+        <button class="btn" style="flex:1;background:white;color:#c62828;border:1.5px solid #ef9a9a;font-weight:700;" onclick="rejectCompoundInterest('${loan.id}')">❌ ປະຕິເສດທົບຕົ້ນ</button>
+      </div>
+    </div>`;
+}
+
+// Reject / waive compounding: the unpaid interest is written off and the cycle is closed.
+function rejectCompoundInterest(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const curP = loan.remainingPrincipal ?? loan.amount;
+  const iDue = Math.max(0, (loan.totalDue || 0) - curP);
+  if (iDue <= 0) { showToast('ບໍ່ມີດອກຄ້າງ', 'error'); return; }
+
+  const msg = `ຍົກເວັ້ນ (ບໍ່ທົບຕົ້ນ) ດອກຄ້າງ <strong style="color:#c62828;">${formatMoney(iDue)}</strong><br>
+    <span style="font-size:.82rem;color:#616161;">ດອກຄ້າງຈະຖືກຍົກເລີກ ແລະ ປິດຮອບນີ້ — ລູກຄ້າຄ້າງສະເພາະທຶນຕົ້ນ <strong>${formatMoney(curP)}</strong></span>`;
+
+  openConfirm('🚫', 'ປະຕິເສດທົບຕົ້ນ', msg, async () => {
+    try {
+      await DB.rejectCompoundInterest(loanId);
+      closeConfirm();
+      openLoanModal(loanId);
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      updateAlertsBadge();
+      showToast('ປະຕິເສດທົບຕົ້ນ — ຍົກເວັ້ນດອກຄ້າງ ✅');
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
