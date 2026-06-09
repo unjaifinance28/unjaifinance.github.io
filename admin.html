@@ -242,6 +242,10 @@
   .md-collapsible-hdr { padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-size:.83rem; font-weight:700; color:#1b5e20; }
   .md-collapsible-hdr:hover { background:#f9fbe7; }
   .md-collapsible-body { padding:0 14px 12px; }
+  .stmt-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  .stmt-table th { background:#f5f7fa; color:#546e7a; font-weight:700; padding:6px 8px; border-bottom:1.5px solid #e0e0e0; white-space:nowrap; }
+  .stmt-table td { padding:6px 8px; border-bottom:1px solid #f0f0f0; white-space:nowrap; }
+  .stmt-table tr.stmt-total td { border-top:2px solid #cfd8dc; border-bottom:none; background:#eceff1; }
 
   @media(max-width:600px) {
     #md-info-cards { grid-template-columns:1fr !important; }
@@ -667,7 +671,10 @@
     <div id="tab-alerts" class="tab-pane">
       <div class="kpi-row" id="alertKpi"></div>
 
-      <div class="sec-title" style="color:#c62828;">🔴 ລາຍການເກີນກຳໜົດ</div>
+      <div class="sec-title" style="color:#3949ab;">🔄 ແນະນຳໃຫ້ທົບຕົ້ນ</div>
+      <div id="alert-compound-list"></div>
+
+      <div class="sec-title" style="color:#c62828;margin-top:18px;">🔴 ລາຍການເກີນກຳໜົດ</div>
       <div id="alert-overdue-list"></div>
 
       <div class="sec-title" style="color:#e65100;margin-top:18px;">🟠 ໃກ້ຄົບກຳໜົດ (ພາຍໃນ 7 ວັນ)</div>
@@ -883,17 +890,14 @@
         </div>
       </div>
 
-      <!-- Compound interest decision (approve / reject — built by JS) -->
-      <div id="md-compound-decision"></div>
-
       <!-- Document section (collapsible, built by JS) -->
       <div id="md-doc-section" style="margin-bottom:10px;"></div>
 
       <!-- Payment history (collapsible, built by JS) -->
       <div id="md-hist" style="margin-bottom:0;"></div>
 
-      <!-- Compound interest history (collapsible, built by JS) -->
-      <div id="md-compound-hist"></div>
+      <!-- Per-loan statement / ledger (collapsible, built by JS) -->
+      <div id="md-statement" style="margin-top:10px;"></div>
 
       <!-- Payment form -->
       <div id="md-pay-form"></div>
@@ -1507,6 +1511,94 @@ function deleteLoan(id) {
 
 // ====== LOAN MODAL ======
 let currentLoanId = null;
+
+// Build a chronological per-loan ledger with TWO running balances:
+//   principal (ທຶນຕົ້ນຄ້າງ) — principal still owed
+//   total     (ຍອດໜີ້ລວມ)   — principal + outstanding interest
+//
+// Payments are split interest-first, mirroring DB.addPayment, but that split is not stored,
+// so the history is reconstructed by replaying events in date order: a cycle's interest
+// (principal × rate) is accrued lazily right before a payment when no interest is outstanding,
+// then the payment pays down interest first, then principal. NOTE: addTopup increments
+// loan.amount, so the original disbursed principal = current amount − everything topped up.
+function buildLoanStatement(loan) {
+  const topups    = DB.getLoanTopups(loan.id);
+  const payments  = DB.getLoanPayments(loan.id);
+  const compounds = DB.getCompoundHistory(loan.id);
+  const product   = DB.products.find(p => p.id === loan.productId);
+
+  const totalTopups = topups.reduce((s, t) => s + (t.amount || 0), 0);
+  const disbursed   = Math.max(0, (loan.amount || 0) - totalTopups);
+
+  // Interest for one full term on a given principal (flat or daily), honouring any discount.
+  const rate       = loan.discountedRate != null ? loan.discountedRate : (product ? product.interestRate : 0);
+  const effProduct = product ? { ...product, interestRate: rate } : null;
+  const cycleInterest = P => {
+    if (!effProduct || rate === 0 || P <= 0) return 0;
+    return Math.max(0, Math.round(calcLoanTotal(effProduct, P, loan.duration) - P));
+  };
+
+  // Merge dated events; on ties order compound → payment → top-up.
+  const PRIO = { compound: 1, payment: 2, topup: 3 };
+  const events = [
+    ...compounds.map(c => ({ date: c.date, kind: 'compound', amount: c.unpaidInterest || 0 })),
+    ...topups.map(t    => ({ date: t.date, kind: 'topup',    amount: t.amount || 0 })),
+    ...payments.map(p  => ({ date: p.date, kind: 'payment',  amount: p.amount || 0 })),
+  ].sort((a, b) => (new Date(a.date) - new Date(b.date)) || (PRIO[a.kind] - PRIO[b.kind]));
+
+  const rows = [];
+  let P = 0, I = 0; // principal outstanding, interest outstanding (total = P + I)
+  let basePrincipal = 0; // disbursed + topups only — excludes compound roll-ins; used for interest
+  const push = (date, label, dr, cr) => {
+    P = Math.max(0, P);
+    rows.push({ date, label, dr, cr, principal: P, total: P + I });
+  };
+
+  // 1) Disbursement — principal only
+  P += disbursed;
+  basePrincipal += disbursed;
+  push(loan.createdAt, 'ປ່ອຍກູ້', disbursed, 0);
+
+  // 2) Replay events
+  events.forEach(e => {
+    if (e.kind === 'compound') {
+      P += e.amount;                         // unpaid interest rolled into principal
+      push(e.date, 'ທົບຕົ້ນດອກ', e.amount, 0);
+      // basePrincipal intentionally not updated — compound roll-ins must not inflate interest base
+    } else if (e.kind === 'topup') {
+      P += e.amount;
+      basePrincipal += e.amount;
+      push(e.date, 'ຢືມເພີ່ມ', e.amount, 0);
+    } else { // payment — split interest-first
+      if (I <= 0) {
+        const accr = cycleInterest(basePrincipal);
+        if (accr > 0) { I += accr; push(e.date, 'ດອກງວດໃໝ່', accr, 0); }
+      }
+      let amt = e.amount;
+      const interestPortion = Math.min(amt, I);
+      if (interestPortion > 0) {
+        I -= interestPortion; amt -= interestPortion;
+        push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
+      }
+      if (amt > 0) {
+        P -= amt;
+        push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
+      }
+    }
+  });
+
+  // 3) Reconcile to the loan's current outstanding interest (current-cycle interest that has
+  //    accrued but is not yet paid or compounded — e.g. an active loan past its due date).
+  const targetInterest = Math.max(0, (loan.totalDue || 0) - (loan.remainingPrincipal ?? loan.amount ?? 0));
+  const gap = Math.round(targetInterest - I);
+  if (gap > 0) {
+    I += gap;
+    push(new Date().toISOString(), 'ດອກງວດໃໝ່', gap, 0);
+  }
+
+  return { rows, finalPrincipal: P, finalTotal: P + I };
+}
+
 function openLoanModal(id, focus) {
   currentLoanId = id;
   const loan = DB.loans.find(l=>l.id===id);
@@ -1522,10 +1614,10 @@ function openLoanModal(id, focus) {
   // regardless of whether totalDue in DB was decremented (e.g. manual loans with initial paidAmount).
   // Interest = Principal × rate/100  (flat)  or  Principal × rate/100 × days  (daily)
   // Total    = Principal + Interest
-  // Remaining = Total − Amount already paid
+  // Remaining = remaining_principal only (interest payments must not reduce principal)
   const total    = _prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : Math.max(paid + (loan.totalDue || 0), loan.amount);
   const interest = Math.max(0, total - loan.amount);
-  const rem      = Math.max(0, total - paid);
+  const rem      = Math.max(0, loan.remainingPrincipal ?? loan.amount);
   const pct      = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const MTD   = {bcel:'BCEL',ldb:'LDB',cash:'ເງິນສົດ',transfer:'ໂອນ'};
 
@@ -1661,27 +1753,54 @@ function openLoanModal(id, focus) {
       </div>
     </div>` : '';
 
-  // ── COMPOUND INTEREST HISTORY (collapsible) ──
-  const cphList   = DB.getCompoundHistory(id);
-  const cphTogId  = 'ctog-' + loan.id;
-  document.getElementById('md-compound-hist').innerHTML = cphList.length ? `
-    <div class="md-collapsible" style="border-color:#c5cae9;">
-      <div class="md-collapsible-hdr" style="color:#3949ab;" onclick="toggleMdSection('${cphTogId}')">
-        <span>🔄 ປະຫວັດທົບຕົ້ນດອກ <span style="background:#e8eaf6;color:#3949ab;padding:1px 8px;border-radius:50px;font-size:.72rem;margin-left:4px;">${cphList.length}</span></span>
-        <span id="${cphTogId}-arr" style="color:#9e9e9e;font-size:.8rem;">▼</span>
+  // ── STATEMENT / LEDGER (ສະຫຼຸບລາຍການ) — collapsible ──
+  const stmtTogId = 'stog-' + loan.id;
+  const fmtNum    = n => Number(n || 0).toLocaleString('en-US');
+  const fmtSD     = iso => {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
+  };
+  const { rows: stmtRows, finalPrincipal, finalTotal } = buildLoanStatement(loan);
+  document.getElementById('md-statement').innerHTML = `
+    <div class="md-collapsible" style="border-color:#bbdefb;">
+      <div class="md-collapsible-hdr" style="color:#1565c0;" onclick="toggleMdSection('${stmtTogId}')">
+        <span>📋 ສະຫຼຸບລາຍການ <span style="background:#e3f2fd;color:#1565c0;padding:1px 8px;border-radius:50px;font-size:.72rem;margin-left:4px;">${stmtRows.length}</span></span>
+        <span id="${stmtTogId}-arr" style="color:#9e9e9e;font-size:.8rem;">▼</span>
       </div>
-      <div id="${cphTogId}" style="display:none;" class="md-collapsible-body">
-        <div class="history-list">${[...cphList].reverse().map(h=>`
-          <div class="hist-item">
-            <div>
-              <div style="font-weight:600;font-size:.83rem;">${formatDate(h.date)}</div>
-              <div class="hi-ref">ດອກຄ້າງ ${formatMoney(h.unpaidInterest)} → ຕົ້ນໃໝ່ ${formatMoney(h.newPrincipal)}${h.note?' · '+h.note:''}</div>
-            </div>
-            <div class="hi-amt" style="color:#3949ab;">ລວມ ${formatMoney(h.newTotalDue)}</div>
-          </div>`).join('')}
+      <div id="${stmtTogId}" style="display:none;" class="md-collapsible-body">
+        <div style="overflow-x:auto;">
+          <table class="stmt-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;">ວັນທີ</th>
+                <th style="text-align:left;">ລາຍການ</th>
+                <th style="text-align:right;">Dr (ອອກ)</th>
+                <th style="text-align:right;">Cr (ເຂົ້າ)</th>
+                <th style="text-align:right;">ທຶນຕົ້ນຄ້າງ</th>
+                <th style="text-align:right;">ຍອດໜີ້ລວມ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${stmtRows.map(r => `
+                <tr>
+                  <td>${fmtSD(r.date)}</td>
+                  <td>${r.label}</td>
+                  <td style="text-align:right;color:#c62828;">${r.dr ? fmtNum(r.dr) : ''}</td>
+                  <td style="text-align:right;color:#2e7d32;">${r.cr ? fmtNum(r.cr) : ''}</td>
+                  <td style="text-align:right;">${fmtNum(r.principal)}</td>
+                  <td style="text-align:right;font-weight:700;">${fmtNum(r.total)}</td>
+                </tr>`).join('')}
+              <tr class="stmt-total">
+                <td colspan="4" style="font-weight:800;">ຍອດຄ້າງ</td>
+                <td style="text-align:right;font-weight:800;color:${finalPrincipal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalPrincipal)}</td>
+                <td style="text-align:right;font-weight:900;color:${finalTotal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>` : '';
+    </div>`;
 
   // Payment form for active loans
   const pf = document.getElementById('md-pay-form');
@@ -1756,20 +1875,14 @@ function openLoanModal(id, focus) {
     if (DB.products.some(p => p.isVip && p.status === 'active')) {
       acts.innerHTML += `<button class="btn btn-vip" onclick="openVipModal('${id}')">👑 VIP</button>`;
     }
-    const product = DB.products.find(p => p.id === loan.productId);
-    if (overdue && rem > 0 && product?.compound) {
-      acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;font-weight:700;" onclick="doCompound('${id}')">🔄 ທົບຕົ້ນ</button>`;
-    }
-    // The compound interest approve/reject decision is rendered as its own section
-    // (#md-compound-decision) below — see renderCompoundDecision().
   }
-  renderCompoundDecision(loan);
   acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
   if (loan.status === 'completed') {
     acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openRenewLoan('${id}')">🔄 ສ້າງສັນຍາໃໝ່</button>`;
   }
   acts.innerHTML += `<button class="btn" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-weight:700;font-size:.78rem;" onclick="toggleForceStatusSection('${loan.status}')">🔧 ແກ້ໄຂສະຖານະ</button>`;
+  acts.innerHTML += `<button class="btn" style="background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;font-weight:700;font-size:.78rem;" onclick="recalcLoanTotal('${id}')">🔧 ຄຳນວນໃໝ່</button>`;
 
   // Barcode
   const barcodeSection = document.getElementById('md-barcode-section');
@@ -2099,6 +2212,49 @@ function rejectCompoundInterest(loanId) {
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }
+
+// Recalculate a loan's total_due from its original amount + the product's current rate.
+// Used to repair loans whose total_due was saved wrong at creation time.
+function recalcLoanTotal(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const product = DB.products.find(p => p.id === loan.productId);
+  if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
+  const effectiveRate = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+  const preview = calcLoanTotal({ ...product, interestRate: effectiveRate }, loan.amount, loan.duration);
+  const msg = `ຄຳນວນຍອດລວມໃໝ່ຈາກ ເງິນຕົ້ນ <strong>${formatMoney(loan.amount)}</strong> · ດອກ <strong>${effectiveRate}%</strong><br>
+    <span style="font-size:.82rem;color:#616161;">ປັດຈຸບັນ: <strong>${formatMoney(loan.totalDue)}</strong> &nbsp;→&nbsp; ໃໝ່: <strong style="color:#1b5e20;">${formatMoney(preview)}</strong></span>`;
+  openConfirm('🔧', 'ຄຳນວນຍອດລວມໃໝ່', msg, async () => {
+    try {
+      const { oldTotalDue, newTotalDue } = await DB.recalcTotalDue(loanId);
+      closeConfirm();
+      openLoanModal(loanId);
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
+      showToast(`✅ ຄຳນວນໃໝ່: ${formatMoney(oldTotalDue)} → ${formatMoney(newTotalDue)}`);
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+// Console debug helper — run debugLoan('LAO572082') in the browser console.
+// Prints the raw Supabase rows and compares saved vs. expected total_due.
+async function debugLoan(loanId) {
+  const { data: loan } = await sb.from('loans').select('*').eq('id', loanId).single();
+  console.log(loanId + ':', loan);
+  if (!loan) { console.warn('ບໍ່ພົບສັນຍາກູ້:', loanId); return; }
+  const { data: product } = await sb.from('products').select('*').eq('id', loan.product_id).single();
+  console.log('Product:', product);
+  const { data: payments } = await sb.from('payments').select('*').eq('loan_id', loanId);
+  console.log('Payments:', payments);
+  if (product) {
+    const expected = calcLoanTotal(mapProduct(product), loan.amount, loan.duration);
+    console.log('Expected total_due (calcLoanTotal):', expected,
+      '| saved total_due:', loan.total_due,
+      '| match:', expected === loan.total_due);
+  }
+  return { loan, product, payments };
+}
+window.debugLoan = debugLoan;
 
 // ====== TAB: PRODUCTS ======
 function onProdTypeChange() {
@@ -2692,6 +2848,20 @@ function renderAlerts() {
     <div class="kl">${k.label}</div>
   </div>`).join('');
 
+  // Compound-suggestion list (active, overdue, interest still owed)
+  const compoundList = DB.loans.filter(l => compoundNeeded(l, now));
+  compoundList.sort((a,b) => calcDueDate(a) - calcDueDate(b));
+  const compoundEl = document.getElementById('alert-compound-list');
+  compoundEl.innerHTML = compoundList.length
+    ? compoundList.map(l => {
+        const due  = calcDueDate(l);
+        const days = Math.floor((now - due) / 86400000);
+        const curP = l.remainingPrincipal ?? l.amount ?? 0;
+        const interestDue = Math.max(0, (l.totalDue || 0) - curP);
+        return compoundAlertCard(l, days, interestDue);
+      }).join('')
+    : '<div style="text-align:center;padding:24px;color:#9e9e9e;background:white;border-radius:12px;">✅ ບໍ່ມີລາຍການຄວນທົບຕົ້ນ</div>';
+
   // Overdue list
   const overdueEl = document.getElementById('alert-overdue-list');
   overdueEl.innerHTML = overdue.length
@@ -2722,6 +2892,81 @@ function renderAlerts() {
     : '<div style="text-align:center;padding:24px;color:#9e9e9e;background:white;border-radius:12px;">✅ ບໍ່ມີລາຍການໃກ້ຄົບ</div>';
 
   updateAlertsBadge();
+}
+
+// ── COMPOUND SUGGESTIONS (alerts tab) ──
+// Suggest compounding when a loan is active, its due date has passed, and interest is still
+// owed (paidAmount < totalDue). Admin can apply (✅ ທົບຕົ້ນ) or dismiss (❌ ບໍ່ທົບ);
+// dismissed loan ids are remembered in localStorage.
+function getDismissedCompounds() {
+  try { return JSON.parse(localStorage.getItem('uf_compound_dismissed') || '[]'); }
+  catch { return []; }
+}
+function compoundNeeded(l, now = new Date()) {
+  if (l.status !== 'active') return false;
+  if (l.cycleSettled) return false;
+  if (getDismissedCompounds().includes(l.id)) return false;
+  const due = calcDueDate(l);
+  if (!due || due >= now) return false;                       // due date must have passed
+  if ((l.paidAmount || 0) >= (l.totalDue || 0)) return false; // already paid in full
+  const curP = l.remainingPrincipal ?? l.amount ?? 0;
+  const interestDue = Math.max(0, (l.totalDue || 0) - curP);
+  return interestDue > 0;
+}
+function compoundAlertCard(l, days, interestDue) {
+  return `
+  <div style="background:#e8eaf6;border:1.5px solid #c5cae9;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+    <div style="font-weight:800;color:#3949ab;font-size:.95rem;margin-bottom:6px;">⚠️ ລູກຄ້ານີ້ຄວນທົບຕົ້ນ</div>
+    <div style="font-size:.84rem;color:#37474f;margin-bottom:10px;">
+      ຊື່: <strong>${l.name}</strong> &nbsp;|&nbsp; ລະຫັດ: <strong>${l.id}</strong>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;">
+      <div>
+        <div style="font-size:.64rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ດອກຄ້າງ</div>
+        <div style="font-weight:900;color:#c62828;font-size:.95rem;">${formatMoney(interestDue)} ກີບ</div>
+      </div>
+      <div>
+        <div style="font-size:.64rem;color:#9e9e9e;text-transform:uppercase;letter-spacing:.3px;">ເກີນກຳນົດ</div>
+        <div style="font-weight:700;color:#e65100;">${days} ວັນ</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" style="flex:1;background:#2e7d32;color:white;border:none;font-weight:700;" onclick="compoundFromAlert('${l.id}')">✅ ທົບຕົ້ນ</button>
+      <button class="btn" style="flex:1;background:white;color:#c62828;border:1.5px solid #ef9a9a;font-weight:700;" onclick="dismissCompoundAlert('${l.id}')">❌ ບໍ່ທົບ</button>
+    </div>
+  </div>`;
+}
+function dismissCompoundAlert(loanId) {
+  const list = getDismissedCompounds();
+  if (!list.includes(loanId)) {
+    list.push(loanId);
+    localStorage.setItem('uf_compound_dismissed', JSON.stringify(list));
+  }
+  renderAlerts();
+  showToast('ບໍ່ທົບ — ເຊື່ອງແຈ້ງເຕືອນແລ້ວ');
+}
+function compoundFromAlert(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const product = DB.products.find(p => p.id === loan.productId);
+  if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
+  const curP = loan.remainingPrincipal ?? loan.amount ?? 0;
+  const interestDue = Math.max(0, (loan.totalDue || 0) - curP);
+  if (interestDue <= 0) { showToast('ດອກຊຳລະຄົບແລ້ວ', 'error'); return; }
+  const newPrincipal = curP + interestDue;
+  const newTotalDue  = calcLoanTotal(product, newPrincipal, loan.duration);
+  const msg = `ດອກຄ້າງ <strong style="color:#c62828;">${formatMoney(interestDue)}</strong> ຈະຖືກທົບເຂົ້າຕົ້ນ<br>
+    <span style="font-size:.82rem;color:#616161;">ຕົ້ນໃໝ່: <strong>${formatMoney(newPrincipal)}</strong> &nbsp;|&nbsp; ລວມໃໝ່: <strong>${formatMoney(newTotalDue)}</strong></span>`;
+  openConfirm('🔄', 'ທົບຕົ້ນ', msg, async () => {
+    try {
+      await DB.addCompoundInterest(loanId, '');
+      closeConfirm();
+      if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
+      renderAlerts();
+      updateAlertsBadge();
+      showToast('✅ ທົບຕົ້ນສຳເລັດ');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
 }
 
 // ====== EXPORT CSV ======
@@ -4220,7 +4465,8 @@ function exportStatementExcel() {
     + DB.debts.reduce((s,d) => s+(d.amount||0), 0)                                                          // ourDebts
     - _d.reduce((s,l) => s+(l.amount||0), 0)                                                                // moneyLentOut
     - DB.expenses.reduce((s,e) => s+(e.amount||0), 0)                                                       // expenses
-    - _d.reduce((s,l) => s+(l.discountApplied||0), 0);                                                      // discountsGiven
+    - _d.reduce((s,l) => s+(l.discountApplied||0), 0)                                                       // discountsGiven
+    - DB.debtPayments.reduce((s,p) => s+(p.amount||0), 0);                                                  // totalDebtPayments
 
   const aoa = [['ວັນທີ', 'ລາຍການ', 'Dr (ເງິນອອກ)', 'Cr (ເງິນເຂົ້າ)', 'ຍອດຄົງເຫຼືອ']];
   filtered.forEach(e => aoa.push([e.dateStr, e.label, e.dr || '', e.cr || '', Math.round(e.balance)]));
@@ -4252,12 +4498,16 @@ function renderCurrentBalance() {
   // Discounts / write-offs
   const discountsGiven = disbursed.reduce((s, l) => s + (l.discountApplied || 0), 0);
 
+  // Money we paid back to lenders (cash OUT from debt_payments table)
+  const totalDebtPayments = DB.debtPayments.reduce((s, p) => s + (p.amount || 0), 0);
+
   const balance = openingBalance
                + totalPaymentsReceived
                + ourDebts
                - moneyLentOut
                - expenses
-               - discountsGiven;
+               - discountsGiven
+               - totalDebtPayments;
 
   const balColor = balance < 0 ? '#c62828' : '#2e7d32';
 
@@ -4281,6 +4531,7 @@ function renderCurrentBalance() {
       ${row(false, 'ປ່ອຍກູ້ (ທັງໝົດ)',     moneyLentOut)}
       ${row(false, 'ລາຍຈ່າຍ',             expenses)}
       ${discountsGiven > 0 ? row(false, 'ສ່ວນຫຼຸດ / Write-off', discountsGiven) : ''}
+      ${totalDebtPayments > 0 ? row(false, 'ຊຳລະໜີ້ທຶນ', totalDebtPayments) : ''}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;background:white;border-top:1px solid #e0e0e0;">
       <span style="font-size:.95rem;font-weight:800;color:#424242;">ຍອດຄົງເຫຼືອປັດຈຸບັນ</span>
@@ -4406,7 +4657,7 @@ function renderReport() {
   }
 
   tbody.innerHTML = loans.map((l, i) => {
-    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    const principal = l.amount ?? 0;
     const interest  = (l.totalDue ?? 0) - principal;
     return `<tr>
       <td style="text-align:center;">${i + 1}</td>
@@ -4436,7 +4687,7 @@ function exportReportExcel() {
 
   const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
   const rows = loans.map((l, i) => {
-    const principal = l.originalPrincipal ?? l.amount ?? 0;
+    const principal = l.amount ?? 0;
     return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, (l.totalDue ?? 0) - principal, l.totalDue ?? 0];
   });
 

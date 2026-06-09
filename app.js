@@ -309,8 +309,11 @@ const DB = {
     const interestDue  = Math.max(0, loan.totalDue - curPrincipal);
     if (interestDue <= 0) throw new Error('ດອກຊຳລະຄົບແລ້ວ — ບໍ່ຕ້ອງທົບຕົ້ນ');
 
-    const newPrincipal = curPrincipal + interestDue;
-    const newTotalDue  = calcLoanTotal(product, newPrincipal, loan.duration);
+    const newPrincipal  = curPrincipal + interestDue;
+    const effectiveRate = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+    const effProduct    = { ...product, interestRate: effectiveRate };
+    const cycleInterest = Math.round(newPrincipal * effectiveRate / 100);
+    const newTotalDue   = calcLoanTotal(effProduct, newPrincipal, loan.duration);
     const id = 'CPD' + Date.now();
 
     const { data: hr, error: herr } = await sb.from('compound_history').insert({
@@ -331,12 +334,15 @@ const DB = {
     // cycle_settled = true closes the rolled-over cycle: the unpaid interest is now part of
     // the principal and the new (higher-principal) cycle starts fresh, so nothing is shown as
     // still-owed and the compound decision does not immediately re-trigger on the same loan.
+    const cycleStartDate = new Date().toISOString();
     let { error: upErr } = await sb.from('loans').update({
       remaining_principal: newPrincipal,
       total_due:           newTotalDue,
       interest_paid:       0,
       cycle_settled:       true,
       note:                newNote,
+      cycle_start_date:    cycleStartDate,
+      cycle_interest:      cycleInterest,
     }).eq('id', loanId);
     if (upErr) {
       const { error: upErr2 } = await sb.from('loans').update({ total_due: newTotalDue, note: newNote }).eq('id', loanId);
@@ -348,6 +354,8 @@ const DB = {
     loan.totalDue           = newTotalDue;
     loan.interestPaid       = 0;
     loan.cycleSettled       = true;
+    loan.cycleStartDate     = cycleStartDate;
+    loan.cycleInterest      = cycleInterest;
     loan.note               = newNote;
   },
 
@@ -392,17 +400,25 @@ const DB = {
     }).select().single();
     if (error) throw error;
     const newAmount             = loan.amount + amount;
-    const newTotalDue           = calcLoanTotal(product, newAmount, loan.duration);
     const newOriginalPrincipal  = (loan.originalPrincipal ?? loan.amount) + amount;
     const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
+    // total_due is based on remaining principal (the actual debt base), not loan.amount,
+    // so a loan where some principal has already been repaid gets correct next-cycle interest.
+    const effectiveRate  = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+    const effProduct     = { ...product, interestRate: effectiveRate };
+    const newTotalDue    = calcLoanTotal(effProduct, newRemainingPrincipal, loan.duration);
+    const cycleInterest  = Math.round(newRemainingPrincipal * effectiveRate / 100);
+    const cycleStartDate = new Date().toISOString();
     // cycle_settled = true closes the current interest cycle: the payment made before the
     // top-up counts as full settlement, so the loan detail page shows 0 still-owed and no
     // compound warning for this cycle. (Compounding likewise closes its rolled-over cycle.)
     let { error: upErr } = await sb.from('loans').update({
       amount: newAmount, total_due: newTotalDue,
-      original_principal: newOriginalPrincipal,
+      original_principal:  newOriginalPrincipal,
       remaining_principal: newRemainingPrincipal,
-      cycle_settled: true,
+      cycle_settled:       true,
+      cycle_start_date:    cycleStartDate,
+      cycle_interest:      cycleInterest,
     }).eq('id', loanId);
     if (upErr) {
       const { error: upErr2 } = await sb.from('loans').update({
@@ -416,6 +432,33 @@ const DB = {
     loan.originalPrincipal   = newOriginalPrincipal;
     loan.remainingPrincipal  = newRemainingPrincipal;
     loan.cycleSettled        = true;
+    loan.cycleStartDate      = cycleStartDate;
+    loan.cycleInterest       = cycleInterest;
+  },
+
+  // Recalculate total_due from the ORIGINAL loan amount and the product's current rate.
+  // Fixes loans whose total_due was saved incorrectly at creation time. Honours a
+  // Credit-Score discount if one was applied (uses discountedRate when present), and
+  // respects the product's interest type (flat vs daily) via calcLoanTotal.
+  async recalcTotalDue(loanId) {
+    const loan = this.loans.find(l => l.id === loanId);
+    if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    const product = this.products.find(p => p.id === loan.productId);
+    if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
+    const effectiveRate = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+    const effProduct    = { ...product, interestRate: effectiveRate };
+    const oldTotalDue   = loan.totalDue;
+    const newTotalDue   = calcLoanTotal(effProduct, loan.amount, loan.duration);
+    console.log('[recalcTotalDue]', loanId, {
+      amount: loan.amount, duration: loan.duration,
+      productRate: product.interestRate, interestType: product.interestType,
+      discountedRate: loan.discountedRate, effectiveRate,
+      oldTotalDue, newTotalDue,
+    });
+    const { error } = await sb.from('loans').update({ total_due: newTotalDue }).eq('id', loanId);
+    if (error) throw error;
+    loan.totalDue = newTotalDue;
+    return { oldTotalDue, newTotalDue };
   },
 
   async addPayment(loanId, amount, method, note) {
