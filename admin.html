@@ -1550,6 +1550,11 @@ function buildLoanStatement(loan) {
   const topups    = DB.getLoanTopups(loan.id);
   const payments  = DB.getLoanPayments(loan.id);
   const compounds = DB.getCompoundHistory(loan.id);
+  const product   = DB.products.find(p => p.id === loan.productId);
+
+  // daily_installment: fixed total from day 1, payments are flat — no interest/principal split.
+  // lump_sum (cycle): payments split interest-first then principal.
+  const isDaily = product?.paymentType === 'daily_installment';
 
   const totalTopups = topups.reduce((s, t) => s + (t.amount || 0), 0);
   const disbursed   = Math.max(0, (loan.amount || 0) - totalTopups);
@@ -1584,21 +1589,32 @@ function buildLoanStatement(loan) {
       P += e.amount;                        // unpaid interest rolled into principal
       push(e.date, 'ທົບຕົ້ນດອກ', e.amount, 0);
     } else if (e.kind === 'cycle_interest') {
-      I += e.amount;                        // admin-charged cycle interest becomes outstanding
+      if (isDaily) {
+        P += e.amount;                      // daily: interest folds into running total
+      } else {
+        I += e.amount;                      // cycle: interest sits in a separate bucket
+      }
       push(e.date, 'ດອກງວດໃໝ່', e.amount, 0);
     } else if (e.kind === 'topup') {
       P += e.amount;
       push(e.date, 'ຢືມເພີ່ມ', e.amount, 0);
-    } else { // payment — split interest-first, then principal
-      let amt = e.amount;
-      const interestPortion = Math.min(amt, I);
-      if (interestPortion > 0) {
-        I -= interestPortion; amt -= interestPortion;
-        push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
-      }
-      if (amt > 0) {
-        P -= amt;
-        push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
+    } else { // payment
+      if (isDaily) {
+        // Flat single line — full amount reduces running total, no interest/principal split.
+        P -= e.amount;
+        push(e.date, 'ຮັບຊຳລະ', 0, e.amount);
+      } else {
+        // Cycle loan — interest-first split, then principal.
+        let amt = e.amount;
+        const interestPortion = Math.min(amt, I);
+        if (interestPortion > 0) {
+          I -= interestPortion; amt -= interestPortion;
+          push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
+        }
+        if (amt > 0) {
+          P -= amt;
+          push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
+        }
       }
     }
   });
