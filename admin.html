@@ -1542,39 +1542,38 @@ let currentLoanId = null;
 //   principal (ທຶນຕົ້ນຄ້າງ) — principal still owed
 //   total     (ຍອດໜີ້ລວມ)   — principal + outstanding interest
 //
-// Payments are split interest-first, mirroring DB.addPayment, but that split is not stored,
-// so the history is reconstructed by replaying events in date order: a cycle's interest
-// (principal × rate) is accrued lazily right before a payment when no interest is outstanding,
-// then the payment pays down interest first, then principal. NOTE: addTopup increments
-// loan.amount, so the original disbursed principal = current amount − everything topped up.
+// "ດອກງວດໃໝ່" rows appear ONLY when the admin has explicitly charged a new cycle via
+// addCycleInterest() — stored as type='cycle_interest' in compound_history.
+// There is NO automatic interest inference. NOTE: addTopup increments loan.amount,
+// so the original disbursed principal = current amount − everything topped up.
 function buildLoanStatement(loan) {
   const topups    = DB.getLoanTopups(loan.id);
   const payments  = DB.getLoanPayments(loan.id);
   const compounds = DB.getCompoundHistory(loan.id);
   const product   = DB.products.find(p => p.id === loan.productId);
 
+  // daily_installment: fixed total from day 1, payments are flat — no interest/principal split.
+  // lump_sum (cycle): payments split interest-first then principal.
+  const isDaily = product?.paymentType === 'daily_installment';
+
   const totalTopups = topups.reduce((s, t) => s + (t.amount || 0), 0);
   const disbursed   = Math.max(0, (loan.amount || 0) - totalTopups);
 
-  // Interest for one full term on a given principal (flat or daily), honouring any discount.
-  const rate       = loan.discountedRate != null ? loan.discountedRate : (product ? product.interestRate : 0);
-  const effProduct = product ? { ...product, interestRate: rate } : null;
-  const cycleInterest = P => {
-    if (!effProduct || rate === 0 || P <= 0) return 0;
-    return Math.max(0, Math.round(calcLoanTotal(effProduct, P, loan.duration) - P));
-  };
+  // Split compound_history into roll-ups vs explicit cycle-interest charges.
+  const compoundEvents      = compounds.filter(c => !c.type || c.type === 'compound');
+  const cycleInterestEvents = compounds.filter(c => c.type === 'cycle_interest');
 
-  // Merge dated events; on ties order compound → payment → top-up.
-  const PRIO = { compound: 1, payment: 2, topup: 3 };
+  // Merge dated events; on ties: compound roll-up → cycle interest → payment → top-up.
+  const PRIO = { compound: 0, cycle_interest: 1, payment: 2, topup: 3 };
   const events = [
-    ...compounds.map(c => ({ date: c.date, kind: 'compound', amount: c.unpaidInterest || 0 })),
-    ...topups.map(t    => ({ date: t.date, kind: 'topup',    amount: t.amount || 0 })),
-    ...payments.map(p  => ({ date: p.date, kind: 'payment',  amount: p.amount || 0 })),
+    ...compoundEvents.map(c      => ({ date: c.date, kind: 'compound',       amount: c.unpaidInterest || 0 })),
+    ...cycleInterestEvents.map(c => ({ date: c.date, kind: 'cycle_interest', amount: c.unpaidInterest || 0 })),
+    ...topups.map(t              => ({ date: t.date, kind: 'topup',          amount: t.amount || 0 })),
+    ...payments.map(p            => ({ date: p.date, kind: 'payment',        amount: p.amount || 0 })),
   ].sort((a, b) => (new Date(a.date) - new Date(b.date)) || (PRIO[a.kind] - PRIO[b.kind]));
 
   const rows = [];
   let P = 0, I = 0; // principal outstanding, interest outstanding (total = P + I)
-  let basePrincipal = 0; // disbursed + topups only — excludes compound roll-ins; used for interest
   const push = (date, label, dr, cr) => {
     P = Math.max(0, P);
     rows.push({ date, label, dr, cr, principal: P, total: P + I });
@@ -1582,45 +1581,43 @@ function buildLoanStatement(loan) {
 
   // 1) Disbursement — principal only
   P += disbursed;
-  basePrincipal += disbursed;
   push(loan.createdAt, 'ປ່ອຍກູ້', disbursed, 0);
 
   // 2) Replay events
   events.forEach(e => {
     if (e.kind === 'compound') {
-      P += e.amount;                         // unpaid interest rolled into principal
+      P += e.amount;                        // unpaid interest rolled into principal
       push(e.date, 'ທົບຕົ້ນດອກ', e.amount, 0);
-      // basePrincipal intentionally not updated — compound roll-ins must not inflate interest base
+    } else if (e.kind === 'cycle_interest') {
+      if (isDaily) {
+        P += e.amount;                      // daily: interest folds into running total
+      } else {
+        I += e.amount;                      // cycle: interest sits in a separate bucket
+      }
+      push(e.date, 'ດອກງວດໃໝ່', e.amount, 0);
     } else if (e.kind === 'topup') {
       P += e.amount;
-      basePrincipal += e.amount;
       push(e.date, 'ຢືມເພີ່ມ', e.amount, 0);
-    } else { // payment — split interest-first
-      if (I <= 0) {
-        const accr = cycleInterest(basePrincipal);
-        if (accr > 0) { I += accr; push(e.date, 'ດອກງວດໃໝ່', accr, 0); }
-      }
-      let amt = e.amount;
-      const interestPortion = Math.min(amt, I);
-      if (interestPortion > 0) {
-        I -= interestPortion; amt -= interestPortion;
-        push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
-      }
-      if (amt > 0) {
-        P -= amt;
-        push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
+    } else { // payment
+      if (isDaily) {
+        // Flat single line — full amount reduces running total, no interest/principal split.
+        P -= e.amount;
+        push(e.date, 'ຮັບຊຳລະ', 0, e.amount);
+      } else {
+        // Cycle loan — interest-first split, then principal.
+        let amt = e.amount;
+        const interestPortion = Math.min(amt, I);
+        if (interestPortion > 0) {
+          I -= interestPortion; amt -= interestPortion;
+          push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
+        }
+        if (amt > 0) {
+          P -= amt;
+          push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
+        }
       }
     }
   });
-
-  // 3) Reconcile to the loan's current outstanding interest (current-cycle interest that has
-  //    accrued but is not yet paid or compounded — e.g. an active loan past its due date).
-  const targetInterest = Math.max(0, (loan.totalDue || 0) - (loan.remainingPrincipal ?? loan.amount ?? 0));
-  const gap = Math.round(targetInterest - I);
-  if (gap > 0) {
-    I += gap;
-    push(new Date().toISOString(), 'ດອກງວດໃໝ່', gap, 0);
-  }
 
   return { rows, finalPrincipal: P, finalTotal: P + I };
 }
@@ -1898,6 +1895,17 @@ function openLoanModal(id, focus) {
   if (loan.status === 'active') {
     acts.innerHTML += `<button class="btn btn-primary" style="flex:1;min-width:120px;" onclick="doStatus('${id}','completed')">🎉 ປິດສຳເລັດ</button>`;
     acts.innerHTML += `<button class="btn" style="background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb;font-weight:700;" onclick="openLoanModal('${id}','topup')">💰 ຢືມເພີ່ມ</button>`;
+    const _ciPrincipal = loan.remainingPrincipal ?? loan.amount ?? 0;
+    const _ciProduct   = DB.products.find(p => p.id === loan.productId);
+    const _ciRate      = loan.discountedRate != null ? loan.discountedRate : (_ciProduct?.interestRate || 0);
+    const _ciNoDebt    = (loan.totalDue || 0) <= _ciPrincipal;
+    const _ciIsCycle   = _ciProduct?.paymentType !== 'daily_installment';
+    if (_ciNoDebt && _ciRate > 0 && _ciIsCycle) {
+      const _ciAmt = _ciProduct
+        ? Math.max(0, Math.round(calcLoanTotal({ ..._ciProduct, interestRate: _ciRate }, _ciPrincipal, loan.duration) - _ciPrincipal))
+        : 0;
+      acts.innerHTML += `<button class="btn" style="background:#fff8e1;color:#f57f17;border:1px solid #ffe082;font-weight:700;" onclick="doChargeCycleInterest('${id}')">📋 ຄິດດອກໃໝ່ (${formatMoney(_ciAmt)})</button>`;
+    }
     if (DB.products.some(p => p.isVip && p.status === 'active')) {
       acts.innerHTML += `<button class="btn btn-vip" onclick="openVipModal('${id}')">👑 VIP</button>`;
     }
@@ -2178,6 +2186,36 @@ function doCompoundInterest(loanId) {
       if (document.getElementById('tab-alerts').classList.contains('on')) renderAlerts();
       updateAlertsBadge();
       showToast('ທົບຕົ້ນດອກສຳເລັດ ✅');
+    } catch(err) { showToast('Error: ' + err.message, 'error'); }
+  });
+}
+
+function doChargeCycleInterest(loanId) {
+  const loan = DB.loans.find(l => l.id === loanId);
+  if (!loan) return;
+  const product = DB.products.find(p => p.id === loan.productId);
+  if (!product) { showToast('ບໍ່ພົບຜະລິດຕະພັນ', 'error'); return; }
+
+  const principal    = loan.remainingPrincipal ?? loan.amount;
+  const interestDue  = Math.max(0, (loan.totalDue || 0) - principal);
+  if (interestDue > 0) { showToast('ດອກງວດກ່ອນຍັງຄ້າງຢູ່', 'error'); return; }
+
+  const effectiveRate  = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+  const effProduct     = { ...product, interestRate: effectiveRate };
+  const interestAmount = Math.max(0, Math.round(calcLoanTotal(effProduct, principal, loan.duration) - principal));
+  if (interestAmount <= 0) { showToast('ດອກ 0% — ບໍ່ຕ້ອງຄິດດອກ', 'error'); return; }
+
+  const msg = `ຄິດດອກໃໝ່ສຳລັບງວດນີ້<br>
+    <span style="font-size:.82rem;color:#616161;">
+      ທຶນຕົ້ນ: <strong>${formatMoney(principal)}</strong> &nbsp;×&nbsp; ${effectiveRate}% &nbsp;=&nbsp; ດອກ <strong style="color:#e65100;">${formatMoney(interestAmount)}</strong>
+    </span>`;
+
+  openConfirm('📋', 'ຄິດດອກໃໝ່', msg, async () => {
+    try {
+      await DB.addCycleInterest(loanId);
+      closeConfirm();
+      openLoanModal(loanId);
+      showToast('ຄິດດອກໃໝ່ສຳເລັດ ✅');
     } catch(err) { showToast('Error: ' + err.message, 'error'); }
   });
 }

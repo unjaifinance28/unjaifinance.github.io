@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🧪 Test Manager | Unjai Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green:      #1b5e20;
+      --green-main: #2e7d32;
+      --green-bg:   #e8f5e9;
+      --green-pale: #c8e6c9;
+      --gray:       #616161;
+      --gray-light: #f5f5f5;
+      --gray-mid:   #e0e0e0;
+      --red:        #c62828;
+      --blue:       #1565c0;
+      --orange:     #e65100;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans Lao', 'Noto Sans', sans-serif;
+      font-weight: 400;
+      line-height: 1.8;
+      letter-spacing: 0.3px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      background: #f0f4f0;
+      color: #212121;
+      font-size: 14px;
+    }
+
+    /* ===== HEADER ===== */
+    .hdr {
+      background: var(--green);
+      color: white;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .hdr-title { font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .hdr-badge { background: #ff6f00; color: white; font-size: .65rem; padding: 2px 7px; border-radius: 50px; font-weight: 700; letter-spacing: .3px; }
+    .hdr-links { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hdr-links a {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      color: white; padding: 5px 12px; border-radius: 8px;
+      text-decoration: none; font-size: .8rem; font-weight: 700;
+    }
+    .hdr-links a:hover { background: rgba(255,255,255,.28); }
+
+    /* ===== LAYOUT ===== */
+    .wrap { max-width: 1140px; margin: 0 auto; padding: 16px; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ===== CARD ===== */
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: .82rem;
+      font-weight: 800;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 14px;
+      padding-bottom: 9px;
+      border-bottom: 2px solid var(--green-bg);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title .sub { font-size: .7rem; color: #9e9e9e; font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+    /* ===== FORM ===== */
+    .fgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 10px;
+    }
+    .fi { display: flex; flex-direction: column; gap: 4px; }
+    .fi label { font-size: .73rem; font-weight: 700; color: var(--gray); }
+    .fi input, .fi select {
+      padding: 9px 11px; border: 1.5px solid var(--gray-mid); border-radius: 9px;
+      font-family: inherit; font-size: .88rem; outline: none; width: 100%;
+    }
+    .fi input:focus, .fi select:focus { border-color: #4caf50; }
+
+    .preview-bar {
+      margin-top: 10px; padding: 10px 14px;
+      background: var(--green-bg); border-radius: 9px;
+      font-size: .8rem; color: var(--green);
+      min-height: 36px;
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      padding: 9px 18px; border: none; border-radius: 10px;
+      font-family: inherit; font-size: .85rem; font-weight: 700;
+      cursor: pointer; transition: .15s; display: inline-flex;
+      align-items: center; gap: 5px;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-green  { background: var(--green-main); color: white; }
+    .btn-green:hover  { background: var(--green); }
+    .btn-outline { background: white; color: var(--green-main); border: 2px solid var(--green-main); }
+    .btn-red    { background: #ffebee; color: var(--red); border: 1.5px solid #ef9a9a; }
+    .btn-blue   { background: #e3f2fd; color: var(--blue); border: 1.5px solid #90caf9; }
+    .btn-purple { background: #f3e5f5; color: #6a1b9a; border: 1.5px solid #ce93d8; }
+    .btn-sm { padding: 5px 10px; font-size: .76rem; border-radius: 7px; }
+
+    /* ===== SCENARIO BUTTONS ===== */
+    .sc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+    }
+    .sc-btn {
+      padding: 12px 13px; border: 1.5px solid var(--gray-mid);
+      border-radius: 11px; background: white;
+      font-family: inherit; font-size: .82rem; font-weight: 700;
+      cursor: pointer; text-align: left; transition: .15s; line-height: 1.35;
+    }
+    .sc-btn:hover { border-color: var(--green-main); background: var(--green-bg); }
+    .sc-btn:active { transform: scale(.97); }
+    .sc-sub { font-size: .67rem; color: #9e9e9e; font-weight: 400; margin-top: 3px; }
+
+    /* ===== TABLE ===== */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .81rem; }
+    thead th {
+      background: var(--green); color: white;
+      padding: 9px 11px; text-align: left;
+      white-space: nowrap; font-weight: 700;
+      font-size: .75rem; letter-spacing: .3px;
+    }
+    tbody tr:nth-child(even) { background: #fafafa; }
+    tbody tr:hover { background: var(--green-bg); }
+    tbody td { padding: 9px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+
+    .badge {
+      display: inline-block; padding: 2px 9px; border-radius: 50px;
+      font-size: .7rem; font-weight: 700; white-space: nowrap;
+    }
+    .b-active    { background: #e3f2fd; color: var(--blue); }
+    .b-approved  { background: var(--green-bg); color: var(--green); }
+    .b-pending   { background: #fff3e0; color: var(--orange); }
+    .b-completed { background: #f3e5f5; color: #6a1b9a; }
+    .b-rejected  { background: #ffebee; color: var(--red); }
+
+    .mono { font-family: 'Courier New', monospace; letter-spacing: .5px; }
+
+    /* ===== BULK BAR ===== */
+    .bulk-bar {
+      background: white; border-radius: 14px; padding: 14px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 14px;
+    }
+    .bulk-bar a { text-decoration: none; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: none; align-items: flex-end; justify-content: center; z-index: 500;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 20px 20px 0 0;
+      padding: 22px 20px 40px; width: 100%; max-width: 600px;
+      max-height: 88vh; overflow-y: auto;
+    }
+    .modal h3 { font-size: .95rem; font-weight: 800; color: var(--green); margin-bottom: 14px; }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #323232; color: white; padding: 11px 22px;
+      border-radius: 50px; font-size: .85rem; opacity: 0;
+      transition: opacity .3s; z-index: 9999; pointer-events: none; white-space: nowrap;
+    }
+    .toast.show    { opacity: 1; }
+    .toast.success { background: var(--green-main); }
+    .toast.error   { background: var(--red); }
+
+    .spinner { width:28px;height:28px;border:3px solid rgba(27,94,32,.2);border-top-color:var(--green-main);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align:center;padding:32px;color:#9e9e9e;font-size:.88rem; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-title">
+    🧪 Test Manager — Unjai Finance
+    <span class="hdr-badge">DEV</span>
+  </div>
+  <div class="hdr-links">
+    <a href="admin.html">📊 Admin</a>
+    <a href="index.html" target="_blank">👤 Customer</a>
+    <a href="agent.html" target="_blank">🚗 Agent</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="two-col">
+
+    <!-- ===== CREATE FORM ===== -->
+    <div class="card">
+      <div class="card-title">➕ ສ້າງ Test Loan</div>
+      <div class="fgrid">
+        <div class="fi">
+          <label>ຊື່ລູກຄ້າ</label>
+          <input type="text" id="f-name" value="ທ້າວ ຄຳ" />
+        </div>
+        <div class="fi">
+          <label>ເບີໂທ</label>
+          <input type="text" id="f-phone" value="020 9999 8888" />
+        </div>
+        <div class="fi" style="grid-column: 1/-1;">
+          <label>ເລືອກຜະລິດຕະພັນ</label>
+          <select id="f-product" onchange="onProductChange()">
+            <option value="">⏳ ກຳລັງໂຫລດ...</option>
+          </select>
+        </div>
+        <div class="fi">
+          <label>ຈຳນວນກູ້ (ກີບ)</label>
+          <input type="text" id="f-amount" inputmode="numeric" placeholder="1,000,000"
+            oninput="formatMoneyInput(this); updatePreview()" />
+        </div>
+        <div class="fi">
+          <label>ວັນທີເລີ່ມ</label>
+          <input type="date" id="f-date" />
+        </div>
+        <div class="fi">
+          <label>ສະຖານະ</label>
+          <select id="f-status">
+            <option value="active">ດຳເນີນ (active)</option>
+            <option value="pending">ລໍຖ້າ (pending)</option>
+            <option value="approved">ອະນຸມັດ (approved)</option>
+            <option value="completed">ສຳເລັດ (completed)</option>
+            <option value="rejected">ປະຕິເສດ (rejected)</option>
+          </select>
+        </div>
+        <div class="fi">
+          <label>ຊຳລະແລ້ວ (paid_amount)</label>
+          <input type="text" id="f-paid" inputmode="numeric" placeholder="0"
+            oninput="formatMoneyInput(this)" />
+        </div>
+        <div class="fi">
+          <label>ດອກທີ່ຊຳລະ (interest_paid)</label>
+          <input type="text" id="f-intpaid" inputmode="numeric" placeholder="0"
+            oninput="formatMoneyInput(this)" />
+        </div>
+        <div class="fi">
+          <label>ຕົ້ນຄ້າງ (remaining_principal)</label>
+          <input type="text" id="f-remprincipal" inputmode="numeric" placeholder="= ຈຳນວນກູ້"
+            oninput="formatMoneyInput(this)" />
+        </div>
+      </div>
+      <div class="preview-bar" id="loanPreview">← ເລືອກຜະລິດຕະພັນ ແລະ ຈຳນວນ</div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-green" onclick="createTestLoan()">➕ ສ້າງ Test Loan</button>
+        <button class="btn btn-outline" onclick="resetForm()">🔄 ລ້າງຟອມ</button>
+      </div>
+    </div>
+
+    <!-- ===== QUICK SCENARIOS ===== -->
+    <div class="card">
+      <div class="card-title">
+        ⚡ Quick Scenarios
+        <span class="sub">ເລືອກຜະລິດຕະພັນ + ຈຳນວນກ່ອນ</span>
+      </div>
+      <div class="sc-grid">
+        <button class="sc-btn" onclick="runScenario('normal')">
+          📋 ກູ້ປົກກະຕິ
+          <div class="sc-sub">active · ວັນນີ້ · 0 ຊຳລະ</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('fullPaid')">
+          ✅ ຊຳລະດອກຄົບ
+          <div class="sc-sub">active · ດອກຊຳລະ 100%</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('halfPaid')">
+          ⚠️ ຈ່າຍດອກບໍ່ຄົບ
+          <div class="sc-sub">active · ດອກຊຳລະ 50%</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('overdue')">
+          🔴 ເກີນກຳນົດ
+          <div class="sc-sub">active · 40 ວັນຜ່ານ · 0 ຊຳລະ</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('compound')">
+          🔄 ດອກທົບຕົ້ນ
+          <div class="sc-sub">active · overdue · ຕົ້ນ+ດອກ</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('topup')">
+          💰 ຢືມເພີ່ມ
+          <div class="sc-sub">active · topup +500,000</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('completed')">
+          🎉 ສຳເລັດ
+          <div class="sc-sub">completed · ຊຳລະຄົບ</div>
+        </button>
+        <button class="sc-btn" onclick="runScenario('rejected')">
+          ❌ ປະຕິເສດ
+          <div class="sc-sub">rejected</div>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /two-col -->
+
+  <!-- ===== BULK BAR ===== -->
+  <div class="bulk-bar">
+    <button class="btn btn-red" onclick="deleteAllTest()">🗑 ລຶບທຸກ Test</button>
+    <button class="btn btn-outline" onclick="refresh()">🔄 ໂຫລດໃໝ່</button>
+    <a href="admin.html" class="btn btn-blue">📊 ເບິ່ງໃນ Admin</a>
+    <a href="index.html" target="_blank" class="btn btn-outline">👤 ເບິ່ງໃນ Customer</a>
+    <span style="margin-left:auto;font-size:.78rem;color:#9e9e9e;" id="lastRefresh"></span>
+  </div>
+
+  <!-- ===== TEST TABLE ===== -->
+  <div class="card">
+    <div class="card-title">
+      📋 Test Loans
+      <span class="sub" id="testCount"></span>
+    </div>
+    <div class="tbl-wrap" id="testTable">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- ===== EDIT MODAL ===== -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ ແກ້ໄຂ Test Loan</h3>
+    <div class="fgrid" id="editGrid"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-green" onclick="saveEdit()">💾 ບັນທຶກ</button>
+      <button class="btn btn-outline" onclick="closeModal('editModal')">ຍົກເລີກ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAYMENT MODAL ===== -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal">
+    <h3>💳 ບັນທຶກການຊຳລະ</h3>
+    <div id="payInfo" style="font-size:.83rem;color:#616161;background:var(--green-bg);padding:10px 13px;border-radius:9px;margin-bottom:13px;line-height:1.6;"></div>
+    <div class="fi" style="margin-bottom:10px;">
+      <label>ຈຳນວນ (ກີບ)</label>
+      <input type="text" id="pay-amount" inputmode="numeric" placeholder="0"
+        oninput="formatMoneyInput(this)"
+        onkeydown="if(event.key==='Enter') submitPayment()" />
+    </div>
+    <div class="fi" style="margin-bottom:14px;">
+      <label>ວິທີ</label>
+      <select id="pay-method">
+        <option value="cash">💵 ເງິນສົດ</option>
+        <option value="bcel">🏦 BCEL</option>
+        <option value="ldb">🏦 LDB</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-green" onclick="submitPayment()">✅ ຊຳລະ</button>
+      <button class="btn btn-outline" onclick="closeModal('payModal')">ຍົກເລີກ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="app.js"></script>
+<script>
+
+const TEST_NAME  = 'ທ້າວ ຄຳ';
+const TEST_PHONE = '02099998888';
+
+// ===== INIT =====
+(async () => {
+  document.getElementById('f-date').value = todayStr();
+  try {
+    await DB.loadAll();
+    buildProductDropdown();
+    onProductChange();
+    renderTestTable();
+  } catch(e) {
+    showToast('ໂຫລດລົ້ມເຫລວ: ' + e.message, 'error');
+  }
+})();
+
+async function refresh() {
+  document.getElementById('testTable').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+  await DB.loadAll();
+  buildProductDropdown();
+  renderTestTable();
+  document.getElementById('lastRefresh').textContent = 'ໂຫລດ: ' + new Date().toLocaleTimeString('lo-LA');
+}
+
+// ===== PRODUCT DROPDOWN =====
+function buildProductDropdown() {
+  const sel = document.getElementById('f-product');
+  const cur = sel.value;
+  const active = DB.products.filter(p => p.status === 'active');
+  if (!active.length) { sel.innerHTML = '<option value="">ບໍ່ມີຜະລິດຕະພັນ</option>'; return; }
+  sel.innerHTML = active.map(p =>
+    `<option value="${p.id}" ${p.id===cur?'selected':''}>
+      ${p.name} · ${p.interestRate}% ${p.interestType==='flat'?'flat':'ຕໍ່ວັນ'} · ${p.duration}ວ
+    </option>`
+  ).join('');
+}
+
+function getSelectedProduct() {
+  return DB.products.find(p => p.id === document.getElementById('f-product').value) || null;
+}
+
+// ===== FORM HELPERS =====
+function fmv(id)    { return parseFloat((document.getElementById(id)?.value||'').replace(/,/g,''))||0; }
+function setMv(id, n) { document.getElementById(id).value = n > 0 ? Math.round(n).toLocaleString('en-US') : ''; }
+function todayStr()  { return new Date().toISOString().slice(0,10); }
+function daysAgoStr(n) { return new Date(Date.now() - n*86400000).toISOString().slice(0,10); }
+
+function onProductChange() {
+  const p = getSelectedProduct(); if (!p) return;
+  if (!fmv('f-amount') && p.minAmount) setMv('f-amount', p.minAmount);
+  updatePreview();
+}
+
+function updatePreview() {
+  const p = getSelectedProduct(); const amt = fmv('f-amount');
+  if (!p || !amt) { document.getElementById('loanPreview').textContent = '← ເລືອກຜະລິດຕະພັນ ແລະ ຈຳນວນ'; return; }
+  const totalDue = calcLoanTotal(p, amt);
+  const cycleInt = totalDue - amt;
+  document.getElementById('loanPreview').innerHTML =
+    `💚 ຍອດລວມ: <strong>${formatMoney(totalDue)}</strong> &nbsp;|&nbsp; ` +
+    `🟠 ດອກ: <strong>${formatMoney(cycleInt)}</strong> &nbsp;|&nbsp; ⏱ ${p.duration} ວັນ`;
+}
+
+function resetForm() {
+  document.getElementById('f-name').value  = TEST_NAME;
+  document.getElementById('f-phone').value = '020 9999 8888';
+  document.getElementById('f-date').value  = todayStr();
+  document.getElementById('f-status').value = 'active';
+  ['f-paid','f-intpaid','f-remprincipal'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-amount').removeAttribute('data-topup');
+  updatePreview();
+}
+
+// ===== SCENARIOS =====
+function runScenario(type) {
+  const p = getSelectedProduct();
+  if (!p) { showToast('ເລືອກຜະລິດຕະພັນກ່ອນ', 'error'); return; }
+
+  const amount   = fmv('f-amount') || p.minAmount || 1000000;
+  setMv('f-amount', amount);
+  const totalDue = calcLoanTotal(p, amount);
+  const cycleInt = totalDue - amount;
+
+  const cfg = {
+    normal:    { date: todayStr(),    status:'active',    paid:0,                        intPaid:0,                        remPrinc:amount,            topup:0 },
+    fullPaid:  { date: todayStr(),    status:'active',    paid:cycleInt,                 intPaid:cycleInt,                 remPrinc:amount,            topup:0 },
+    halfPaid:  { date: todayStr(),    status:'active',    paid:Math.round(cycleInt/2),   intPaid:Math.round(cycleInt/2),   remPrinc:amount,            topup:0 },
+    overdue:   { date: daysAgoStr(40),status:'active',    paid:0,                        intPaid:0,                        remPrinc:amount,            topup:0 },
+    compound:  { date: daysAgoStr(40),status:'active',    paid:0,                        intPaid:0,                        remPrinc:amount + cycleInt, topup:0 },
+    topup:     { date: todayStr(),    status:'active',    paid:0,                        intPaid:0,                        remPrinc:amount + 500000,   topup:500000 },
+    completed: { date: daysAgoStr(30),status:'completed', paid:totalDue,                 intPaid:cycleInt,                 remPrinc:0,                 topup:0 },
+    rejected:  { date: todayStr(),    status:'rejected',  paid:0,                        intPaid:0,                        remPrinc:amount,            topup:0 },
+  };
+
+  const c = cfg[type];
+  document.getElementById('f-date').value   = c.date;
+  document.getElementById('f-status').value = c.status;
+  setMv('f-paid',         c.paid);
+  setMv('f-intpaid',      c.intPaid);
+  setMv('f-remprincipal', c.remPrinc);
+  document.getElementById('f-amount').dataset.topup = c.topup;
+
+  createTestLoan();
+}
+
+// ===== CREATE TEST LOAN =====
+async function createTestLoan() {
+  const p = getSelectedProduct();
+  if (!p) { showToast('ເລືອກຜະລິດຕະພັນກ່ອນ', 'error'); return; }
+
+  const name      = document.getElementById('f-name').value.trim()  || TEST_NAME;
+  const phone     = document.getElementById('f-phone').value.trim() || '020 9999 8888';
+  const amount    = fmv('f-amount') || p.minAmount || 1000000;
+  const status    = document.getElementById('f-status').value;
+  const dateStr   = document.getElementById('f-date').value;
+  const createdAt = dateStr ? new Date(dateStr + 'T08:00:00').toISOString() : new Date().toISOString();
+
+  const paidAmt      = fmv('f-paid');
+  const intPaid      = fmv('f-intpaid');
+  const remPrincipal = fmv('f-remprincipal') || amount;
+  const topupAmt     = parseFloat(document.getElementById('f-amount').dataset.topup) || 0;
+  const baseAmount   = topupAmt ? amount - topupAmt : amount;
+
+  // total_due = interest on remPrincipal (compound scenario raises remPrinc), minus what's already paid
+  const baseTotalDue   = calcLoanTotal(p, remPrincipal);
+  const currentTotalDue = Math.max(0, baseTotalDue - paidAmt);
+
+  const id = 'LAO' + Date.now().toString().slice(-6);
+
+  try {
+    const { error } = await sb.from('loans').insert({
+      id,
+      product_id:          p.id,
+      product_name:        p.name,
+      name,  phone,
+      id_card:             'TEST-ID',
+      doc_type:            'id_card',
+      doc_image:           null,
+      occupation:          'ທົດສອບ',
+      income:              0,
+      address:             'ທົດສອບ',
+      note:                '[TEST]',
+      amount,
+      duration:            p.duration,
+      total_due:           currentTotalDue,
+      status,
+      paid_amount:         paidAmt,
+      original_principal:  baseAmount || amount,
+      remaining_principal: remPrincipal,
+      interest_paid:       intPaid,
+      created_at:          createdAt,
+    });
+    if (error) throw error;
+
+    if (topupAmt > 0) {
+      await sb.from('topups').insert({
+        id: 'TOP' + Date.now(), loan_id: id,
+        amount: topupAmt, note: '[TEST topup]', date: createdAt,
+      });
+    }
+
+    document.getElementById('f-amount').removeAttribute('data-topup');
+    showToast('ສ້າງ ' + id + ' ✅');
+    await DB.loadAll();
+    renderTestTable();
+  } catch(e) {
+    showToast('ຜິດພາດ: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+// ===== TEST TABLE =====
+function getTestLoans() {
+  return DB.loans
+    .filter(l => l.name.includes('ທ້າວ ຄຳ') || l.phone.replace(/\D/g,'').includes(TEST_PHONE))
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+const ST_LBL = { active:'ດຳເນີນ', pending:'ລໍຖ້າ', approved:'ອະນຸມັດ', completed:'ສຳເລັດ', rejected:'ປະຕິເສດ', restructured:'ທົບຕົ້ນ' };
+const ST_CLS = { active:'b-active', pending:'b-pending', approved:'b-approved', completed:'b-completed', rejected:'b-rejected', restructured:'b-completed' };
+
+function renderTestTable() {
+  const loans = getTestLoans();
+  document.getElementById('testCount').textContent = loans.length + ' ລາຍການ';
+
+  if (!loans.length) {
+    document.getElementById('testTable').innerHTML = '<div class="empty">📭 ຍັງບໍ່ມີ test loans<br><small>ໃຊ້ "Quick Scenarios" ຂ້າງເທິງ</small></div>';
+    return;
+  }
+
+  document.getElementById('testTable').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>ID</th>
+        <th>ຜະລິດຕະພັນ</th>
+        <th style="text-align:right;">ກູ້</th>
+        <th style="text-align:right;">ຕົ້ນຄ້າງ</th>
+        <th style="text-align:right;">ດອກຊ/ລ</th>
+        <th style="text-align:right;">ຊ/ລແລ້ວ</th>
+        <th>ສະຖານະ</th>
+        <th>ວັນທີ</th>
+        <th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${loans.map(l => {
+          const p          = DB.products.find(x => x.id === l.productId);
+          const principal  = l.remainingPrincipal ?? l.amount;
+          const cycleInt   = p ? (p.interestType==='daily'
+            ? Math.round(principal*(p.interestRate/100)*(l.duration||30))
+            : Math.round(principal*(p.interestRate/100))) : 0;
+          const intOwed    = Math.max(0, cycleInt - (l.interestPaid||0));
+          const isOverdue  = l.status==='active' && new Date(l.createdAt).getTime() + (l.duration||30)*86400000 < Date.now();
+          return `<tr>
+            <td><span class="mono" style="font-size:.75rem;color:var(--green);font-weight:700;">${l.id}</span></td>
+            <td style="font-size:.78rem;">${l.productName||'-'}</td>
+            <td style="text-align:right;font-weight:700;">${n(l.amount)}</td>
+            <td style="text-align:right;color:var(--blue);">${n(principal)}</td>
+            <td style="text-align:right;color:${intOwed>0?'var(--orange)':'var(--green-main)'};">
+              ${l.interestPaid>0?n(l.interestPaid):'0'}
+              ${intOwed>0?`<div style="font-size:.65rem;color:var(--red);">ຄ້າງ ${n(intOwed)}</div>`:''}
+            </td>
+            <td style="text-align:right;font-weight:700;">${n(l.paidAmount||0)}</td>
+            <td>
+              <span class="badge ${ST_CLS[l.status]||'b-pending'}">${ST_LBL[l.status]||l.status}</span>
+              ${isOverdue?'<div style="font-size:.65rem;color:var(--red);margin-top:2px;">🔴 overdue</div>':''}
+            </td>
+            <td style="font-size:.74rem;white-space:nowrap;">${dmy(l.createdAt)}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-outline btn-sm" title="ແກ້ໄຂ" onclick="openEdit('${l.id}')">✏️</button>
+              <button class="btn btn-blue btn-sm" title="ຊຳລະ" style="margin-left:3px;" onclick="openPayment('${l.id}')">💳</button>
+              <button class="btn btn-purple btn-sm" title="Customer view" style="margin-left:3px;" onclick="openCustomer('${l.id}')">👁</button>
+              <button class="btn btn-red btn-sm" title="ລຶບ" style="margin-left:3px;" onclick="deleteOne('${l.id}')">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function n(v) { return v!=null ? new Intl.NumberFormat('lo-LA').format(Math.round(v)) : '-'; }
+function dmy(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+// ===== OPEN IN CUSTOMER =====
+function openCustomer(loanId) {
+  try { navigator.clipboard.writeText(loanId); } catch(e) {}
+  window.open('index.html', '_blank');
+  showToast('ຄັດລອກ ' + loanId + ' ແລ້ວ — ວາງໃສ່ຊ່ອງຄົ້ນຫາ');
+}
+
+// ===== EDIT MODAL =====
+let _editId = null;
+function openEdit(id) {
+  _editId = id;
+  const l = DB.loans.find(x => x.id === id); if (!l) return;
+  const dateVal = l.createdAt ? new Date(l.createdAt).toISOString().slice(0,10) : todayStr();
+
+  document.getElementById('editGrid').innerHTML = `
+    <div class="fi"><label>ຊື່ລູກຄ້າ</label>
+      <input type="text" id="e-name" value="${esc(l.name||'')}" /></div>
+    <div class="fi"><label>ເບີໂທ</label>
+      <input type="text" id="e-phone" value="${esc(l.phone||'')}" /></div>
+    <div class="fi"><label>ຈຳນວນກູ້</label>
+      <input type="text" id="e-amount" inputmode="numeric" oninput="formatMoneyInput(this)"
+        value="${l.amount?Math.round(l.amount).toLocaleString('en-US'):''}" /></div>
+    <div class="fi"><label>ວັນທີ</label>
+      <input type="date" id="e-date" value="${dateVal}" /></div>
+    <div class="fi"><label>ສະຖານະ</label>
+      <select id="e-status">
+        ${['active','pending','approved','completed','rejected'].map(s=>
+          `<option value="${s}" ${l.status===s?'selected':''}>${ST_LBL[s]||s}</option>`
+        ).join('')}
+      </select></div>
+    <div class="fi"><label>ຊຳລະແລ້ວ (paid_amount)</label>
+      <input type="text" id="e-paid" inputmode="numeric" oninput="formatMoneyInput(this)"
+        value="${l.paidAmount?Math.round(l.paidAmount).toLocaleString('en-US'):''}" /></div>
+    <div class="fi"><label>ດອກທີ່ຊຳລະ (interest_paid)</label>
+      <input type="text" id="e-intpaid" inputmode="numeric" oninput="formatMoneyInput(this)"
+        value="${l.interestPaid?Math.round(l.interestPaid).toLocaleString('en-US'):''}" /></div>
+    <div class="fi"><label>ຕົ້ນຄ້າງ (remaining_principal)</label>
+      <input type="text" id="e-remprincipal" inputmode="numeric" oninput="formatMoneyInput(this)"
+        value="${(l.remainingPrincipal??l.amount)?Math.round(l.remainingPrincipal??l.amount).toLocaleString('en-US'):''}" /></div>
+    <div class="fi"><label>ຍອດຄ້າງ (total_due)</label>
+      <input type="text" id="e-totaldue" inputmode="numeric" oninput="formatMoneyInput(this)"
+        value="${l.totalDue?Math.round(l.totalDue).toLocaleString('en-US'):''}" /></div>
+  `;
+  document.getElementById('editModal').classList.add('open');
+}
+
+async function saveEdit() {
+  const g = id => parseFloat((document.getElementById(id)?.value||'').replace(/,/g,''))||0;
+  const dateVal = document.getElementById('e-date').value;
+  const upd = {
+    name:                document.getElementById('e-name').value.trim(),
+    phone:               document.getElementById('e-phone').value.trim(),
+    amount:              g('e-amount'),
+    status:              document.getElementById('e-status').value,
+    paid_amount:         g('e-paid'),
+    interest_paid:       g('e-intpaid'),
+    remaining_principal: g('e-remprincipal'),
+    total_due:           g('e-totaldue'),
+  };
+  if (dateVal) upd.created_at = new Date(dateVal + 'T08:00:00').toISOString();
+  try {
+    const { error } = await sb.from('loans').update(upd).eq('id', _editId);
+    if (error) throw error;
+    closeModal('editModal');
+    showToast('ແກ້ໄຂ ' + _editId + ' ✅');
+    await DB.loadAll();
+    renderTestTable();
+  } catch(e) { showToast('ຜິດພາດ: ' + e.message, 'error'); }
+}
+
+// ===== PAYMENT MODAL =====
+let _payId = null;
+function openPayment(id) {
+  _payId = id;
+  const l = DB.loans.find(x => x.id === id); if (!l) return;
+  const p         = DB.products.find(x => x.id === l.productId);
+  const principal = l.remainingPrincipal ?? l.amount;
+  const cycleInt  = p ? (p.interestType==='daily'
+    ? Math.round(principal*(p.interestRate/100)*(l.duration||30))
+    : Math.round(principal*(p.interestRate/100))) : 0;
+  const intOwed   = Math.max(0, cycleInt - (l.interestPaid||0));
+
+  document.getElementById('payInfo').innerHTML =
+    `<strong>${l.name}</strong> · <span class="mono">${l.id}</span><br>
+     ເງິນຕົ້ນ: ${formatMoney(principal)} &nbsp;|&nbsp;
+     ດອກທີ່ຕ້ອງຊຳລະ: <strong style="color:var(--orange);">${formatMoney(intOwed)}</strong>`;
+  document.getElementById('pay-amount').value = intOwed ? Math.round(intOwed).toLocaleString('en-US') : '';
+  document.getElementById('payModal').classList.add('open');
+  setTimeout(() => document.getElementById('pay-amount').focus(), 100);
+}
+
+async function submitPayment() {
+  const amt    = parseFloat((document.getElementById('pay-amount').value||'').replace(/,/g,''))||0;
+  const method = document.getElementById('pay-method').value;
+  if (!amt) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+  try {
+    await DB.addPayment(_payId, amt, method, '[TEST payment]');
+    closeModal('payModal');
+    showToast('ຊຳລະ ' + formatMoney(amt) + ' ✅');
+    renderTestTable();
+  } catch(e) { showToast('ຜິດພາດ: ' + e.message, 'error'); }
+}
+
+// ===== DELETE =====
+async function deleteOne(id) {
+  if (!confirm('ລຶບ ' + id + '?')) return;
+  try {
+    await DB.deleteLoan(id);
+    showToast('ລຶບ ' + id + ' ✅');
+    await DB.loadAll();
+    renderTestTable();
+  } catch(e) { showToast('ຜິດພາດ: ' + e.message, 'error'); }
+}
+
+async function deleteAllTest() {
+  const loans = getTestLoans();
+  if (!loans.length) { showToast('ບໍ່ມີ test loans', 'error'); return; }
+  if (!confirm('ລຶບ ' + loans.length + ' test loans ທັງໝົດ?')) return;
+  let done = 0;
+  for (const l of loans) {
+    try { await DB.deleteLoan(l.id); done++; } catch(e) { console.warn('delete failed', l.id, e); }
+  }
+  showToast('ລຶບ ' + done + '/' + loans.length + ' loans ✅');
+  await DB.loadAll();
+  renderTestTable();
+}
+
+// ===== UTILS =====
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function esc(s) { return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+['editModal','payModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === document.getElementById(id)) closeModal(id);
+  });
+});
+
+</script>
+</body>
+</html>
