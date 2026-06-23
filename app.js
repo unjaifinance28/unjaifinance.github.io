@@ -450,11 +450,10 @@ const DB = {
     const newAmount             = loan.amount + amount;
     const newOriginalPrincipal  = (loan.originalPrincipal ?? loan.amount) + amount;
     const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
-    // total_due is based on remaining principal (the actual debt base), not loan.amount,
-    // so a loan where some principal has already been repaid gets correct next-cycle interest.
+    // Interest is NOT pre-baked here — admin charges it manually via addCycleInterest.
+    // total_due = principal only; the "ຄິດດອກໃໝ່" button will add interest when ready.
     const effectiveRate  = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
-    const effProduct     = { ...product, interestRate: effectiveRate };
-    const newTotalDue    = calcLoanTotal(effProduct, newRemainingPrincipal, loan.duration);
+    const newTotalDue    = newRemainingPrincipal;
     const cycleInterest  = Math.round(newRemainingPrincipal * effectiveRate / 100);
     const cycleStartDate = new Date().toISOString();
     // cycle_settled = true closes the current interest cycle: the payment made before the
