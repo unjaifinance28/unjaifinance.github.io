@@ -1659,15 +1659,15 @@ function openLoanModal(id, focus) {
   const paid  = loan.paidAmount || 0;
   const _prod = DB.products.find(p => p.id === loan.productId);
 
-  const _isDaily       = _prod?.paymentType === 'daily_installment';
-  const _basePrincipal = loan.basePrincipal ?? loan.amount;
-  const _rate          = loan.discountedRate != null ? loan.discountedRate : (_prod?.interestRate || 0);
+  const _isDaily        = _prod?.paymentType === 'daily_installment';
+  const _remaining      = loan.remainingPrincipal ?? loan.amount;
+  const _rate           = loan.discountedRate != null ? loan.discountedRate : (_prod?.interestRate || 0);
   const interest = _isDaily
-    ? Math.max(0, (loan.totalDue || 0) - (loan.remainingPrincipal ?? loan.amount))
-    : Math.round(_basePrincipal * _rate / 100);
+    ? Math.max(0, (loan.totalDue || 0) - _remaining)
+    : Math.round(_remaining * _rate / 100);
   const total = _isDaily
     ? (loan.totalDue ?? (_prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : loan.amount))
-    : _basePrincipal + interest;
+    : _remaining + interest;
   const rem      = Math.max(0, loan.remainingPrincipal ?? loan.amount);
   const pct      = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const _isZeroRate = _prod ? (_prod.interestRate === 0 && (loan.discountedRate == null || loan.discountedRate === 0)) : false;
@@ -1718,7 +1718,7 @@ function openLoanModal(id, focus) {
       <div class="md-card-title" style="border-bottom-color:#dcedc8;">💰 ຍອດເງິນ</div>
       <div class="md-money-item">
         <div class="md-money-lbl">ເງິນຕົ້ນ</div>
-        <div style="font-size:1.15rem;font-weight:800;color:#1b5e20;">${formatMoney(_basePrincipal)}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:#1b5e20;">${formatMoney(_remaining)}</div>
       </div>
       <div class="md-money-item">
         <div class="md-money-lbl">ດອກ</div>
@@ -4898,13 +4898,12 @@ function renderReport() {
   }
 
   tbody.innerHTML = loans.map((l, i) => {
-    const basePrincipal  = l.basePrincipal ?? l.amount ?? 0;
+    const principal      = l.remainingPrincipal ?? l.amount ?? 0;
     const prod           = DB.products.find(p => p.id === l.productId);
     const isDaily        = prod?.paymentType === 'daily_installment';
     const rate           = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest       = isDaily ? 0 : Math.round(basePrincipal * rate / 100);
-    const principal      = isDaily ? (l.remainingPrincipal ?? l.amount ?? 0) : basePrincipal;
-    const total          = isDaily ? (l.totalDue ?? 0) : basePrincipal + interest;
+    const interest       = isDaily ? 0 : Math.round(principal * rate / 100);
+    const total          = isDaily ? (l.totalDue ?? 0) : principal + interest;
     const nid       = _nextInterestDue(l);
     let dateTd, daysTd;
     if (nid) {
@@ -4955,13 +4954,12 @@ function exportReportExcel() {
 
   const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນຄົບກຳນົດ','ເຫຼືອ (ວັນ)'];
   const rows = loans.map((l, i) => {
-    const basePrincipal = l.basePrincipal ?? l.amount ?? 0;
+    const principal     = l.remainingPrincipal ?? l.amount ?? 0;
     const prod          = DB.products.find(p => p.id === l.productId);
     const isDaily       = prod?.paymentType === 'daily_installment';
     const rate          = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest      = isDaily ? 0 : Math.round(basePrincipal * rate / 100);
-    const principal     = isDaily ? (l.remainingPrincipal ?? l.amount ?? 0) : basePrincipal;
-    const total         = isDaily ? (l.totalDue ?? 0) : basePrincipal + interest;
+    const interest      = isDaily ? 0 : Math.round(principal * rate / 100);
+    const total         = isDaily ? (l.totalDue ?? 0) : principal + interest;
     const nid       = _nextInterestDue(l);
     const dateFmt   = nid ? nid.dateFmt : '-';
     const daysLeft  = nid ? nid.daysLeft : '-';
