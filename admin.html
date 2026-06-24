@@ -877,9 +877,14 @@
         <div id="reportWpChecks" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>
 
-      <!-- Search -->
-      <div style="margin-bottom:10px;">
-        <div class="srch-wrap" style="max-width:360px;">
+      <!-- Product filter + Search -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;">
+        <div>
+          <select id="reportProductFilter" onchange="renderReport()" style="padding:8px 12px;border:1.5px solid #c8e6c9;border-radius:8px;font-size:.88rem;background:white;color:#212121;min-width:180px;">
+            <option value="">📦 ທຸກຜະລິດຕະພັນ</option>
+          </select>
+        </div>
+        <div class="srch-wrap" style="max-width:320px;flex:1;">
           <input class="sbox" id="reportSearch" placeholder="🔍 ຊື່ / ເບີ / ລະຫັດ..." autocomplete="off"
             oninput="renderReport();showAcDrop('reportSearch','reportAcDrop',_getReportLoans())"
             onkeydown="acKey(event,'reportSearch','reportAcDrop')"
@@ -898,7 +903,7 @@
               <th style="text-align:right;">ເງິນຕົ້ນ</th>
               <th style="text-align:right;">ດອກເບ້ຍ</th>
               <th style="text-align:right;">ລວມ</th>
-              <th style="text-align:center;">ວັນດີດດອກ</th>
+              <th style="text-align:center;">ວັນຄົບກຳນົດ</th>
               <th style="text-align:center;">ເຫຼືອ (ວັນ)</th>
             </tr></thead>
             <tbody id="reportTableBody"></tbody>
@@ -1737,7 +1742,7 @@ function openLoanModal(id, focus) {
         else if (daysLeft <= 3)  { color = '#e65100'; suffix = ` (${daysLeft} ວັນ)`; }
         else                     { suffix = ` (${daysLeft} ວັນ)`; }
         return `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
-          <div class="md-money-lbl">ວັນດີດດອກຕໍ່ໄປ</div>
+          <div class="md-money-lbl">ວັນຄົບກຳນົດ</div>
           <div style="font-weight:700;color:${color};font-size:.88rem;">${dateFmt}${suffix}</div>
         </div>`;
       })()}
@@ -4810,6 +4815,15 @@ function initReport() {
       ${wp}
     </label>`).join('');
 
+  // populate product filter dropdown
+  const prodSel = document.getElementById('reportProductFilter');
+  if (prodSel) {
+    const usedProdIds = new Set(active.map(l => l.productId));
+    const prods = DB.products.filter(p => usedProdIds.has(p.id));
+    prodSel.innerHTML = '<option value="">📦 ທຸກຜະລິດຕະພັນ</option>' +
+      prods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  }
+
   renderReport();
 }
 
@@ -4828,7 +4842,12 @@ function onReportWpChange(cb) {
 function _getReportLoans() {
   const all    = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
   const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
-  const active = DB.loans.filter(l => l.status === 'active');
+  let active = DB.loans.filter(l => l.status === 'active');
+  // product filter
+  const prodSel = document.getElementById('reportProductFilter');
+  const prodId  = prodSel ? prodSel.value : '';
+  if (prodId) active = active.filter(l => l.productId === prodId);
+  // workplace filter
   if (!allCb || allCb.checked) return active;
   const checked = Array.from(all).filter(c => c.checked && c.value !== 'ທັງໝົດ').map(c => c.value);
   if (!checked.length) return [];
@@ -4871,7 +4890,9 @@ function renderReport() {
   tbody.innerHTML = loans.map((l, i) => {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
-    const interest  = Math.max(0, total - principal);
+    const prod      = DB.products.find(p => p.id === l.productId);
+    const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest  = Math.round((l.remainingPrincipal ?? principal) * rate / 100);
     const nid       = _nextInterestDue(l);
     let dateTd, daysTd;
     if (nid) {
@@ -4920,11 +4941,13 @@ function exportReportExcel() {
   const loans = _getReportLoans();
   if (!loans.length) { showToast('ບໍ່ມີຂໍ້ມູນ', 'error'); return; }
 
-  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນດີດດອກ','ເຫຼືອ (ວັນ)'];
+  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນຄົບກຳນົດ','ເຫຼືອ (ວັນ)'];
   const rows = loans.map((l, i) => {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
-    const interest  = Math.max(0, total - principal);
+    const prod      = DB.products.find(p => p.id === l.productId);
+    const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest  = Math.round((l.remainingPrincipal ?? principal) * rate / 100);
     const nid       = _nextInterestDue(l);
     const dateFmt   = nid ? nid.dateFmt : '-';
     const daysLeft  = nid ? nid.daysLeft : '-';
