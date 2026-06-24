@@ -4841,11 +4841,8 @@ function renderReport() {
 
   tbody.innerHTML = loans.map((l, i) => {
     const principal = l.amount ?? 0;
-    const _prod = DB.products.find(p => p.id === l.productId);
-    const interest = _prod
-      ? Math.max(0, calcLoanTotal(_prod, principal, l.duration) - principal)
-      : Math.max(0, (l.totalDue ?? 0) - principal);
-    const cycleTotal = principal + interest;
+    const total     = l.totalDue ?? 0;
+    const interest  = Math.max(0, total - principal);
     return `<tr>
       <td style="text-align:center;">${i + 1}</td>
       <td style="font-weight:600;">${l.name || '-'}</td>
@@ -4855,14 +4852,11 @@ function renderReport() {
       <td>${l.productName || '-'}</td>
       <td style="text-align:right;">${fmtNum(principal)}</td>
       <td style="text-align:right;">${fmtNum(interest)}</td>
-      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(cycleTotal)}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(total)}</td>
     </tr>`;
   }).join('');
 
-  const totalDue = loans.reduce((s, l) => {
-    const _prod = DB.products.find(p => p.id === l.productId);
-    return s + (_prod ? calcLoanTotal(_prod, l.amount ?? 0, l.duration) : (l.totalDue ?? 0));
-  }, 0);
+  const totalDue = loans.reduce((s, l) => s + (l.totalDue ?? 0), 0);
   if (summary) summary.innerHTML = `
     <div style="display:flex;gap:28px;flex-wrap:wrap;">
       <span>👥 ຈຳນວນລູກຄ້າ: <strong style="color:#1b5e20;">${loans.length} ຄົນ</strong></span>
@@ -4878,11 +4872,9 @@ function exportReportExcel() {
   const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
   const rows = loans.map((l, i) => {
     const principal = l.amount ?? 0;
-    const _prod = DB.products.find(p => p.id === l.productId);
-    const interest = _prod
-      ? Math.max(0, calcLoanTotal(_prod, principal, l.duration) - principal)
-      : Math.max(0, (l.totalDue ?? 0) - principal);
-    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, principal + interest];
+    const total     = l.totalDue ?? 0;
+    const interest  = Math.max(0, total - principal);
+    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, total];
   });
 
   const wb = XLSX.utils.book_new();
