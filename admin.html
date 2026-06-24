@@ -898,6 +898,8 @@
               <th style="text-align:right;">ເງິນຕົ້ນ</th>
               <th style="text-align:right;">ດອກເບ້ຍ</th>
               <th style="text-align:right;">ລວມ</th>
+              <th style="text-align:center;">ວັນດີດດອກ</th>
+              <th style="text-align:center;">ເຫຼືອ (ວັນ)</th>
             </tr></thead>
             <tbody id="reportTableBody"></tbody>
           </table>
@@ -1725,6 +1727,20 @@ function openLoanModal(id, focus) {
         <div class="md-money-lbl">ຄ້າງ</div>
         <div style="font-size:1rem;font-weight:800;color:${rem > 0 ? '#c62828' : '#1b5e20'};">${formatMoney(rem)}</div>
       </div>
+      ${(() => {
+        const nid = _nextInterestDue(loan);
+        if (!nid) return '';
+        const { dateFmt, daysLeft } = nid;
+        let color = '#1b5e20', suffix = '';
+        if (daysLeft < 0)       { color = '#c62828'; suffix = ` (⚠️ -${Math.abs(daysLeft)} ວັນ)`; }
+        else if (daysLeft === 0) { color = '#e65100'; suffix = ' (ຄົບກຳນົດ)'; }
+        else if (daysLeft <= 3)  { color = '#e65100'; suffix = ` (${daysLeft} ວັນ)`; }
+        else                     { suffix = ` (${daysLeft} ວັນ)`; }
+        return `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
+          <div class="md-money-lbl">ວັນດີດດອກຕໍ່ໄປ</div>
+          <div style="font-weight:700;color:${color};font-size:.88rem;">${dateFmt}${suffix}</div>
+        </div>`;
+      })()}
       ${paid > 0 ? `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
         <div class="md-money-lbl">ຊຳລະທັງໝົດ</div>
         <div style="font-weight:600;color:#388e3c;">${formatMoney(paid)}</div>
@@ -4819,6 +4835,19 @@ function _getReportLoans() {
   return active.filter(l => checked.includes(l.workplace || ''));
 }
 
+function _nextInterestDue(loan) {
+  const start   = loan.cycleStartDate || loan.createdAt;
+  if (!start) return null;
+  const dueDate = new Date(new Date(start).getTime() + 30 * 86400000);
+  const today   = new Date(); today.setHours(0, 0, 0, 0);
+  const due0    = new Date(dueDate); due0.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((due0 - today) / 86400000);
+  const dd = String(dueDate.getDate()).padStart(2, '0');
+  const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
+  const yy = String(dueDate.getFullYear()).slice(-2);
+  return { dueDate, daysLeft, dateFmt: `${dd}/${mm}/${yy}` };
+}
+
 function renderReport() {
   const tbody   = document.getElementById('reportTableBody');
   const summary = document.getElementById('reportSummary');
@@ -4834,7 +4863,7 @@ function renderReport() {
   const fmtNum = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0));
 
   if (!loans.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">ບໍ່ພົບລາຍການ</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">ບໍ່ພົບລາຍການ</td></tr>';
     if (summary) summary.innerHTML = '';
     return;
   }
@@ -4843,6 +4872,26 @@ function renderReport() {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
     const interest  = Math.max(0, total - principal);
+    const nid       = _nextInterestDue(l);
+    let dateTd, daysTd;
+    if (nid) {
+      const { dateFmt, daysLeft } = nid;
+      if (daysLeft < 0) {
+        dateTd = `<span style="color:#c62828;font-weight:700;">⚠️ ${dateFmt}</span>`;
+        daysTd = `<span style="color:#c62828;font-weight:700;">-${Math.abs(daysLeft)} ວັນ</span>`;
+      } else if (daysLeft <= 3) {
+        dateTd = `<span style="color:#e65100;font-weight:700;">${dateFmt}</span>`;
+        daysTd = daysLeft === 0
+          ? `<span style="color:#e65100;font-weight:700;">ຄົບກຳນົດ</span>`
+          : `<span style="color:#e65100;font-weight:700;">${daysLeft} ວັນ</span>`;
+      } else {
+        dateTd = dateFmt;
+        daysTd = `${daysLeft} ວັນ`;
+      }
+    } else {
+      dateTd = '-';
+      daysTd = '-';
+    }
     return `<tr>
       <td style="text-align:center;">${i + 1}</td>
       <td style="font-weight:600;">${l.name || '-'}</td>
@@ -4853,6 +4902,8 @@ function renderReport() {
       <td style="text-align:right;">${fmtNum(principal)}</td>
       <td style="text-align:right;">${fmtNum(interest)}</td>
       <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(total)}</td>
+      <td style="text-align:center;font-size:.82rem;">${dateTd}</td>
+      <td style="text-align:center;font-size:.82rem;">${daysTd}</td>
     </tr>`;
   }).join('');
 
@@ -4869,17 +4920,20 @@ function exportReportExcel() {
   const loans = _getReportLoans();
   if (!loans.length) { showToast('ບໍ່ມີຂໍ້ມູນ', 'error'); return; }
 
-  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
+  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນດີດດອກ','ເຫຼືອ (ວັນ)'];
   const rows = loans.map((l, i) => {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
     const interest  = Math.max(0, total - principal);
-    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, total];
+    const nid       = _nextInterestDue(l);
+    const dateFmt   = nid ? nid.dateFmt : '-';
+    const daysLeft  = nid ? nid.daysLeft : '-';
+    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, total, dateFmt, daysLeft];
   });
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14, 12, 12].map(w => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'ລາຍງານ');
   XLSX.writeFile(wb, 'ລາຍງານ_' + new Date().toISOString().slice(0, 10) + '.xlsx');
 }

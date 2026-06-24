@@ -35,6 +35,7 @@ const mapLoan = r => ({
   discountAmount: r.discount_amount || 0,
   dailyPayment: r.daily_payment || null,
   cycleSettled: r.cycle_settled || false,
+  cycleStartDate: r.cycle_start_date || null,
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
