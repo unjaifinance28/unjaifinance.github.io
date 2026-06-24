@@ -16,6 +16,9 @@ const mapProduct = r => ({
   isVip: r.is_vip || false,
   vipCustomers: r.vip_customers || [],
   paymentType: r.payment_type || 'lump_sum',
+  allowTopup: r.allow_topup !== false,
+  requireInterestBeforeTopup: r.require_interest_before_topup !== false,
+  topupRequiresClose: r.topup_requires_close || false,
 });
 const mapLoan = r => ({
   id: r.id, productId: r.product_id, productName: r.product_name,
@@ -201,6 +204,9 @@ const DB = {
       is_vip: data.isVip || false,
       vip_customers: data.vipCustomers || [],
       payment_type: data.paymentType || 'lump_sum',
+      allow_topup: data.allowTopup !== false,
+      require_interest_before_topup: data.requireInterestBeforeTopup !== false,
+      topup_requires_close: data.topupRequiresClose || false,
     }).select().single();
     if (error) ({ data: r, error } = await sb.from('products').insert(core).select().single());
     if (error) throw error;
@@ -224,7 +230,10 @@ const DB = {
     if (data.compoundDays !== undefined) ext.compound_days  = data.compoundDays;
     if (data.isVip        !== undefined) ext.is_vip         = data.isVip;
     if (data.vipCustomers !== undefined) ext.vip_customers  = data.vipCustomers;
-    if (data.paymentType  !== undefined) ext.payment_type   = data.paymentType;
+    if (data.paymentType              !== undefined) ext.payment_type                = data.paymentType;
+    if (data.allowTopup               !== undefined) ext.allow_topup                = data.allowTopup;
+    if (data.requireInterestBeforeTopup !== undefined) ext.require_interest_before_topup = data.requireInterestBeforeTopup;
+    if (data.topupRequiresClose       !== undefined) ext.topup_requires_close       = data.topupRequiresClose;
     let { error } = await sb.from('products').update({ ...core, ...ext }).eq('id', id);
     if (error && Object.keys(ext).length) {
       ({ error } = await sb.from('products').update(core).eq('id', id));
@@ -442,6 +451,11 @@ const DB = {
     if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
     const product = this.products.find(p => p.id === loan.productId);
     if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
+    if (product.allowTopup === false) throw new Error('ຜະລິດຕະພັນນີ້ບໍ່ອະນຸຍາດ Topup');
+    if (product.requireInterestBeforeTopup) {
+      const outstandingInterest = Math.max(0, (loan.totalDue || 0) - (loan.remainingPrincipal ?? loan.amount));
+      if (outstandingInterest > 0) throw new Error('ກະລຸນາຊຳລະດອກກ່ອນ Topup');
+    }
     const id = 'TOP' + Date.now();
     const { data: r, error } = await sb.from('topups').insert({
       id, loan_id: loanId, amount, note: note || '', date: new Date().toISOString(),

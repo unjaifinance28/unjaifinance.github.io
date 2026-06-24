@@ -455,6 +455,25 @@
               <input type="text" id="pf-vip-phones" placeholder="020xxxxxxxx, 030xxxxxxxx" />
               <small style="color:#9e9e9e;font-size:.75rem;">ລູກຄ້າທີ່ໃສ່ເບີຕາມນີ້ຈະເຫັນ VIP product ໃນໜ້າສະໝັກ</small>
             </div>
+            <!-- Topup settings -->
+            <div class="fi full" style="padding:8px 0;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-allow-topup" style="width:17px;height:17px;accent-color:#1565c0;flex-shrink:0;" onchange="onAllowTopupChange()" checked />
+                <span style="font-weight:700;color:#1565c0;">ອະນຸຍາດ Topup</span>
+              </label>
+            </div>
+            <div class="fi full" id="pf-require-interest-group" style="padding:8px 0 8px 27px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-require-interest" style="width:17px;height:17px;accent-color:#e65100;flex-shrink:0;" checked />
+                <span style="font-weight:700;color:#e65100;">ຕ້ອງຈ່າຍດອກກ່ອນ Topup</span>
+              </label>
+            </div>
+            <div class="fi full" id="pf-topup-close-group" style="display:none;padding:8px 0 8px 27px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-topup-close" style="width:17px;height:17px;accent-color:#c62828;flex-shrink:0;" />
+                <span style="font-weight:700;color:#c62828;">Topup ຕ້ອງປິດ Loan ກ່ອນ</span>
+              </label>
+            </div>
           </div>
           <!-- Mini preview -->
           <div id="prodCalcPreview" style="display:none;background:#e8f5e9;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.82rem;color:#1b5e20;">
@@ -2375,11 +2394,14 @@ async function saveProd(e) {
     ? document.getElementById('pf-vip-phones').value.split(',').map(s=>s.trim()).filter(Boolean)
     : [];
   const paymentType  = document.getElementById('pf-payment-type').value;
+  const allowTopup               = document.getElementById('pf-allow-topup').checked;
+  const requireInterestBeforeTopup = allowTopup ? document.getElementById('pf-require-interest').checked : false;
+  const topupRequiresClose       = !allowTopup ? document.getElementById('pf-topup-close').checked : false;
 
   if (!name || isNaN(rate) || rate < 0 || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
-  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers, paymentType };
+  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers, paymentType, allowTopup, requireInterestBeforeTopup, topupRequiresClose };
   try {
     if (id) {
       await DB.updateProduct(id, data);
@@ -2408,6 +2430,11 @@ function cancelProdEdit() {
   document.getElementById('pf-vip-phones').value = '';
   document.getElementById('pf-vip-phones-group').style.display = 'none';
   document.getElementById('pf-payment-type').value = 'lump_sum';
+  document.getElementById('pf-allow-topup').checked = true;
+  document.getElementById('pf-require-interest').checked = true;
+  document.getElementById('pf-topup-close').checked = false;
+  document.getElementById('pf-require-interest-group').style.display = '';
+  document.getElementById('pf-topup-close-group').style.display = 'none';
   document.getElementById('prodCalcPreview').style.display = 'none';
   document.getElementById('prodFormTitle').textContent = '➕ ສ້າງຜະລິດຕະພັນໃໝ່';
 }
@@ -2429,6 +2456,12 @@ function editProd(id) {
   document.getElementById('pf-vip-phones').value = (p.vipCustomers || []).join(', ');
   document.getElementById('pf-vip-phones-group').style.display = p.isVip ? 'flex' : 'none';
   document.getElementById('pf-payment-type').value = p.paymentType || 'lump_sum';
+  const allowTopupVal = p.allowTopup !== false;
+  document.getElementById('pf-allow-topup').checked = allowTopupVal;
+  document.getElementById('pf-require-interest').checked = p.requireInterestBeforeTopup !== false;
+  document.getElementById('pf-topup-close').checked = !!p.topupRequiresClose;
+  document.getElementById('pf-require-interest-group').style.display = allowTopupVal ? '' : 'none';
+  document.getElementById('pf-topup-close-group').style.display = allowTopupVal ? 'none' : '';
   document.getElementById('prodFormTitle').textContent = '✏️ ແກ້ໄຂ: '+p.name;
   updateProdPreview();
   document.getElementById('pf-name').scrollIntoView({behavior:'smooth'});
@@ -3319,6 +3352,13 @@ function closeConfirm() { document.getElementById('confirmModal').classList.remo
 function onVipChange() {
   const checked = document.getElementById('pf-vip').checked;
   document.getElementById('pf-vip-phones-group').style.display = checked ? 'flex' : 'none';
+}
+
+// ====== TOPUP SETTINGS ======
+function onAllowTopupChange() {
+  const allowed = document.getElementById('pf-allow-topup').checked;
+  document.getElementById('pf-require-interest-group').style.display = allowed ? '' : 'none';
+  document.getElementById('pf-topup-close-group').style.display = allowed ? 'none' : '';
 }
 
 // ====== VIP UPGRADE MODAL ======
