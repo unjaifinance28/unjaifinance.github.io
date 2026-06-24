@@ -36,6 +36,7 @@ const mapLoan = r => ({
   dailyPayment: r.daily_payment || null,
   cycleSettled: r.cycle_settled || false,
   cycleStartDate: r.cycle_start_date || null,
+  basePrincipal: r.base_principal ?? r.amount,
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
@@ -267,6 +268,7 @@ const DB = {
       ...core,
       original_principal: data.amount,
       remaining_principal: data.amount,
+      base_principal: data.amount,
       interest_paid: 0,
       daily_payment: data.dailyPayment || null,
     }).select().single();
@@ -388,11 +390,11 @@ const DB = {
     if (product.paymentType === 'daily_installment')
       throw new Error('ສິນຄ້ານີ້ເປັນການຜ່ອນລາຍວັນ — ດອກຄິດໄວ້ລ່ວງໜ້າແລ້ວ ບໍ່ຕ້ອງຄິດໃໝ່');
 
-    const effectiveRate = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
+    const effectiveRate  = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
     if (effectiveRate === 0) throw new Error('ດອກ 0% — ບໍ່ຕ້ອງຄິດດອກ');
 
-    const effProduct     = { ...product, interestRate: effectiveRate };
-    const interestAmount = Math.max(0, Math.round(calcLoanTotal(effProduct, principal, loan.duration) - principal));
+    const basePrincipal  = loan.basePrincipal ?? loan.amount; // never decreases with payments
+    const interestAmount = Math.round(basePrincipal * effectiveRate / 100);
     if (interestAmount <= 0) throw new Error('ດອກທີ່ຄຳນວນໄດ້ເທົ່າກັບ 0');
 
     const newTotalDue = principal + interestAmount;
@@ -465,11 +467,12 @@ const DB = {
     const newAmount             = loan.amount + amount;
     const newOriginalPrincipal  = (loan.originalPrincipal ?? loan.amount) + amount;
     const newRemainingPrincipal = (loan.remainingPrincipal ?? loan.amount) + amount;
+    const newBasePrincipal      = newAmount; // basePrincipal = cumulative disbursements + topups
     // Interest is NOT pre-baked here — admin charges it manually via addCycleInterest.
     // total_due = principal only; the "ຄິດດອກໃໝ່" button will add interest when ready.
     const effectiveRate  = loan.discountedRate != null ? loan.discountedRate : product.interestRate;
     const newTotalDue    = newRemainingPrincipal;
-    const cycleInterest  = Math.round(newRemainingPrincipal * effectiveRate / 100);
+    const cycleInterest  = Math.round(newBasePrincipal * effectiveRate / 100); // interest on base, not remaining
     const cycleStartDate = new Date().toISOString();
     // cycle_settled = true closes the current interest cycle: the payment made before the
     // top-up counts as full settlement, so the loan detail page shows 0 still-owed and no
@@ -478,6 +481,7 @@ const DB = {
       amount: newAmount, total_due: newTotalDue,
       original_principal:  newOriginalPrincipal,
       remaining_principal: newRemainingPrincipal,
+      base_principal:      newBasePrincipal,
       cycle_settled:       true,
       cycle_start_date:    cycleStartDate,
       cycle_interest:      cycleInterest,
@@ -493,6 +497,7 @@ const DB = {
     loan.totalDue            = newTotalDue;
     loan.originalPrincipal   = newOriginalPrincipal;
     loan.remainingPrincipal  = newRemainingPrincipal;
+    loan.basePrincipal       = newBasePrincipal;
     loan.cycleSettled        = true;
     loan.cycleStartDate      = cycleStartDate;
     loan.cycleInterest       = cycleInterest;

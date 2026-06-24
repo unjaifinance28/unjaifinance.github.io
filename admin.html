@@ -4896,12 +4896,13 @@ function renderReport() {
   }
 
   tbody.innerHTML = loans.map((l, i) => {
-    const principal = l.remainingPrincipal ?? l.amount ?? 0;
-    const total     = l.totalDue ?? 0;
-    const prod      = DB.products.find(p => p.id === l.productId);
-    const isDaily   = prod?.paymentType === 'daily_installment';
-    const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest  = isDaily ? 0 : Math.round(principal * rate / 100);
+    const principal      = l.remainingPrincipal ?? l.amount ?? 0;
+    const basePrincipal  = l.basePrincipal ?? l.amount ?? 0;
+    const total          = l.totalDue ?? 0;
+    const prod           = DB.products.find(p => p.id === l.productId);
+    const isDaily        = prod?.paymentType === 'daily_installment';
+    const rate           = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest       = isDaily ? 0 : Math.round(basePrincipal * rate / 100);
     const nid       = _nextInterestDue(l);
     let dateTd, daysTd;
     if (nid) {
@@ -4952,12 +4953,13 @@ function exportReportExcel() {
 
   const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນຄົບກຳນົດ','ເຫຼືອ (ວັນ)'];
   const rows = loans.map((l, i) => {
-    const principal = l.remainingPrincipal ?? l.amount ?? 0;
-    const total     = l.totalDue ?? 0;
-    const prod      = DB.products.find(p => p.id === l.productId);
-    const isDaily   = prod?.paymentType === 'daily_installment';
-    const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest  = isDaily ? 0 : Math.round(principal * rate / 100);
+    const principal     = l.remainingPrincipal ?? l.amount ?? 0;
+    const basePrincipal = l.basePrincipal ?? l.amount ?? 0;
+    const total         = l.totalDue ?? 0;
+    const prod          = DB.products.find(p => p.id === l.productId);
+    const isDaily       = prod?.paymentType === 'daily_installment';
+    const rate          = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest      = isDaily ? 0 : Math.round(basePrincipal * rate / 100);
     const nid       = _nextInterestDue(l);
     const dateFmt   = nid ? nid.dateFmt : '-';
     const daysLeft  = nid ? nid.daysLeft : '-';
