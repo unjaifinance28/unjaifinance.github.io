@@ -524,31 +524,36 @@ const DB = {
   },
 
   async addPayment(loanId, amount, method, note) {
-    const ref  = 'PAY' + Date.now().toString().slice(-8);
-    const loan = this.loans.find(l => l.id === loanId);
+    const ref     = 'PAY' + Date.now().toString().slice(-8);
+    const loan    = this.loans.find(l => l.id === loanId);
     if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    const product = this.products.find(p => p.id === loan.productId);
+    const isDaily = product?.paymentType === 'daily_installment';
 
     const curPrincipal = loan.remainingPrincipal ?? loan.amount;
-    const interestDue  = Math.max(0, loan.totalDue - curPrincipal);
-    const isZeroInterest = (loan.totalDue || 0) <= (loan.amount || 0);
 
-    let interestCollected, principalReduced;
-    if (isZeroInterest || interestDue === 0) {
-      // 0% interest loan — entire payment reduces principal directly
-      interestCollected = 0;
-      principalReduced  = amount;
-    } else if (amount >= interestDue) {
-      interestCollected = interestDue;
-      principalReduced  = amount - interestDue;
+    let interestCollected, principalReduced, newRemainingPrincipal, newTotalDue;
+
+    if (isDaily) {
+      // daily_installment: fixed schedule, no interest/principal split
+      interestCollected     = 0;
+      principalReduced      = 0;
+      newRemainingPrincipal = curPrincipal;
+      newTotalDue           = Math.max(0, (loan.totalDue || 0) - amount);
     } else {
-      interestCollected = amount;
-      principalReduced  = 0;
+      // lump_sum: interest paid first, then principal
+      const outstandingInterest = Math.max(0, (loan.totalDue || 0) - curPrincipal);
+      const interestPortion     = Math.min(amount, outstandingInterest);
+      const principalPortion    = amount - interestPortion;
+      interestCollected         = interestPortion;
+      principalReduced          = principalPortion;
+      newRemainingPrincipal     = Math.max(0, curPrincipal - principalReduced);
+      const newOutstandingInterest = Math.max(0, outstandingInterest - interestCollected);
+      newTotalDue               = newRemainingPrincipal + newOutstandingInterest;
     }
 
-    const newRemainingPrincipal = Math.max(0, curPrincipal - principalReduced);
-    const newTotalDue           = Math.max(0, loan.totalDue - amount);
-    const newPaid               = (loan.paidAmount || 0) + amount;
-    const newInterestPaid       = (loan.interestPaid || 0) + interestCollected;
+    const newPaid         = (loan.paidAmount || 0) + amount;
+    const newInterestPaid = (loan.interestPaid || 0) + interestCollected;
 
     const { data: r, error } = await sb.from('payments').insert({
       id: ref, loan_id: loanId, amount, method, note: note || '',
