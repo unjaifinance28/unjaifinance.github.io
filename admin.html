@@ -4855,11 +4855,19 @@ function _getReportLoans() {
 }
 
 function _nextInterestDue(loan) {
-  const start   = loan.cycleStartDate || loan.createdAt;
-  if (!start) return null;
-  const dueDate = new Date(new Date(start).getTime() + 30 * 86400000);
-  const today   = new Date(); today.setHours(0, 0, 0, 0);
-  const due0    = new Date(dueDate); due0.setHours(0, 0, 0, 0);
+  const prod    = DB.products.find(p => p.id === loan.productId);
+  const isDaily = prod?.paymentType === 'daily_installment';
+  let dueDate;
+  if (isDaily) {
+    if (!loan.createdAt || !loan.duration) return null;
+    dueDate = new Date(new Date(loan.createdAt).getTime() + loan.duration * 86400000);
+  } else {
+    const start = loan.cycleStartDate || loan.createdAt;
+    if (!start) return null;
+    dueDate = new Date(new Date(start).getTime() + 30 * 86400000);
+  }
+  const today  = new Date(); today.setHours(0, 0, 0, 0);
+  const due0   = new Date(dueDate); due0.setHours(0, 0, 0, 0);
   const daysLeft = Math.round((due0 - today) / 86400000);
   const dd = String(dueDate.getDate()).padStart(2, '0');
   const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
@@ -4891,8 +4899,9 @@ function renderReport() {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
     const prod      = DB.products.find(p => p.id === l.productId);
+    const isDaily   = prod?.paymentType === 'daily_installment';
     const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest  = Math.round((l.remainingPrincipal ?? principal) * rate / 100);
+    const interest  = isDaily ? 0 : Math.round((l.remainingPrincipal ?? principal) * rate / 100);
     const nid       = _nextInterestDue(l);
     let dateTd, daysTd;
     if (nid) {
@@ -4946,8 +4955,9 @@ function exportReportExcel() {
     const principal = l.amount ?? 0;
     const total     = l.totalDue ?? 0;
     const prod      = DB.products.find(p => p.id === l.productId);
+    const isDaily   = prod?.paymentType === 'daily_installment';
     const rate      = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
-    const interest  = Math.round((l.remainingPrincipal ?? principal) * rate / 100);
+    const interest  = isDaily ? 0 : Math.round((l.remainingPrincipal ?? principal) * rate / 100);
     const nid       = _nextInterestDue(l);
     const dateFmt   = nid ? nid.dateFmt : '-';
     const daysLeft  = nid ? nid.daysLeft : '-';
