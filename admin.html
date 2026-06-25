@@ -1840,7 +1840,6 @@ function openLoanModal(id, focus) {
                 <th style="text-align:right;">Dr (ອອກ)</th>
                 <th style="text-align:right;">Cr (ເຂົ້າ)</th>
                 <th style="text-align:right;">ທຶນຕົ້ນຄ້າງ</th>
-                <th style="text-align:right;">ຍອດໜີ້ລວມ</th>
               </tr>
             </thead>
             <tbody>
@@ -1851,15 +1850,24 @@ function openLoanModal(id, focus) {
                   <td style="text-align:right;color:#c62828;">${r.dr ? fmtNum(r.dr) : ''}</td>
                   <td style="text-align:right;color:#2e7d32;">${r.cr ? fmtNum(r.cr) : ''}</td>
                   <td style="text-align:right;">${fmtNum(r.principal)}</td>
-                  <td style="text-align:right;font-weight:700;">${fmtNum(r.total)}</td>
                 </tr>`).join('')}
               <tr class="stmt-total">
                 <td colspan="4" style="font-weight:800;">ຍອດຄ້າງ</td>
                 <td style="text-align:right;font-weight:800;color:${finalPrincipal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalPrincipal)}</td>
-                <td style="text-align:right;font-weight:900;color:${finalTotal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalTotal)}</td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div style="margin-top:10px;padding:8px 4px 2px;border-top:2px solid #bbdefb;font-size:.83rem;">
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຕົ້ນຄ້າງ</span><span>${fmtNum(_remaining)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ດອກ cycle ນີ້</span><span>${fmtNum(interest)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${total > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
+            <span>ຍອດລວມ</span><span>${fmtNum(total)}</span>
+          </div>
         </div>
       </div>
     </div>`;
