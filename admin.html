@@ -1859,6 +1859,17 @@ function openLoanModal(id, focus) {
           </table>
         </div>
         <div style="margin-top:10px;padding:8px 4px 2px;border-top:2px solid #bbdefb;font-size:.83rem;">
+          ${_isDaily ? `
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຈ່າຍ/ວັນ</span><span>${fmtNum(loan.dailyPayment)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຈ່າຍແລ້ວ</span><span>${fmtNum(loan.paidAmount)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${loan.totalDue > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
+            <span>ຍອດເຫຼືອ</span><span>${fmtNum(loan.totalDue)}</span>
+          </div>
+          ` : `
           <div style="display:flex;justify-content:space-between;padding:3px 0;">
             <span>ຕົ້ນຄ້າງ</span><span>${fmtNum(_remaining)}</span>
           </div>
@@ -1868,6 +1879,7 @@ function openLoanModal(id, focus) {
           <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${total > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
             <span>ຍອດລວມ</span><span>${fmtNum(total)}</span>
           </div>
+          `}
         </div>
       </div>
     </div>`;
