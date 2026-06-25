@@ -92,3 +92,11 @@ create index if not exists idx_remittances_status   on agent_remittances(status)
 -- =============================================================
 -- insert into agents (id, full_name, username, password, phone, commission_rate)
 -- values ('AGT000001', 'ທົດສອບ Agent', 'agent01', 'agent123', '020-0000000', 500000);
+
+
+-- =============================================================
+-- Payments table — interest/principal split columns
+-- Run in Supabase SQL Editor
+-- =============================================================
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS interest_amount numeric DEFAULT 0;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS principal_amount numeric DEFAULT 0;

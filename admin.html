@@ -1874,25 +1874,41 @@ function openLoanModal(id, focus) {
     pf.innerHTML = `
       <div style="background:#f9fbe7;border:1.5px solid #c8e6c9;border-radius:11px;padding:14px 16px;margin-top:12px;">
         <div style="font-size:.82rem;font-weight:700;color:#1b5e20;margin-bottom:12px;">💳 ບັນທຶກການຊຳລະ</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        ${_isDaily ? `
           <input type="text" inputmode="numeric" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" class="money-input"
-            style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+            style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;margin-bottom:8px;"
             oninput="formatMoneyInput(this)" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
-          <select id="pay-method" style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;"
-            onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'">
-            <option value="bcel">🏦 BCEL</option>
-            <option value="ldb">🏛 LDB</option>
-            <option value="cash">💵 ເງິນສົດ</option>
-            <option value="transfer">💳 ໂອນ</option>
-          </select>
-        </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;align-items:center;margin-bottom:8px;">
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ດອກ:</span>
+            <input type="text" inputmode="numeric" id="pay-interest" placeholder="0" class="money-input"
+              style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+              oninput="formatMoneyInput(this); updatePayTotal()" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ຕົ້ນ:</span>
+            <input type="text" inputmode="numeric" id="pay-principal" placeholder="0" class="money-input"
+              style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+              oninput="formatMoneyInput(this); updatePayTotal()" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ລວມ:</span>
+            <div id="pay-total-display" style="padding:9px 12px;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:8px;font-size:.85rem;font-weight:800;color:#1b5e20;">0</div>
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+          </div>
+        `}
+        <select id="pay-method" style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;margin-bottom:8px;"
+          onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'">
+          <option value="bcel">🏦 BCEL</option>
+          <option value="ldb">🏛 LDB</option>
+          <option value="cash">💵 ເງິນສົດ</option>
+          <option value="transfer">💳 ໂອນ</option>
+        </select>
         <input type="text" id="pay-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)"
           style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:10px;box-sizing:border-box;"
           onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
         <button class="btn btn-primary btn-full" style="padding:11px;font-size:.9rem;" onclick="doPayment()">✅ ຢືນຢັນຊຳລະ</button>
       </div>`;
     if (focus === 'pay') {
-      setTimeout(()=>document.getElementById('pay-amt')?.focus(), 300);
+      setTimeout(()=>(document.getElementById(_isDaily ? 'pay-amt' : 'pay-interest'))?.focus(), 300);
     }
   } else pf.innerHTML = '';
 
@@ -2139,14 +2155,35 @@ function toggleMdSection(id) {
   if (arr) arr.textContent = open ? '▼' : '▲';
 }
 
+function updatePayTotal() {
+  const interest  = getMoneyValue(document.getElementById('pay-interest')) || 0;
+  const principal = getMoneyValue(document.getElementById('pay-principal')) || 0;
+  const el = document.getElementById('pay-total-display');
+  if (el) el.textContent = (interest + principal).toLocaleString('en-US');
+}
+
 function doPayment() {
-  const amt = getMoneyValue(document.getElementById('pay-amt'));
+  const loan    = DB.loans.find(l => l.id === currentLoanId);
+  const product = loan && DB.products.find(p => p.id === loan.productId);
+  const isDaily = product?.paymentType === 'daily_installment';
+
+  let interestAmt, principalAmt;
+  if (isDaily) {
+    const amt = getMoneyValue(document.getElementById('pay-amt'));
+    if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+    interestAmt  = 0;
+    principalAmt = amt;
+  } else {
+    interestAmt  = getMoneyValue(document.getElementById('pay-interest')) || 0;
+    principalAmt = getMoneyValue(document.getElementById('pay-principal')) || 0;
+    if (interestAmt <= 0 && principalAmt <= 0) { showToast('ໃສ່ດອກ ຫຼື ຕົ້ນຢ່າງໜຶ່ງ', 'error'); return; }
+  }
+
   const method = document.getElementById('pay-method').value;
   const note   = document.getElementById('pay-note').value.trim();
-  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
   (async () => {
     try {
-      await DB.addPayment(currentLoanId, amt, method, note);
+      await DB.addPayment(currentLoanId, interestAmt, principalAmt, method, note);
       showToast('ບັນທຶກຊຳລະ ✅');
       openLoanModal(currentLoanId);
       if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
