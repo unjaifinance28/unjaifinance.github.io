@@ -1583,7 +1583,7 @@ function buildLoanStatement(loan) {
   const isDaily = product?.paymentType === 'daily_installment';
 
   const totalTopups = topups.reduce((s, t) => s + (t.amount || 0), 0);
-  const disbursed   = Math.max(0, (loan.amount || 0) - totalTopups);
+  const disbursed   = loan.originalPrincipal || 0;
 
   // Split compound_history into roll-ups vs explicit cycle-interest charges.
   const compoundEvents      = compounds.filter(c => !c.type || c.type === 'compound');
@@ -1595,7 +1595,7 @@ function buildLoanStatement(loan) {
     ...compoundEvents.map(c      => ({ date: c.date, kind: 'compound',       amount: c.unpaidInterest || 0 })),
     ...cycleInterestEvents.map(c => ({ date: c.date, kind: 'cycle_interest', amount: c.unpaidInterest || 0 })),
     ...topups.map(t              => ({ date: t.date, kind: 'topup',          amount: t.amount || 0 })),
-    ...payments.map(p            => ({ date: p.date, kind: 'payment',        amount: p.amount || 0 })),
+    ...payments.map(p            => ({ date: p.date, kind: 'payment',        amount: p.amount || 0, interestAmount: p.interestAmount || 0, principalAmount: p.principalAmount || 0 })),
   ].sort((a, b) => (new Date(a.date) - new Date(b.date)) || (PRIO[a.kind] - PRIO[b.kind]));
 
   const rows = [];
@@ -1630,22 +1630,18 @@ function buildLoanStatement(loan) {
         P -= e.amount;
         push(e.date, 'ຮັບຊຳລະ', 0, e.amount);
       } else {
-        // Cycle loan — interest-first split, then principal.
-        let amt = e.amount;
-        const interestPortion = Math.min(amt, I);
-        if (interestPortion > 0) {
-          I -= interestPortion; amt -= interestPortion;
-          push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
-        }
-        if (amt > 0) {
-          P -= amt;
-          push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
-        }
+        // Use stored split if available; auto-split only for old records (both = 0).
+        const ip = (e.interestAmount > 0 || e.principalAmount > 0)
+          ? { i: e.interestAmount, p: e.principalAmount }
+          : (() => { let a = e.amount; const i = Math.min(a, I); return { i, p: a - i }; })();
+        if (ip.i > 0) { I -= ip.i; push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, ip.i); }
+        if (ip.p > 0) { P -= ip.p; push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, ip.p); }
       }
     }
   });
 
-  return { rows, finalPrincipal: P, finalTotal: P + I };
+  const finalPrincipal = loan.remainingPrincipal ?? P;
+  return { rows, finalPrincipal, finalTotal: finalPrincipal + I };
 }
 
 function openLoanModal(id, focus) {
