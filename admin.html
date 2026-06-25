@@ -1808,6 +1808,7 @@ function openLoanModal(id, focus) {
             <div>
               <div style="font-weight:600;font-size:.83rem;">${formatDate(p.date)}</div>
               <div class="hi-ref">${p.ref} · ${MTD[p.method]||p.method}${p.note?' · '+p.note:''}</div>
+              ${(p.interestAmount > 0 || p.principalAmount > 0) ? `<div style="font-size:.72rem;color:#757575;">ດອກ ${formatMoney(p.interestAmount)} · ຕົ້ນ ${formatMoney(p.principalAmount)}</div>` : ''}
             </div>
             <div class="hi-amt">+${formatMoney(p.amount)}</div>
           </div>`).join('')}
