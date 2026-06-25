@@ -455,6 +455,25 @@
               <input type="text" id="pf-vip-phones" placeholder="020xxxxxxxx, 030xxxxxxxx" />
               <small style="color:#9e9e9e;font-size:.75rem;">ລູກຄ້າທີ່ໃສ່ເບີຕາມນີ້ຈະເຫັນ VIP product ໃນໜ້າສະໝັກ</small>
             </div>
+            <!-- Topup settings -->
+            <div class="fi full" style="padding:8px 0;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-allow-topup" style="width:17px;height:17px;accent-color:#1565c0;flex-shrink:0;" onchange="onAllowTopupChange()" checked />
+                <span style="font-weight:700;color:#1565c0;">ອະນຸຍາດ Topup</span>
+              </label>
+            </div>
+            <div class="fi full" id="pf-require-interest-group" style="padding:8px 0 8px 27px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-require-interest" style="width:17px;height:17px;accent-color:#e65100;flex-shrink:0;" checked />
+                <span style="font-weight:700;color:#e65100;">ຕ້ອງຈ່າຍດອກກ່ອນ Topup</span>
+              </label>
+            </div>
+            <div class="fi full" id="pf-topup-close-group" style="display:none;padding:8px 0 8px 27px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pf-topup-close" style="width:17px;height:17px;accent-color:#c62828;flex-shrink:0;" />
+                <span style="font-weight:700;color:#c62828;">Topup ຕ້ອງປິດ Loan ກ່ອນ</span>
+              </label>
+            </div>
           </div>
           <!-- Mini preview -->
           <div id="prodCalcPreview" style="display:none;background:#e8f5e9;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.82rem;color:#1b5e20;">
@@ -858,9 +877,14 @@
         <div id="reportWpChecks" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>
 
-      <!-- Search -->
-      <div style="margin-bottom:10px;">
-        <div class="srch-wrap" style="max-width:360px;">
+      <!-- Product filter + Search -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;">
+        <div>
+          <select id="reportProductFilter" onchange="renderReport()" style="padding:8px 12px;border:1.5px solid #c8e6c9;border-radius:8px;font-size:.88rem;background:white;color:#212121;min-width:180px;">
+            <option value="">📦 ທຸກຜະລິດຕະພັນ</option>
+          </select>
+        </div>
+        <div class="srch-wrap" style="max-width:320px;flex:1;">
           <input class="sbox" id="reportSearch" placeholder="🔍 ຊື່ / ເບີ / ລະຫັດ..." autocomplete="off"
             oninput="renderReport();showAcDrop('reportSearch','reportAcDrop',_getReportLoans())"
             onkeydown="acKey(event,'reportSearch','reportAcDrop')"
@@ -879,6 +903,8 @@
               <th style="text-align:right;">ເງິນຕົ້ນ</th>
               <th style="text-align:right;">ດອກເບ້ຍ</th>
               <th style="text-align:right;">ລວມ</th>
+              <th style="text-align:center;">ວັນຄົບກຳນົດ</th>
+              <th style="text-align:center;">ເຫຼືອ (ວັນ)</th>
             </tr></thead>
             <tbody id="reportTableBody"></tbody>
           </table>
@@ -1557,7 +1583,7 @@ function buildLoanStatement(loan) {
   const isDaily = product?.paymentType === 'daily_installment';
 
   const totalTopups = topups.reduce((s, t) => s + (t.amount || 0), 0);
-  const disbursed   = Math.max(0, (loan.amount || 0) - totalTopups);
+  const disbursed   = loan.originalPrincipal || 0;
 
   // Split compound_history into roll-ups vs explicit cycle-interest charges.
   const compoundEvents      = compounds.filter(c => !c.type || c.type === 'compound');
@@ -1569,7 +1595,7 @@ function buildLoanStatement(loan) {
     ...compoundEvents.map(c      => ({ date: c.date, kind: 'compound',       amount: c.unpaidInterest || 0 })),
     ...cycleInterestEvents.map(c => ({ date: c.date, kind: 'cycle_interest', amount: c.unpaidInterest || 0 })),
     ...topups.map(t              => ({ date: t.date, kind: 'topup',          amount: t.amount || 0 })),
-    ...payments.map(p            => ({ date: p.date, kind: 'payment',        amount: p.amount || 0 })),
+    ...payments.map(p            => ({ date: p.date, kind: 'payment',        amount: p.amount || 0, interestAmount: p.interestAmount || 0, principalAmount: p.principalAmount || 0 })),
   ].sort((a, b) => (new Date(a.date) - new Date(b.date)) || (PRIO[a.kind] - PRIO[b.kind]));
 
   const rows = [];
@@ -1604,22 +1630,18 @@ function buildLoanStatement(loan) {
         P -= e.amount;
         push(e.date, 'ຮັບຊຳລະ', 0, e.amount);
       } else {
-        // Cycle loan — interest-first split, then principal.
-        let amt = e.amount;
-        const interestPortion = Math.min(amt, I);
-        if (interestPortion > 0) {
-          I -= interestPortion; amt -= interestPortion;
-          push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, interestPortion);
-        }
-        if (amt > 0) {
-          P -= amt;
-          push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, amt);
-        }
+        // Use stored split if available; auto-split only for old records (both = 0).
+        const ip = (e.interestAmount > 0 || e.principalAmount > 0)
+          ? { i: e.interestAmount, p: e.principalAmount }
+          : (() => { let a = e.amount; const i = Math.min(a, I); return { i, p: a - i }; })();
+        if (ip.i > 0) { I -= ip.i; push(e.date, 'ຮັບຊຳລະ - ດອກ', 0, ip.i); }
+        if (ip.p > 0) { P -= ip.p; push(e.date, 'ຮັບຊຳລະ - ຫັກທຶນຕົ້ນ', 0, ip.p); }
       }
     }
   });
 
-  return { rows, finalPrincipal: P, finalTotal: P + I };
+  const finalPrincipal = loan.remainingPrincipal ?? P;
+  return { rows, finalPrincipal, finalTotal: finalPrincipal + I };
 }
 
 function openLoanModal(id, focus) {
@@ -1633,13 +1655,15 @@ function openLoanModal(id, focus) {
   const paid  = loan.paidAmount || 0;
   const _prod = DB.products.find(p => p.id === loan.productId);
 
-  // Always derive totals from the product formula so the display is correct
-  // regardless of whether totalDue in DB was decremented (e.g. manual loans with initial paidAmount).
-  // Interest = Principal × rate/100  (flat)  or  Principal × rate/100 × days  (daily)
-  // Total    = Principal + Interest
-  // Remaining = remaining_principal only (interest payments must not reduce principal)
-  const total    = loan.totalDue ?? (_prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : loan.amount);
-  const interest = Math.max(0, (loan.totalDue || 0) - (loan.remainingPrincipal ?? loan.amount));
+  const _isDaily        = _prod?.paymentType === 'daily_installment';
+  const _remaining      = loan.remainingPrincipal ?? loan.amount;
+  const _rate           = loan.discountedRate != null ? loan.discountedRate : (_prod?.interestRate || 0);
+  const interest = _isDaily
+    ? Math.max(0, (loan.totalDue || 0) - _remaining)
+    : Math.round(_remaining * _rate / 100);
+  const total = _isDaily
+    ? (loan.totalDue ?? (_prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : loan.amount))
+    : _remaining + interest;
   const rem      = Math.max(0, loan.remainingPrincipal ?? loan.amount);
   const pct      = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const _isZeroRate = _prod ? (_prod.interestRate === 0 && (loan.discountedRate == null || loan.discountedRate === 0)) : false;
@@ -1690,7 +1714,7 @@ function openLoanModal(id, focus) {
       <div class="md-card-title" style="border-bottom-color:#dcedc8;">💰 ຍອດເງິນ</div>
       <div class="md-money-item">
         <div class="md-money-lbl">ເງິນຕົ້ນ</div>
-        <div style="font-size:1.15rem;font-weight:800;color:#1b5e20;">${formatMoney(loan.amount)}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:#1b5e20;">${formatMoney(_remaining)}</div>
       </div>
       <div class="md-money-item">
         <div class="md-money-lbl">ດອກ</div>
@@ -1706,6 +1730,20 @@ function openLoanModal(id, focus) {
         <div class="md-money-lbl">ຄ້າງ</div>
         <div style="font-size:1rem;font-weight:800;color:${rem > 0 ? '#c62828' : '#1b5e20'};">${formatMoney(rem)}</div>
       </div>
+      ${(() => {
+        const nid = _nextInterestDue(loan);
+        if (!nid) return '';
+        const { dateFmt, daysLeft } = nid;
+        let color = '#1b5e20', suffix = '';
+        if (daysLeft < 0)       { color = '#c62828'; suffix = ` (⚠️ -${Math.abs(daysLeft)} ວັນ)`; }
+        else if (daysLeft === 0) { color = '#e65100'; suffix = ' (ຄົບກຳນົດ)'; }
+        else if (daysLeft <= 3)  { color = '#e65100'; suffix = ` (${daysLeft} ວັນ)`; }
+        else                     { suffix = ` (${daysLeft} ວັນ)`; }
+        return `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
+          <div class="md-money-lbl">ວັນຄົບກຳນົດ</div>
+          <div style="font-weight:700;color:${color};font-size:.88rem;">${dateFmt}${suffix}</div>
+        </div>`;
+      })()}
       ${paid > 0 ? `<div class="md-money-item" style="border-top:1px solid #dcedc8;padding-top:6px;margin-top:4px;">
         <div class="md-money-lbl">ຊຳລະທັງໝົດ</div>
         <div style="font-weight:600;color:#388e3c;">${formatMoney(paid)}</div>
@@ -1770,6 +1808,7 @@ function openLoanModal(id, focus) {
             <div>
               <div style="font-weight:600;font-size:.83rem;">${formatDate(p.date)}</div>
               <div class="hi-ref">${p.ref} · ${MTD[p.method]||p.method}${p.note?' · '+p.note:''}</div>
+              ${(p.interestAmount > 0 || p.principalAmount > 0) ? `<div style="font-size:.72rem;color:#757575;">ດອກ ${formatMoney(p.interestAmount)} · ຕົ້ນ ${formatMoney(p.principalAmount)}</div>` : ''}
             </div>
             <div class="hi-amt">+${formatMoney(p.amount)}</div>
           </div>`).join('')}
@@ -1802,7 +1841,6 @@ function openLoanModal(id, focus) {
                 <th style="text-align:right;">Dr (ອອກ)</th>
                 <th style="text-align:right;">Cr (ເຂົ້າ)</th>
                 <th style="text-align:right;">ທຶນຕົ້ນຄ້າງ</th>
-                <th style="text-align:right;">ຍອດໜີ້ລວມ</th>
               </tr>
             </thead>
             <tbody>
@@ -1813,15 +1851,36 @@ function openLoanModal(id, focus) {
                   <td style="text-align:right;color:#c62828;">${r.dr ? fmtNum(r.dr) : ''}</td>
                   <td style="text-align:right;color:#2e7d32;">${r.cr ? fmtNum(r.cr) : ''}</td>
                   <td style="text-align:right;">${fmtNum(r.principal)}</td>
-                  <td style="text-align:right;font-weight:700;">${fmtNum(r.total)}</td>
                 </tr>`).join('')}
               <tr class="stmt-total">
                 <td colspan="4" style="font-weight:800;">ຍອດຄ້າງ</td>
                 <td style="text-align:right;font-weight:800;color:${finalPrincipal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalPrincipal)}</td>
-                <td style="text-align:right;font-weight:900;color:${finalTotal > 0 ? '#c62828' : '#1b5e20'};">${fmtNum(finalTotal)}</td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div style="margin-top:10px;padding:8px 4px 2px;border-top:2px solid #bbdefb;font-size:.83rem;">
+          ${_isDaily ? `
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຈ່າຍ/ວັນ</span><span>${fmtNum(loan.dailyPayment)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຈ່າຍແລ້ວ</span><span>${fmtNum(loan.paidAmount)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${loan.totalDue > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
+            <span>ຍອດເຫຼືອ</span><span>${fmtNum(loan.totalDue)}</span>
+          </div>
+          ` : `
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ຕົ້ນຄ້າງ</span><span>${fmtNum(_remaining)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span>ດອກ cycle ນີ້</span><span>${fmtNum(interest)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${total > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
+            <span>ຍອດລວມ</span><span>${fmtNum(total)}</span>
+          </div>
+          `}
         </div>
       </div>
     </div>`;
@@ -1832,25 +1891,41 @@ function openLoanModal(id, focus) {
     pf.innerHTML = `
       <div style="background:#f9fbe7;border:1.5px solid #c8e6c9;border-radius:11px;padding:14px 16px;margin-top:12px;">
         <div style="font-size:.82rem;font-weight:700;color:#1b5e20;margin-bottom:12px;">💳 ບັນທຶກການຊຳລະ</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        ${_isDaily ? `
           <input type="text" inputmode="numeric" id="pay-amt" placeholder="ຈຳນວນ (ກີບ)" class="money-input"
-            style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+            style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;margin-bottom:8px;"
             oninput="formatMoneyInput(this)" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
-          <select id="pay-method" style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;"
-            onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'">
-            <option value="bcel">🏦 BCEL</option>
-            <option value="ldb">🏛 LDB</option>
-            <option value="cash">💵 ເງິນສົດ</option>
-            <option value="transfer">💳 ໂອນ</option>
-          </select>
-        </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;align-items:center;margin-bottom:8px;">
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ດອກ:</span>
+            <input type="text" inputmode="numeric" id="pay-interest" placeholder="0" class="money-input"
+              style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+              oninput="formatMoneyInput(this); updatePayTotal()" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ຕົ້ນ:</span>
+            <input type="text" inputmode="numeric" id="pay-principal" placeholder="0" class="money-input"
+              style="padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;box-sizing:border-box;"
+              oninput="formatMoneyInput(this); updatePayTotal()" onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+            <span style="font-size:.82rem;font-weight:700;color:#1b5e20;">ລວມ:</span>
+            <div id="pay-total-display" style="padding:9px 12px;background:#e8f5e9;border:2px solid #a5d6a7;border-radius:8px;font-size:.85rem;font-weight:800;color:#1b5e20;">0</div>
+            <span style="font-size:.8rem;color:#757575;">ກີບ</span>
+          </div>
+        `}
+        <select id="pay-method" style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.85rem;outline:none;margin-bottom:8px;"
+          onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'">
+          <option value="bcel">🏦 BCEL</option>
+          <option value="ldb">🏛 LDB</option>
+          <option value="cash">💵 ເງິນສົດ</option>
+          <option value="transfer">💳 ໂອນ</option>
+        </select>
         <input type="text" id="pay-note" placeholder="ໝາຍເຫດ (ທາງເລືອກ)"
           style="width:100%;padding:9px 12px;border:2px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:.82rem;outline:none;margin-bottom:10px;box-sizing:border-box;"
           onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#c8e6c9'" />
         <button class="btn btn-primary btn-full" style="padding:11px;font-size:.9rem;" onclick="doPayment()">✅ ຢືນຢັນຊຳລະ</button>
       </div>`;
     if (focus === 'pay') {
-      setTimeout(()=>document.getElementById('pay-amt')?.focus(), 300);
+      setTimeout(()=>(document.getElementById(_isDaily ? 'pay-amt' : 'pay-interest'))?.focus(), 300);
     }
   } else pf.innerHTML = '';
 
@@ -2097,14 +2172,35 @@ function toggleMdSection(id) {
   if (arr) arr.textContent = open ? '▼' : '▲';
 }
 
+function updatePayTotal() {
+  const interest  = getMoneyValue(document.getElementById('pay-interest')) || 0;
+  const principal = getMoneyValue(document.getElementById('pay-principal')) || 0;
+  const el = document.getElementById('pay-total-display');
+  if (el) el.textContent = (interest + principal).toLocaleString('en-US');
+}
+
 function doPayment() {
-  const amt = getMoneyValue(document.getElementById('pay-amt'));
+  const loan    = DB.loans.find(l => l.id === currentLoanId);
+  const product = loan && DB.products.find(p => p.id === loan.productId);
+  const isDaily = product?.paymentType === 'daily_installment';
+
+  let interestAmt, principalAmt;
+  if (isDaily) {
+    const amt = getMoneyValue(document.getElementById('pay-amt'));
+    if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+    interestAmt  = 0;
+    principalAmt = amt;
+  } else {
+    interestAmt  = getMoneyValue(document.getElementById('pay-interest')) || 0;
+    principalAmt = getMoneyValue(document.getElementById('pay-principal')) || 0;
+    if (interestAmt <= 0 && principalAmt <= 0) { showToast('ໃສ່ດອກ ຫຼື ຕົ້ນຢ່າງໜຶ່ງ', 'error'); return; }
+  }
+
   const method = document.getElementById('pay-method').value;
   const note   = document.getElementById('pay-note').value.trim();
-  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ','error'); return; }
   (async () => {
     try {
-      await DB.addPayment(currentLoanId, amt, method, note);
+      await DB.addPayment(currentLoanId, interestAmt, principalAmt, method, note);
       showToast('ບັນທຶກຊຳລະ ✅');
       openLoanModal(currentLoanId);
       if (document.getElementById('tab-loans').classList.contains('on')) renderLoans();
@@ -2375,11 +2471,14 @@ async function saveProd(e) {
     ? document.getElementById('pf-vip-phones').value.split(',').map(s=>s.trim()).filter(Boolean)
     : [];
   const paymentType  = document.getElementById('pf-payment-type').value;
+  const allowTopup               = document.getElementById('pf-allow-topup').checked;
+  const requireInterestBeforeTopup = allowTopup ? document.getElementById('pf-require-interest').checked : false;
+  const topupRequiresClose       = !allowTopup ? document.getElementById('pf-topup-close').checked : false;
 
   if (!name || isNaN(rate) || rate < 0 || !minA || !maxA) { showToast('ຕື່ມຂໍ້ມູນໃຫ້ຄົບ','error'); return; }
   if (maxA < minA) { showToast('ສູງສຸດຕ້ອງ > ຕ່ຳສຸດ','error'); return; }
 
-  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers, paymentType };
+  const data = { name, interestRate:rate, interestType:type, duration:dur, minAmount:minA, maxAmount:maxA, description:desc, compound, compoundDays, isVip, vipCustomers, paymentType, allowTopup, requireInterestBeforeTopup, topupRequiresClose };
   try {
     if (id) {
       await DB.updateProduct(id, data);
@@ -2408,6 +2507,11 @@ function cancelProdEdit() {
   document.getElementById('pf-vip-phones').value = '';
   document.getElementById('pf-vip-phones-group').style.display = 'none';
   document.getElementById('pf-payment-type').value = 'lump_sum';
+  document.getElementById('pf-allow-topup').checked = true;
+  document.getElementById('pf-require-interest').checked = true;
+  document.getElementById('pf-topup-close').checked = false;
+  document.getElementById('pf-require-interest-group').style.display = '';
+  document.getElementById('pf-topup-close-group').style.display = 'none';
   document.getElementById('prodCalcPreview').style.display = 'none';
   document.getElementById('prodFormTitle').textContent = '➕ ສ້າງຜະລິດຕະພັນໃໝ່';
 }
@@ -2429,6 +2533,12 @@ function editProd(id) {
   document.getElementById('pf-vip-phones').value = (p.vipCustomers || []).join(', ');
   document.getElementById('pf-vip-phones-group').style.display = p.isVip ? 'flex' : 'none';
   document.getElementById('pf-payment-type').value = p.paymentType || 'lump_sum';
+  const allowTopupVal = p.allowTopup !== false;
+  document.getElementById('pf-allow-topup').checked = allowTopupVal;
+  document.getElementById('pf-require-interest').checked = p.requireInterestBeforeTopup !== false;
+  document.getElementById('pf-topup-close').checked = !!p.topupRequiresClose;
+  document.getElementById('pf-require-interest-group').style.display = allowTopupVal ? '' : 'none';
+  document.getElementById('pf-topup-close-group').style.display = allowTopupVal ? 'none' : '';
   document.getElementById('prodFormTitle').textContent = '✏️ ແກ້ໄຂ: '+p.name;
   updateProdPreview();
   document.getElementById('pf-name').scrollIntoView({behavior:'smooth'});
@@ -3319,6 +3429,13 @@ function closeConfirm() { document.getElementById('confirmModal').classList.remo
 function onVipChange() {
   const checked = document.getElementById('pf-vip').checked;
   document.getElementById('pf-vip-phones-group').style.display = checked ? 'flex' : 'none';
+}
+
+// ====== TOPUP SETTINGS ======
+function onAllowTopupChange() {
+  const allowed = document.getElementById('pf-allow-topup').checked;
+  document.getElementById('pf-require-interest-group').style.display = allowed ? '' : 'none';
+  document.getElementById('pf-topup-close-group').style.display = allowed ? 'none' : '';
 }
 
 // ====== VIP UPGRADE MODAL ======
@@ -4754,6 +4871,15 @@ function initReport() {
       ${wp}
     </label>`).join('');
 
+  // populate product filter dropdown
+  const prodSel = document.getElementById('reportProductFilter');
+  if (prodSel) {
+    const usedProdIds = new Set(active.map(l => l.productId));
+    const prods = DB.products.filter(p => usedProdIds.has(p.id));
+    prodSel.innerHTML = '<option value="">📦 ທຸກຜະລິດຕະພັນ</option>' +
+      prods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  }
+
   renderReport();
 }
 
@@ -4772,11 +4898,37 @@ function onReportWpChange(cb) {
 function _getReportLoans() {
   const all    = document.querySelectorAll('#reportWpChecks input[type=checkbox]');
   const allCb  = Array.from(all).find(c => c.value === 'ທັງໝົດ');
-  const active = DB.loans.filter(l => l.status === 'active');
+  let active = DB.loans.filter(l => l.status === 'active');
+  // product filter
+  const prodSel = document.getElementById('reportProductFilter');
+  const prodId  = prodSel ? prodSel.value : '';
+  if (prodId) active = active.filter(l => l.productId === prodId);
+  // workplace filter
   if (!allCb || allCb.checked) return active;
   const checked = Array.from(all).filter(c => c.checked && c.value !== 'ທັງໝົດ').map(c => c.value);
   if (!checked.length) return [];
   return active.filter(l => checked.includes(l.workplace || ''));
+}
+
+function _nextInterestDue(loan) {
+  const prod    = DB.products.find(p => p.id === loan.productId);
+  const isDaily = prod?.paymentType === 'daily_installment';
+  let dueDate;
+  if (isDaily) {
+    if (!loan.createdAt || !loan.duration) return null;
+    dueDate = new Date(new Date(loan.createdAt).getTime() + loan.duration * 86400000);
+  } else {
+    const start = loan.cycleStartDate || loan.createdAt;
+    if (!start) return null;
+    dueDate = new Date(new Date(start).getTime() + 30 * 86400000);
+  }
+  const today  = new Date(); today.setHours(0, 0, 0, 0);
+  const due0   = new Date(dueDate); due0.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((due0 - today) / 86400000);
+  const dd = String(dueDate.getDate()).padStart(2, '0');
+  const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
+  const yy = String(dueDate.getFullYear()).slice(-2);
+  return { dueDate, daysLeft, dateFmt: `${dd}/${mm}/${yy}` };
 }
 
 function renderReport() {
@@ -4794,18 +4946,38 @@ function renderReport() {
   const fmtNum = n => new Intl.NumberFormat('lo-LA').format(Math.round(n || 0));
 
   if (!loans.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">ບໍ່ພົບລາຍການ</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">ບໍ່ພົບລາຍການ</td></tr>';
     if (summary) summary.innerHTML = '';
     return;
   }
 
   tbody.innerHTML = loans.map((l, i) => {
-    const principal = l.amount ?? 0;
-    const _prod = DB.products.find(p => p.id === l.productId);
-    const interest = _prod
-      ? Math.max(0, calcLoanTotal(_prod, principal, l.duration) - principal)
-      : Math.max(0, (l.totalDue ?? 0) - principal);
-    const cycleTotal = principal + interest;
+    const principal      = l.remainingPrincipal ?? l.amount ?? 0;
+    const prod           = DB.products.find(p => p.id === l.productId);
+    const isDaily        = prod?.paymentType === 'daily_installment';
+    const rate           = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest       = isDaily ? 0 : Math.round(principal * rate / 100);
+    const total          = isDaily ? (l.totalDue ?? 0) : principal + interest;
+    const nid       = _nextInterestDue(l);
+    let dateTd, daysTd;
+    if (nid) {
+      const { dateFmt, daysLeft } = nid;
+      if (daysLeft < 0) {
+        dateTd = `<span style="color:#c62828;font-weight:700;">⚠️ ${dateFmt}</span>`;
+        daysTd = `<span style="color:#c62828;font-weight:700;">-${Math.abs(daysLeft)} ວັນ</span>`;
+      } else if (daysLeft <= 3) {
+        dateTd = `<span style="color:#e65100;font-weight:700;">${dateFmt}</span>`;
+        daysTd = daysLeft === 0
+          ? `<span style="color:#e65100;font-weight:700;">ຄົບກຳນົດ</span>`
+          : `<span style="color:#e65100;font-weight:700;">${daysLeft} ວັນ</span>`;
+      } else {
+        dateTd = dateFmt;
+        daysTd = `${daysLeft} ວັນ`;
+      }
+    } else {
+      dateTd = '-';
+      daysTd = '-';
+    }
     return `<tr>
       <td style="text-align:center;">${i + 1}</td>
       <td style="font-weight:600;">${l.name || '-'}</td>
@@ -4815,14 +4987,13 @@ function renderReport() {
       <td>${l.productName || '-'}</td>
       <td style="text-align:right;">${fmtNum(principal)}</td>
       <td style="text-align:right;">${fmtNum(interest)}</td>
-      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(cycleTotal)}</td>
+      <td style="text-align:right;font-weight:700;color:#1b5e20;">${fmtNum(total)}</td>
+      <td style="text-align:center;font-size:.82rem;">${dateTd}</td>
+      <td style="text-align:center;font-size:.82rem;">${daysTd}</td>
     </tr>`;
   }).join('');
 
-  const totalDue = loans.reduce((s, l) => {
-    const _prod = DB.products.find(p => p.id === l.productId);
-    return s + (_prod ? calcLoanTotal(_prod, l.amount ?? 0, l.duration) : (l.totalDue ?? 0));
-  }, 0);
+  const totalDue = loans.reduce((s, l) => s + (l.totalDue ?? 0), 0);
   if (summary) summary.innerHTML = `
     <div style="display:flex;gap:28px;flex-wrap:wrap;">
       <span>👥 ຈຳນວນລູກຄ້າ: <strong style="color:#1b5e20;">${loans.length} ຄົນ</strong></span>
@@ -4835,19 +5006,23 @@ function exportReportExcel() {
   const loans = _getReportLoans();
   if (!loans.length) { showToast('ບໍ່ມີຂໍ້ມູນ', 'error'); return; }
 
-  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ'];
+  const headers = ['ລຳດັບ','ຊື່','ລະຫັດ','ເບີໂທ','ບ່ອນເຮັດວຽກ','ຜະລິດຕະພັນ','ເງິນຕົ້ນ','ດອກເບ້ຍ','ລວມ','ວັນຄົບກຳນົດ','ເຫຼືອ (ວັນ)'];
   const rows = loans.map((l, i) => {
-    const principal = l.amount ?? 0;
-    const _prod = DB.products.find(p => p.id === l.productId);
-    const interest = _prod
-      ? Math.max(0, calcLoanTotal(_prod, principal, l.duration) - principal)
-      : Math.max(0, (l.totalDue ?? 0) - principal);
-    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, principal + interest];
+    const principal     = l.remainingPrincipal ?? l.amount ?? 0;
+    const prod          = DB.products.find(p => p.id === l.productId);
+    const isDaily       = prod?.paymentType === 'daily_installment';
+    const rate          = l.discountedRate != null ? l.discountedRate : (prod?.interestRate || 0);
+    const interest      = isDaily ? 0 : Math.round(principal * rate / 100);
+    const total         = isDaily ? (l.totalDue ?? 0) : principal + interest;
+    const nid       = _nextInterestDue(l);
+    const dateFmt   = nid ? nid.dateFmt : '-';
+    const daysLeft  = nid ? nid.daysLeft : '-';
+    return [i + 1, l.name || '-', l.id, l.phone || '-', l.workplace || '-', l.productName || '-', principal, interest, total, dateFmt, daysLeft];
   });
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [4, 22, 16, 14, 20, 18, 14, 14, 14, 12, 12].map(w => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'ລາຍງານ');
   XLSX.writeFile(wb, 'ລາຍງານ_' + new Date().toISOString().slice(0, 10) + '.xlsx');
 }
