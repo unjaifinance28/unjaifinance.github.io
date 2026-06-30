@@ -4527,10 +4527,10 @@ async function saveManualLoan() {
     id_card: idCard || null, doc_type: docType, doc_image: null,
     occupation: workplace || null, income: null,
     address: address || null, note: note || '',
-    amount, duration: dur, total_due: totalDue,
+    amount, duration: dur, total_due: totalDue - paidAmt,
     status, paid_amount: paidAmt,
     created_at: createdAt,
-    original_principal: amount, remaining_principal: amount,
+    original_principal: amount, remaining_principal: amount - paidAmt,
     interest_paid: 0, daily_payment: dailyPay,
   };
   try {
