@@ -209,6 +209,12 @@
     .pay-section .ps-field input:focus,
     .pay-section .ps-field select:focus { border-color: var(--green-med); }
     .money-input { text-align: right; letter-spacing: .5px; }
+    .pay-section .ps-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pay-total-box {
+      width: 100%; padding: 13px 14px; border: 2px solid var(--green-pale);
+      border-radius: 12px; background: var(--green-bg); font-size: .95rem;
+      font-weight: 800; color: var(--green-dark); text-align: right; letter-spacing: .5px;
+    }
 
     /* Status warning */
     .status-warning {
@@ -750,21 +756,36 @@ function renderLoanCard(loan, prod) {
     </div>
     <div class="pay-section">
       <h3>💳 ຮັບຊຳລະ</h3>
-      <div class="ps-field">
-        <label>ຈຳນວນຮັບ (ກີບ)</label>
-        <input type="text" inputmode="numeric" id="payAmt" class="money-input" placeholder="0"
-          oninput="fmtMoneyInput(this)" />
+      <div class="ps-row">
+        <div class="ps-field">
+          <label>ດອກ (ກີບ)</label>
+          <input type="text" inputmode="numeric" id="payInterest" class="money-input" placeholder="0"
+            oninput="fmtMoneyInput(this); updatePayTotal()" />
+        </div>
+        <div class="ps-field">
+          <label>ຕົ້ນ (ກີບ)</label>
+          <input type="text" inputmode="numeric" id="payPrincipal" class="money-input" placeholder="0"
+            oninput="fmtMoneyInput(this); updatePayTotal()" />
+        </div>
       </div>
       <div class="ps-field">
-        <label>ວິທີຮັບ</label>
+        <label>ລວມ (ກີບ)</label>
+        <div id="payTotalDisplay" class="pay-total-box">0</div>
+      </div>
+      <div class="ps-field">
+        <label>ທະນາຄານ</label>
         <select id="payMethod">
-          <option value="cash">💵 ເງິນສົດ</option>
           <option value="bcel">🏦 BCEL</option>
           <option value="ldb">🏦 LDB</option>
+          <option value="cash">💵 ເງິນສົດ</option>
         </select>
       </div>
+      <div class="ps-field">
+        <label>ໝາຍເຫດ</label>
+        <input type="text" id="payNote" placeholder="ໝາຍເຫດ (ທາງເລືອກ)" />
+      </div>
       <button class="btn btn-primary btn-full btn-lg" onclick="confirmPayment()">
-        ✅ ຢືນຢັນຮັບເງິນ
+        ✅ ຢືນຢັນຊຳລະ
       </button>
       <button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="clearLoan()">
         ✕ ຍົກເລີກ / ສະແກນໃໝ່
@@ -781,11 +802,21 @@ function clearLoan() {
 }
 
 // ===== PAYMENT =====
+function updatePayTotal() {
+  const interest  = getMoneyVal(document.getElementById('payInterest'));
+  const principal = getMoneyVal(document.getElementById('payPrincipal'));
+  const el = document.getElementById('payTotalDisplay');
+  if (el) el.textContent = (interest + principal).toLocaleString('en-US');
+}
+
 async function confirmPayment() {
   if (!currentLoan) return;
-  const amt    = getMoneyVal(document.getElementById('payAmt'));
+  const interestAmt  = getMoneyVal(document.getElementById('payInterest')) || 0;
+  const principalAmt = getMoneyVal(document.getElementById('payPrincipal')) || 0;
   const method = document.getElementById('payMethod').value;
-  if (!amt || amt <= 0) { showToast('ໃສ່ຈຳນວນ', 'error'); return; }
+  const note   = document.getElementById('payNote').value.trim();
+  if (interestAmt <= 0 && principalAmt <= 0) { showToast('ໃສ່ດອກ ຫຼື ຕົ້ນຢ່າງໜຶ່ງ', 'error'); return; }
+  const amt = interestAmt + principalAmt;
 
   const btn = document.querySelector('#loanResult .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ ກຳລັງບັນທຶກ...'; }
@@ -793,20 +824,18 @@ async function confirmPayment() {
   try {
     const loan     = currentLoan;
     const principal    = loan.remaining_principal ?? loan.amount ?? 0;
-    const interestDue  = Math.max(0, (loan.total_due || 0) - principal);
-    let interestCollected, principalReduced;
-    if (amt >= interestDue) { interestCollected = interestDue; principalReduced = amt - interestDue; }
-    else { interestCollected = amt; principalReduced = 0; }
-    const newRemainingPrincipal = Math.max(0, principal - principalReduced);
-    const newTotalDue           = Math.max(0, (loan.total_due || 0) - amt);
+    const newRemainingPrincipal = Math.max(0, principal - principalAmt);
+    const newTotalDue           = newRemainingPrincipal;
     const newPaid               = (loan.paid_amount || 0) + amt;
-    const newInterestPaid       = (loan.interest_paid || 0) + interestCollected;
+    const newInterestPaid       = (loan.interest_paid || 0) + interestAmt;
     const ref = 'PAY' + Date.now().toString().slice(-8);
+    const fullNote = [`[Agent: ${agentSession.full_name}]`, note].filter(Boolean).join(' · ');
 
     // 1. Insert payment record
     await sb.from('payments').insert({
       id: ref, loan_id: loan.id, amount: amt, method,
-      note: `[Agent: ${agentSession.full_name}]`,
+      note: fullNote,
+      interest_amount: interestAmt, principal_amount: principalAmt,
       date: new Date().toISOString(), ref,
     });
 
@@ -855,7 +884,7 @@ async function confirmPayment() {
     loadCollections();
   } catch(e) {
     showToast('ຜິດພາດ: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✅ ຢືນຢັນຮັບເງິນ'; }
+    if (btn) { btn.disabled = false; btn.textContent = '✅ ຢືນຢັນຊຳລະ'; }
   }
 }
 

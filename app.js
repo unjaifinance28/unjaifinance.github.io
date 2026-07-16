@@ -37,6 +37,9 @@ const mapLoan = r => ({
   cycleSettled: r.cycle_settled || false,
   cycleStartDate: r.cycle_start_date || null,
   basePrincipal: r.base_principal ?? r.amount,
+  deceasedDate: r.deceased_date || null,
+  deceasedNote: r.deceased_note || '',
+  heirName: r.heir_name || '',
 });
 const mapPayment = r => ({
   id: r.id, loanId: r.loan_id, amount: r.amount, method: r.method,
@@ -304,6 +307,24 @@ const DB = {
     this.vipInvitations  = this.vipInvitations.filter(v => v.loanId !== id);
   },
 
+  async markDeceased(loanId, deceasedDate, heirName, deceasedNote) {
+    const newStatus = heirName ? 'deceased_active' : 'deceased_closed';
+    const { error } = await sb.from('loans').update({
+      status:        newStatus,
+      deceased_date: deceasedDate,
+      deceased_note: deceasedNote || null,
+      heir_name:     heirName    || null,
+    }).eq('id', loanId);
+    if (error) throw error;
+    const loan = this.loans.find(l => l.id === loanId);
+    if (loan) {
+      loan.status       = newStatus;
+      loan.deceasedDate = deceasedDate;
+      loan.deceasedNote = deceasedNote || '';
+      loan.heirName     = heirName    || '';
+    }
+  },
+
   getLoanPayments(loanId) {
     return this.payments.filter(p => p.loanId === loanId);
   },
@@ -319,6 +340,7 @@ const DB = {
   async addCompoundInterest(loanId, note) {
     const loan = this.loans.find(l => l.id === loanId);
     if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    if (loan.status.startsWith('deceased')) throw new Error('ດອກຢຸດນັບແລ້ວ — ບໍ່ສາມາດທົບຕົ້ນໄດ້');
     const product = this.products.find(p => p.id === loan.productId);
     if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
 
@@ -382,6 +404,7 @@ const DB = {
   async addCycleInterest(loanId) {
     const loan = this.loans.find(l => l.id === loanId);
     if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    if (loan.status.startsWith('deceased')) throw new Error('ດອກຢຸດນັບແລ້ວ — ບໍ່ສາມາດຄິດດອກໃໝ່ໄດ້');
     const product = this.products.find(p => p.id === loan.productId);
     if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
 
@@ -454,6 +477,7 @@ const DB = {
   async addTopup(loanId, amount, note) {
     const loan = this.loans.find(l => l.id === loanId);
     if (!loan) throw new Error('ບໍ່ພົບສັນຍາກູ້');
+    if (loan.status.startsWith('deceased')) throw new Error('ບໍ່ສາມາດ Topup ສໍາລັບລູກຄ້າທີ່ເສຍຊີວິດ');
     const product = this.products.find(p => p.id === loan.productId);
     if (!product) throw new Error('ບໍ່ພົບຜະລິດຕະພັນ');
     if (product.allowTopup === false) throw new Error('ຜະລິດຕະພັນນີ້ບໍ່ອະນຸຍາດ Topup');

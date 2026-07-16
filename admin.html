@@ -85,8 +85,10 @@
   .sb-approved  { background:#e8f5e9; color:#1b5e20; }
   .sb-active    { background:#e3f2fd; color:#1565c0; }
   .sb-completed { background:#f3e5f5; color:#6a1b9a; }
-  .sb-rejected      { background:#ffebee; color:#c62828; }
-  .sb-restructured  { background:#e8eaf6; color:#3949ab; }
+  .sb-rejected        { background:#ffebee; color:#c62828; }
+  .sb-restructured    { background:#e8eaf6; color:#3949ab; }
+  .sb-deceased-active { background:#fff3e0; color:#e65100; border:1px solid #ffcc80; }
+  .sb-deceased-closed { background:#f5f5f5; color:#757575; border:1px solid #e0e0e0; }
 
   /* Section title */
   .sec-title { font-size:.9rem; font-weight:800; color:#1b5e20; margin:18px 0 10px; display:flex; align-items:center; gap:6px; }
@@ -969,6 +971,8 @@
             <option value="active">💰 ດຳເນີນ (active)</option>
             <option value="completed">🎉 ສຳເລັດ (completed)</option>
             <option value="rejected">❌ ປະຕິເສດ (rejected)</option>
+            <option value="deceased_active">🟠 ມີທາຍາດ (deceased_active)</option>
+            <option value="deceased_closed">⚫ ຕັດໜີ້ (deceased_closed)</option>
           </select>
           <button style="background:#e65100;color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:700;white-space:nowrap;" onclick="doForceStatus()">✅ ບັນທຶກສະຖານະ</button>
         </div>
@@ -990,6 +994,47 @@
       <button class="btn btn-outline btn-full" onclick="closeLoanModal()">ປິດ</button>
     </div>
 
+  </div>
+</div>
+
+<!-- ====== DECEASED CONFIRMATION MODAL ====== -->
+<div class="modal-overlay" id="deceasedModal">
+  <div class="modal" style="max-width:420px;padding:0;overflow:hidden;">
+    <div style="background:#c62828;color:white;padding:16px 20px;">
+      <div style="font-size:1.05rem;font-weight:800;">🔴 ລູກຄ້າເສຍຊີວິດ</div>
+      <div style="font-size:.78rem;opacity:.85;margin-top:2px;">ກະລຸນາກວດສອບຂໍ້ມູນກ່ອນຢືນຢັນ</div>
+    </div>
+    <div style="padding:16px 20px;">
+      <div class="fi" style="margin-bottom:12px;">
+        <label>ວັນທີເສຍຊີວິດ *</label>
+        <input type="date" id="dc-date" style="padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;" />
+      </div>
+      <div class="fi" style="margin-bottom:12px;">
+        <label>ມີທາຍາດຊົດໃຊ້ບໍ?</label>
+        <div style="display:flex;gap:20px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:7px;font-size:.88rem;cursor:pointer;font-weight:600;">
+            <input type="radio" name="dc-heir" value="yes" onchange="toggleHeirField()" /> ມີ
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:.88rem;cursor:pointer;font-weight:600;">
+            <input type="radio" name="dc-heir" value="no"  onchange="toggleHeirField()" checked /> ບໍ່ມີ
+          </label>
+        </div>
+      </div>
+      <div id="dc-heir-row" class="fi" style="margin-bottom:12px;display:none;">
+        <label>ຊື່ທາຍາດ *</label>
+        <input type="text" id="dc-heir-name" placeholder="ຊື່ທາຍາດ"
+          style="padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;" />
+      </div>
+      <div class="fi" style="margin-bottom:16px;">
+        <label>ໝາຍເຫດ (ທາງເລືອກ)</label>
+        <textarea id="dc-note" placeholder="ໝາຍເຫດ..."
+          style="padding:8px 11px;border:2px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:.83rem;outline:none;resize:vertical;min-height:60px;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-full" style="background:#c62828;color:white;border:none;padding:11px;font-size:.9rem;font-weight:700;" onclick="confirmDeceased()">ຢືນຢັນ</button>
+        <button class="btn btn-outline btn-full" onclick="closeDeceasedModal()">ຍົກເລີກ</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1307,7 +1352,9 @@ const ST = {
   active:    { label:'ດຳເນີນ',   cls:'sb-active' },
   completed:    { label:'ສຳເລັດ',   cls:'sb-completed' },
   rejected:     { label:'ປະຕິເສດ',  cls:'sb-rejected' },
-  restructured: { label:'ທົບຕົ້ນ',  cls:'sb-restructured' },
+  restructured:    { label:'ທົບຕົ້ນ',  cls:'sb-restructured' },
+  deceased_active: { label:'ມີທາຍາດ', cls:'sb-deceased-active' },
+  deceased_closed: { label:'ຕັດໜີ້',  cls:'sb-deceased-closed' },
 };
 const stBadge = s => { const t=ST[s]||ST.pending; return `<span class="sbadge ${t.cls}">${t.label}</span>`; };
 
@@ -1462,7 +1509,7 @@ function renderLoans() {
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="act-btn a-view" onclick="openLoanModal('${l.id}')">👁</button>
-          ${l.status==='active'?`<button class="act-btn a-pay" onclick="openLoanModal('${l.id}','pay')">💳 ຊຳລະ</button>`:''}
+          ${(l.status==='active'||l.status==='deceased_active')?`<button class="act-btn a-pay" onclick="openLoanModal('${l.id}','pay')">💳 ຊຳລະ</button>`:''}
           ${l.status==='pending'?`<button class="act-btn a-ok" onclick="doStatus('${l.id}','active')">✅</button><button class="act-btn a-bad" onclick="doStatus('${l.id}','rejected')">❌</button>`:''}
           <button class="act-btn a-del" onclick="deleteLoan('${l.id}')">🗑</button>
         </div>
@@ -1656,14 +1703,15 @@ function openLoanModal(id, focus) {
   const _prod = DB.products.find(p => p.id === loan.productId);
 
   const _isDaily        = _prod?.paymentType === 'daily_installment';
+  const _isDeceased     = loan.status.startsWith('deceased');
   const _remaining      = loan.remainingPrincipal ?? loan.amount;
   const _rate           = loan.discountedRate != null ? loan.discountedRate : (_prod?.interestRate || 0);
-  const interest = _isDaily
+  const interest = _isDeceased ? 0 : (_isDaily
     ? Math.max(0, (loan.totalDue || 0) - _remaining)
-    : Math.round(_remaining * _rate / 100);
-  const total = _isDaily
+    : Math.round(_remaining * _rate / 100));
+  const total = _isDeceased ? _remaining : (_isDaily
     ? (loan.totalDue ?? (_prod ? calcLoanTotal(_prod, loan.amount, loan.duration) : loan.amount))
-    : _remaining + interest;
+    : _remaining + interest);
   const rem      = Math.max(0, loan.remainingPrincipal ?? loan.amount);
   const pct      = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const _isZeroRate = _prod ? (_prod.interestRate === 0 && (loan.discountedRate == null || loan.discountedRate === 0)) : false;
@@ -1687,7 +1735,10 @@ function openLoanModal(id, focus) {
       <div>${stBadge(loan.status)}</div>
     </div>
     <div style="font-size:1.05rem;font-weight:700;">${loan.name}</div>
-    <div style="font-size:.85rem;opacity:.8;margin-top:2px;">📞 ${loan.phone}</div>`;
+    <div style="font-size:.85rem;opacity:.8;margin-top:2px;">📞 ${loan.phone}</div>
+    ${loan.deceasedDate ? `<div style="margin-top:8px;background:rgba(0,0,0,.18);padding:6px 10px;border-radius:8px;font-size:.82rem;">
+      ⚰️ ເສຍຊີວິດ ${loan.deceasedDate}${loan.heirName ? ` &nbsp;·&nbsp; ທາຍາດ: <strong>${loan.heirName}</strong>` : '&nbsp;·&nbsp; ບໍ່ມີທາຍາດ'}
+    </div>` : ''}`;
 
   // ── 3-COLUMN INFO CARDS ──
   const mkR = (lbl, val) =>
@@ -1720,7 +1771,9 @@ function openLoanModal(id, focus) {
         <div class="md-money-lbl">ດອກ</div>
         ${_isZeroRate
           ? `<div style="font-weight:700;color:#2e7d32;">🎁 ກູ້ດອກ 0%</div>`
-          : `<div style="font-weight:700;color:#e65100;">${formatMoney(interest)}</div>`}
+          : _isDeceased
+            ? `<div style="font-weight:700;color:#9e9e9e;">0 ກີບ <span style="font-size:.72rem;font-weight:500;">(ດອກຢຸດນັບແລ້ວ)</span></div>`
+            : `<div style="font-weight:700;color:#e65100;">${formatMoney(interest)}</div>`}
       </div>
       <div class="md-money-item" style="border-top:1.5px solid #c8e6c9;padding-top:7px;margin-top:4px;">
         <div class="md-money-lbl">ລວມ</div>
@@ -1786,7 +1839,7 @@ function openLoanModal(id, focus) {
   }
 
   const pw = document.getElementById('md-prog-wrap');
-  if (['active','completed'].includes(loan.status)) {
+  if (['active','completed','deceased_active'].includes(loan.status)) {
     pw.style.display = 'block';
     document.getElementById('md-pct').textContent = pct+'%';
     document.getElementById('md-pfill').style.width = pct+'%';
@@ -1874,8 +1927,8 @@ function openLoanModal(id, focus) {
           <div style="display:flex;justify-content:space-between;padding:3px 0;">
             <span>ຕົ້ນຄ້າງ</span><span>${fmtNum(_remaining)}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:3px 0;">
-            <span>ດອກ cycle ນີ້</span><span>${fmtNum(interest)}</span>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;${_isDeceased?'color:#9e9e9e;':''}">
+            <span>ດອກ cycle ນີ້</span><span>${_isDeceased ? '0 — ດອກຢຸດນັບແລ້ວ' : fmtNum(interest)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:.88rem;font-weight:800;color:${total > 0 ? '#c62828' : '#1b5e20'};border-top:1px solid #bbdefb;margin-top:4px;">
             <span>ຍອດລວມ</span><span>${fmtNum(total)}</span>
@@ -1885,9 +1938,9 @@ function openLoanModal(id, focus) {
       </div>
     </div>`;
 
-  // Payment form for active loans
+  // Payment form for active and deceased_active loans
   const pf = document.getElementById('md-pay-form');
-  if (loan.status === 'active') {
+  if (loan.status === 'active' || loan.status === 'deceased_active') {
     pf.innerHTML = `
       <div style="background:#f9fbe7;border:1.5px solid #c8e6c9;border-radius:11px;padding:14px 16px;margin-top:12px;">
         <div style="font-size:.82rem;font-weight:700;color:#1b5e20;margin-bottom:12px;">💳 ບັນທຶກການຊຳລະ</div>
@@ -1985,6 +2038,7 @@ function openLoanModal(id, focus) {
     if (DB.products.some(p => p.isVip && p.status === 'active')) {
       acts.innerHTML += `<button class="btn btn-vip" onclick="openVipModal('${id}')">👑 VIP</button>`;
     }
+    acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1.5px solid #ffcdd2;font-weight:700;" onclick="openDeceasedModal()">🔴 ລູກຄ້າເສຍຊີວິດ</button>`;
   }
   acts.innerHTML += `<button class="btn" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-weight:700;" onclick="printCustomerCard('${id}')">🪪 ພິມບັດ</button>`;
   acts.innerHTML += `<button class="btn" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;font-weight:700;margin-left:auto;" onclick="deleteLoan('${id}')">🗑 ລຶບ</button>`;
@@ -2105,6 +2159,43 @@ function closeLoanModal() {
   currentLoanId = null;
 }
 
+// ====== DECEASED CUSTOMER ======
+function openDeceasedModal() {
+  document.getElementById('dc-date').value = new Date().toISOString().slice(0, 10);
+  document.querySelectorAll('input[name="dc-heir"]').forEach(r => { r.checked = r.value === 'no'; });
+  document.getElementById('dc-heir-row').style.display = 'none';
+  document.getElementById('dc-heir-name').value = '';
+  document.getElementById('dc-note').value = '';
+  document.getElementById('deceasedModal').classList.add('open');
+}
+
+function closeDeceasedModal() {
+  document.getElementById('deceasedModal').classList.remove('open');
+}
+
+function toggleHeirField() {
+  const hasHeir = document.querySelector('input[name="dc-heir"]:checked')?.value === 'yes';
+  document.getElementById('dc-heir-row').style.display = hasHeir ? 'block' : 'none';
+}
+
+async function confirmDeceased() {
+  const date = document.getElementById('dc-date').value;
+  if (!date) { showToast('ກະລຸນາໃສ່ວັນທີ', 'error'); return; }
+  const hasHeir  = document.querySelector('input[name="dc-heir"]:checked')?.value === 'yes';
+  const heirName = hasHeir ? document.getElementById('dc-heir-name').value.trim() : '';
+  if (hasHeir && !heirName) { showToast('ກະລຸນາໃສ່ຊື່ທາຍາດ', 'error'); return; }
+  const note = document.getElementById('dc-note').value.trim();
+  try {
+    await DB.markDeceased(currentLoanId, date, heirName, note);
+    closeDeceasedModal();
+    openLoanModal(currentLoanId);
+    if (document.getElementById('tab-loans')?.classList.contains('on')) renderLoans();
+    if (document.getElementById('tab-alerts')?.classList.contains('on')) renderAlerts();
+    updatePendingBadge(); updateAlertsBadge();
+    showToast('ບັນທຶກສຳເລັດ ✅');
+  } catch(err) { showToast('Error: ' + err.message, 'error'); }
+}
+
 // ====== ADMIN: FORCE STATUS OVERRIDE ======
 function toggleForceStatusSection(currentStatus) {
   const el = document.getElementById('md-force-status-section');
@@ -2121,7 +2212,7 @@ async function doForceStatus() {
   const sel = document.getElementById('md-force-status-sel');
   const newStatus = sel?.value;
   if (!newStatus || !currentLoanId) return;
-  const STATUS_LBL = { pending:'ລໍຖ້າ', active:'ດຳເນີນ', completed:'ສຳເລັດ', rejected:'ປະຕິເສດ' };
+  const STATUS_LBL = { pending:'ລໍຖ້າ', active:'ດຳເນີນ', completed:'ສຳເລັດ', rejected:'ປະຕິເສດ', deceased_active:'ມີທາຍາດ', deceased_closed:'ຕັດໜີ້' };
   const label = STATUS_LBL[newStatus] || newStatus;
   openConfirm('🔧', 'ບັນທຶກສະຖານະ?',
     `ຕ້ອງການປ່ຽນສະຖານະເປັນ: <strong style="color:#e65100;">${label}</strong><br>
@@ -3090,7 +3181,8 @@ function compoundNeeded(l, now = new Date()) {
 }
 function compoundAlertCard(l, days, interestDue) {
   return `
-  <div style="background:#e8eaf6;border:1.5px solid #c5cae9;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+  <div style="background:#e8eaf6;border:1.5px solid #c5cae9;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;"
+       onclick="openLoanModal('${l.id}')">
     <div style="font-weight:800;color:#3949ab;font-size:.95rem;margin-bottom:6px;">⚠️ ລູກຄ້ານີ້ຄວນທົບຕົ້ນ</div>
     <div style="font-size:.84rem;color:#37474f;margin-bottom:10px;">
       ຊື່: <strong>${l.name}</strong> &nbsp;|&nbsp; ລະຫັດ: <strong>${l.id}</strong>
@@ -3105,7 +3197,7 @@ function compoundAlertCard(l, days, interestDue) {
         <div style="font-weight:700;color:#e65100;">${days} ວັນ</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;" onclick="event.stopPropagation()">
       <button class="btn" style="flex:1;background:#2e7d32;color:white;border:none;font-weight:700;" onclick="compoundFromAlert('${l.id}')">✅ ທົບຕົ້ນ</button>
       <button class="btn" style="flex:1;background:white;color:#c62828;border:1.5px solid #ef9a9a;font-weight:700;" onclick="dismissCompoundAlert('${l.id}')">❌ ບໍ່ທົບ</button>
     </div>
@@ -4436,10 +4528,10 @@ async function saveManualLoan() {
     id_card: idCard || null, doc_type: docType, doc_image: null,
     occupation: workplace || null, income: null,
     address: address || null, note: note || '',
-    amount, duration: dur, total_due: totalDue,
+    amount, duration: dur, total_due: totalDue - paidAmt,
     status, paid_amount: paidAmt,
     created_at: createdAt,
-    original_principal: amount, remaining_principal: amount,
+    original_principal: amount, remaining_principal: amount - paidAmt,
     interest_paid: 0, daily_payment: dailyPay,
   };
   try {
