@@ -540,8 +540,8 @@
               <tr>
                 <th>ວັນທີ</th>
                 <th>ລາຍການ</th>
-                <th style="text-align:right;">Deposit</th>
                 <th style="text-align:right;">Withdrawal</th>
+                <th style="text-align:right;">Deposit</th>
                 <th style="text-align:right;">Balance</th>
               </tr>
             </thead>
@@ -1891,8 +1891,8 @@ function openLoanModal(id, focus) {
               <tr>
                 <th style="text-align:left;">ວັນທີ</th>
                 <th style="text-align:left;">ລາຍການ</th>
-                <th style="text-align:right;">Deposit</th>
                 <th style="text-align:right;">Withdrawal</th>
+                <th style="text-align:right;">Deposit</th>
                 <th style="text-align:right;">ທຶນຕົ້ນຄ້າງ</th>
               </tr>
             </thead>
@@ -4814,7 +4814,7 @@ function exportStatementExcel() {
     - _d.reduce((s,l) => s+(l.discountApplied||0), 0)                                                       // discountsGiven
     - DB.debtPayments.reduce((s,p) => s+(p.amount||0), 0);                                                  // totalDebtPayments
 
-  const aoa = [['ວັນທີ', 'ລາຍການ', 'Deposit', 'Withdrawal', 'Balance']];
+  const aoa = [['ວັນທີ', 'ລາຍການ', 'Withdrawal', 'Deposit', 'Balance']];
   filtered.forEach(e => aoa.push([e.dateStr, e.label, e.dr || '', e.cr || '', Math.round(e.balance)]));
   aoa.push(['', 'ຍອດຄົງເຫຼືອປັດຈຸບັນ', '', '', Math.round(finalBalance)]);
 
